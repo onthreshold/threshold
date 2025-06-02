@@ -16,6 +16,7 @@ libp2p = { version = "0.54", features = [
     "gossipsub",
     "mdns",
     "quic",
+    "cbor",
 ] }
 futures = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
