@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "experiments/networking"
-]
+, "experiments/taproot"]
 resolver = "2"
 
 [workspace.dependencies]

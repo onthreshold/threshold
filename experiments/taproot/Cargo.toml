@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 bitcoin = {version="0.32.6", features=["rand-std"]}
+frost-secp256k1 = "2.1.0"
+rand = "0.9.1"
