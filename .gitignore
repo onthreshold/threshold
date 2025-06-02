@@ -1,0 +1,60 @@
+# Generated files
+/target/
+/**/target/
+
+# Build artifacts
+**/*.rs.bk
+
+# Dependencies
+**/Cargo.lock
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Byebug history
+.byebug_history
+
+# Rust/Cargo specific
+/target/
+**/target/
+**/*.rs.bk
+Cargo.lock
+*.crate
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.rlib
+*.a
+
+# Coverage
+/coverage/
+
+# Profiling
+*.profdata
+*.gcda
+*.gcno
+*.profraw
+
+# Other
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.rej
+*.sublime-workspace
+*.sublime-project

@@ -1,0 +1,8 @@
+[package]
+name = "networking"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libp2p = "0.55"
+tokio = { version = "1.0", features = ["full"] }
