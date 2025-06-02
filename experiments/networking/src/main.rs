@@ -18,6 +18,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             yamux::Config::default,
         )?
         .with_behaviour(|_| ping::Behaviour::default())?
+        .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
 
     // Tell the swarm to listen on all interfaces and a random, OS-assigned
@@ -36,9 +37,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match swarm.select_next_some().await {
             SwarmEvent::NewListenAddr { address, .. } => println!("Listening on {address:?}"),
             SwarmEvent::Behaviour(event) => println!("{event:?}"),
-            _ => {
-                println!("No event");
-            }
+            _ => {}
         }
     }
 }
