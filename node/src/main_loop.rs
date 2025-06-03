@@ -44,6 +44,13 @@ impl<'a> NodeState<'a> {
             for peer_id in connected_peers {
                 println!("  {}", peer_id);
             }
+        } else if let Some(amount_str) = line.trim().strip_prefix("/spend ") {
+            match amount_str.trim().parse::<u64>() {
+                Ok(amount_sat) => {
+                    self.handle_spend_request(amount_sat);
+                }
+                Err(e) => println!("❌ Invalid amount: {}", e),
+            }
         } else if let Some(hex_msg) = line.strip_prefix("/sign ") {
             self.start_signing_session(hex_msg.trim());
         } else if let Some(stripped) = line.strip_prefix('@') {
@@ -98,6 +105,7 @@ impl<'a> NodeState<'a> {
             .behaviour_mut()
             .gossipsub
             .subscribe(&start_dkg_topic)?;
+        println!("Local peer id: {}", self.peer_id);
 
         loop {
             select! {
@@ -222,7 +230,7 @@ impl<'a> NodeState<'a> {
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                         for (peer_id, _multiaddr) in list {
-                            println!("mDNS discovered a new peer: {peer_id}");
+                            println!("mDNS discovered a new peer: {peer_id} {_multiaddr}");
                             self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                         }
                     },

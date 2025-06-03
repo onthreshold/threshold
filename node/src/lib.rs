@@ -7,8 +7,9 @@ use std::collections::BTreeMap;
 
 pub mod dkg;
 pub mod main_loop;
-pub mod swarm_manager;
 pub mod signing;
+pub mod swarm_manager;
+pub mod wallet;
 
 pub struct NodeState<'a> {
     // DKG
@@ -28,6 +29,8 @@ pub struct NodeState<'a> {
 
     // FROST signing
     pub active_signing: Option<ActiveSigning>,
+    pub wallet: crate::wallet::SimpleWallet,
+    pub pending_spends: std::collections::BTreeMap<u64, crate::wallet::PendingSpend>,
 }
 
 impl<'a> NodeState<'a> {
@@ -53,6 +56,8 @@ impl<'a> NodeState<'a> {
             pubkey_package: None,
             private_key_package: None,
             active_signing: None,
+            wallet: crate::wallet::SimpleWallet::new(),
+            pending_spends: BTreeMap::new(),
         }
     }
 }

@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
+use bitcoin::{self};
 use frost_secp256k1::rand_core::RngCore;
 use frost_secp256k1::{self as frost};
 use hex;
 use libp2p::{PeerId, request_response};
 use rand::seq::SliceRandom;
 
-use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
 use crate::swarm_manager::{PrivateRequest, PrivateResponse};
+use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
 
 impl<'a> NodeState<'a> {
     /// Coordinator entrypoint. Start a threshold signing session across the network.
@@ -30,7 +31,6 @@ impl<'a> NodeState<'a> {
             return;
         }
 
-        // Only allow one active session for simplicity
         if self.active_signing.is_some() {
             println!("❌ A signing session is already active");
             return;
@@ -297,6 +297,23 @@ impl<'a> NodeState<'a> {
                 "🎉 Final FROST signature for session {}: {}",
                 sign_id, sig_hex
             );
+
+            // If this signing session corresponds to a pending spend, finalise the transaction.
+            if let Some(pending) = self.pending_spends.remove(&sign_id) {
+                match Self::frost_signature_to_bitcoin(&group_sig) {
+                    Ok(bitcoin_sig) => {
+                        let mut tx = pending.tx;
+                        let mut witness = bitcoin::witness::Witness::new();
+                        witness.push(bitcoin_sig.as_ref());
+                        if let Some(input) = tx.input.first_mut() {
+                            input.witness = witness;
+                        }
+                        let raw_tx = bitcoin::consensus::encode::serialize(&tx);
+                        println!("📤 Signed transaction (hex): {}", hex::encode(raw_tx));
+                    }
+                    Err(e) => println!("❌ Failed to convert signature: {}", e),
+                }
+            }
             // Reset
             self.active_signing = None;
         }
