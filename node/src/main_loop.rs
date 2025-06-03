@@ -207,6 +207,14 @@ impl<'a> NodeState<'a> {
                         println!("Connection established with peer: {peer_id}");
                         let peer_count = self.swarm.behaviour().gossipsub.all_peers().count();
                         println!("Total connected peers: {}", peer_count);
+                        if peer_count + 1 >= self.max_signers as usize {
+                            let start_message = format!("START_DKG:{}", self.peer_id);
+                            let _ = self
+                                .swarm
+                                .behaviour_mut()
+                                .gossipsub
+                                .publish(start_dkg_topic.clone(), start_message.as_bytes());
+                            }
                     },
                     SwarmEvent::ConnectionClosed { peer_id, .. } => {
                         println!("Connection closed with peer: {peer_id}");

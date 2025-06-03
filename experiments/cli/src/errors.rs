@@ -8,7 +8,7 @@ pub enum KeygenError {
     #[display("Failed to create directory.")]
     DirectoryCreation(String),
 
-    #[display("Failed to encode key.")]
+    #[display("Io error: {}", _0)]
     Io(std::io::Error),
 
     #[display("Failed to encode key.")]
@@ -26,7 +26,7 @@ pub enum KeygenError {
     #[display("Failed to create directory.")]
     KeyFileNotFound(String),
 
-    #[display("Failed to decrypt key.")]
+    #[display("Failed to Serialize config. {}", _0)]
     JsonError(serde_json::Error),
 
     #[display("Failed to reconstruct keypair from protobuf.")]

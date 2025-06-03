@@ -110,32 +110,8 @@ enum Commands {
     /// Run the node and connect to the network
     Run {
         #[arg(short, long)]
-        file_path: Option<String>,
+        config: Option<String>,
     },
-}
-
-#[tokio::main]
-async fn main() -> Result<(), CliError> {
-    let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Setup {
-            output,
-            allowed_peers,
-        } => {
-            setup_config(output, allowed_peers).map_err(|e| {
-                println!("Keygen Error: {}", e);
-                CliError::KeygenError(e)
-            })?;
-        }
-        Commands::Run { file_path } => {
-            start_node(file_path)
-                .await
-                .map_err(|_| CliError::NodeError)?;
-        }
-    };
-
-    Ok(())
 }
 
 fn setup_config(
@@ -166,7 +142,10 @@ fn setup_config(
     let key_file_path = if let Some(output) = output {
         let path = PathBuf::from(output);
         if path.is_dir() {
-            path.join("config.json")
+            return Err(KeygenError::KeyFileNotFound(format!(
+                "The path {} is a directory",
+                path.display().to_string()
+            )));
         } else {
             path
         }
@@ -188,12 +167,18 @@ fn setup_config(
 async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
     let config = match get_config(file_path) {
         Ok(config) => config,
-        Err(e) => handle_key_error_and_exit(e),
+        Err(e) => {
+            println!("Failed to get config: {}", e);
+            handle_key_error_and_exit(e);
+        }
     };
 
     let keypair = match load_and_decrypt_keypair(&config) {
         Ok(kp) => kp,
-        Err(e) => handle_key_error_and_exit(e),
+        Err(e) => {
+            println!("Failed to decrypt key: {}", e);
+            handle_key_error_and_exit(e);
+        }
     };
 
     let max_signers = 5;
@@ -213,6 +198,31 @@ async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error:
 
     let mut node_state = NodeState::new(&mut swarm, allowed_peers, min_signers, max_signers);
     let _ = node_state.main_loop().await;
+
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), CliError> {
+    dotenvy::dotenv().ok();
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::Setup {
+            output,
+            allowed_peers,
+        } => {
+            setup_config(output, allowed_peers).map_err(|e| {
+                println!("Keygen Error: {}", e);
+                CliError::KeygenError(e)
+            })?;
+        }
+        Commands::Run { config } => {
+            start_node(config)
+                .await
+                .map_err(|_| CliError::NodeError)?;
+        }
+    };
 
     Ok(())
 }

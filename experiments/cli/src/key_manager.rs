@@ -92,15 +92,21 @@ fn get_password_from_prompt() -> Result<String, KeygenError> {
 pub fn get_config(file_base_path: Option<String>) -> Result<Config, KeygenError> {
     let key_file_path = get_config_file_path(file_base_path)?;
 
+    println!("Using key file path: {}", key_file_path.display());
     let file_content = fs::read_to_string(&key_file_path).map_err(KeygenError::Io)?;
+    println!("Read config file");
     let config_data: Config =
         serde_json::from_str(&file_content).map_err(KeygenError::JsonError)?;
+    println!("Deserialized config file");
 
     Ok(config_data)
 }
 
 pub fn load_and_decrypt_keypair(config_data: &Config) -> Result<Keypair, KeygenError> {
-    let password = get_password_from_prompt()?;
+    let password = match std::env::var("KEY_PASSWORD") {
+        Ok(pw) => pw,
+        Err(_) => get_password_from_prompt()?,
+    };
 
     let private_key_protobuf = decrypt_private_key(
         &config_data.key_data.encrypted_private_key_b64,
@@ -117,7 +123,7 @@ pub fn load_and_decrypt_keypair(config_data: &Config) -> Result<Keypair, KeygenE
 }
 
 pub fn handle_key_error_and_exit(err: KeygenError) -> ! {
-    eprintln!("Identity key error: {}", err);
+    // eprintln!("Identity key error: {}", err);
     match err {
         KeygenError::KeyFileNotFound(_) => {
             eprintln!("Please ensure 'config.json' exists in the default configuration directory.");
