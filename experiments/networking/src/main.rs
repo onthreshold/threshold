@@ -115,14 +115,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
     swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
-    println!("Enter messages via STDIN:");
-    println!("- For broadcast: just type your message");
-    println!("- For direct message: @<peer_id> <message>");
-    println!("- To list connected peers: /peers");
-    println!(
-        "Network configured with lenient peer requirements to reduce 'insufficient peers' errors"
-    );
-
     loop {
         select! {
             Ok(Some(line)) = stdin.next_line() => {
