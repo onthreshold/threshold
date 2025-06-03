@@ -6,7 +6,7 @@ use hex;
 use libp2p::{PeerId, request_response};
 use rand::seq::SliceRandom;
 
-use crate::node::{ActiveSigning, NodeState, peer_id_to_identifier};
+use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
 use crate::swarm_manager::{PrivateRequest, PrivateResponse};
 
 impl<'a> NodeState<'a> {

@@ -4,6 +4,7 @@ members = [
     "experiments/networking",
     "experiments/taproot",
     "experiments/cli",
+    "node",
 ]
 resolver = "2"
 

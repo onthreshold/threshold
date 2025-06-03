@@ -1,8 +1,5 @@
-mod node;
-mod swarm_manager;
-
-use crate::node::NodeState;
-use swarm_manager::build_swarm;
+use node::swarm_manager::build_swarm;
+use node::NodeState;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

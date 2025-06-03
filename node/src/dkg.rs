@@ -1,5 +1,5 @@
 use crate::{
-    node::{NodeState, peer_id_to_identifier},
+    NodeState, peer_id_to_identifier,
     swarm_manager::{PrivateRequest, PrivateResponse},
 };
 use frost_secp256k1::{

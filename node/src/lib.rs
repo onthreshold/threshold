@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 
 pub mod dkg;
 pub mod main_loop;
+pub mod swarm_manager;
 pub mod signing;
 
 pub struct NodeState<'a> {

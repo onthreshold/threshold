@@ -11,7 +11,7 @@ use libp2p::swarm::SwarmEvent;
 use tokio::io::AsyncBufReadExt;
 use tokio::select;
 
-use crate::node::NodeState;
+use crate::NodeState;
 use crate::swarm_manager::MyBehaviourEvent;
 use crate::swarm_manager::{PingBody, PrivateRequest, PrivateResponse};
 
