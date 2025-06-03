@@ -19,9 +19,9 @@ bs58 = "0.5"
 directories = "6.0.0"
 argon2 = "0.5"
 aes-gcm = "0.10"
-thiserror = "2.0.12"
 base64 = "0.22.1"
 rpassword = "7.2"
+derive_more = { version = "2.0.1", features = ["full"] }
 
 [dev-dependencies]
 tempfile = "3.8"
