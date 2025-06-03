@@ -14,27 +14,16 @@ use argon2::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
-use key_manager::{handle_key_error_and_exit, load_and_decrypt_keypair};
-use libp2p::identity::Keypair;
-use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use key_manager::{handle_key_error_and_exit, load_and_decrypt_keypair, Config, KeyData};
+use libp2p::{identity::Keypair, PeerId};
+use std::{fs, path::PathBuf, str::FromStr};
 
 use node::{swarm_manager::build_swarm, NodeState};
 
-use crate::errors::{CliError, KeygenError};
-#[derive(Serialize, Deserialize)]
-struct EncryptionParams {
-    kdf: String,
-    salt_b64: String,
-    iv_b64: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct KeyData {
-    public_key_b58: String,
-    encrypted_private_key_b64: String,
-    encryption_params: EncryptionParams,
-}
+use crate::{
+    errors::{CliError, KeygenError},
+    key_manager::{get_config, EncryptionParams},
+};
 
 fn get_key_file_path() -> Result<PathBuf, KeygenError> {
     let proj_dirs = ProjectDirs::from("", "", "TheVault").ok_or_else(|| {
@@ -44,7 +33,7 @@ fn get_key_file_path() -> Result<PathBuf, KeygenError> {
     let config_dir = proj_dirs.config_dir();
     fs::create_dir_all(config_dir).map_err(|e| KeygenError::DirectoryCreation(e.to_string()))?;
 
-    Ok(config_dir.join("identity.key"))
+    Ok(config_dir.join("config.json"))
 }
 
 fn generate_key(password: &str, salt: &SaltString) -> Result<Vec<u8>, KeygenError> {
@@ -89,11 +78,9 @@ fn encrypt_private_key(
 }
 
 fn get_password() -> Result<String, KeygenError> {
-    let password =
-        rpassword::prompt_password("Enter password: ").map_err(|e| KeygenError::Io(e))?;
+    let password = rpassword::prompt_password("Enter password: ").map_err(KeygenError::Io)?;
 
-    let confirm =
-        rpassword::prompt_password("Confirm password: ").map_err(|e| KeygenError::Io(e))?;
+    let confirm = rpassword::prompt_password("Confirm password: ").map_err(KeygenError::Io)?;
 
     if password != confirm {
         return Err(KeygenError::PasswordMismatch);
@@ -114,9 +101,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Generate a new keypair and save it to a file set by the --output flag
-    GenerateKey {
+    Setup {
         #[arg(short, long)]
         output: Option<String>,
+        #[arg(short, long)]
+        allowed_peers: Option<Vec<String>>,
     },
     /// Run the node and connect to the network
     Run {
@@ -130,8 +119,11 @@ async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::GenerateKey { output } => {
-            generate_keypair(output).map_err(|e| {
+        Commands::Setup {
+            output,
+            allowed_peers,
+        } => {
+            setup_config(output, allowed_peers).map_err(|e| {
                 println!("Keygen Error: {}", e);
                 CliError::KeygenError(e)
             })?;
@@ -146,7 +138,10 @@ async fn main() -> Result<(), CliError> {
     Ok(())
 }
 
-fn generate_keypair(output: Option<String>) -> Result<(), KeygenError> {
+fn setup_config(
+    output: Option<String>,
+    allowed_peers: Option<Vec<String>>,
+) -> Result<(), KeygenError> {
     let keypair = Keypair::generate_ed25519();
     let public_key_b58 = keypair.public().to_peer_id().to_base58();
 
@@ -160,13 +155,18 @@ fn generate_keypair(output: Option<String>) -> Result<(), KeygenError> {
         encryption_params,
     };
 
-    let json = serde_json::to_string_pretty(&key_data)
-        .map_err(|e| KeygenError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+    let config = Config {
+        allowed_peers: allowed_peers.unwrap_or_default(),
+        key_data,
+    };
+
+    let json = serde_json::to_string_pretty(&config)
+        .map_err(|e| KeygenError::Io(std::io::Error::other(e)))?;
 
     let key_file_path = if let Some(output) = output {
         let path = PathBuf::from(output);
         if path.is_dir() {
-            path.join("identity.key")
+            path.join("config.json")
         } else {
             path
         }
@@ -174,10 +174,10 @@ fn generate_keypair(output: Option<String>) -> Result<(), KeygenError> {
         get_key_file_path()?
     };
 
-    fs::write(&key_file_path, json).map_err(|e| KeygenError::Io(e))?;
+    fs::write(&key_file_path, json).map_err(KeygenError::Io)?;
 
     println!(
-        "Key data has been saved to {} with the peer id {}",
+        "Key data has been saved to {} with the peer id {}. To modify the allowed peers, edit the config file.",
         key_file_path.display(),
         public_key_b58
     );
@@ -186,7 +186,12 @@ fn generate_keypair(output: Option<String>) -> Result<(), KeygenError> {
 }
 
 async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
-    let keypair = match load_and_decrypt_keypair(file_path) {
+    let config = match get_config(file_path) {
+        Ok(config) => config,
+        Err(e) => handle_key_error_and_exit(e),
+    };
+
+    let keypair = match load_and_decrypt_keypair(&config) {
         Ok(kp) => kp,
         Err(e) => handle_key_error_and_exit(e),
     };
@@ -197,11 +202,16 @@ async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error:
     let mut swarm = build_swarm(keypair).map_err(|node_err: node::swarm_manager::NodeError| {
         let err_msg = format!("Failed to build swarm: {}", node_err.message);
         println!("{}", err_msg);
-        Box::new(std::io::Error::new(std::io::ErrorKind::Other, err_msg))
-            as Box<dyn std::error::Error>
+        Box::new(std::io::Error::other(err_msg)) as Box<dyn std::error::Error>
     })?;
 
-    let mut node_state = NodeState::new(&mut swarm, min_signers, max_signers);
+    let allowed_peers = config
+        .allowed_peers
+        .iter()
+        .map(|peer_id| PeerId::from_str(peer_id).unwrap())
+        .collect();
+
+    let mut node_state = NodeState::new(&mut swarm, allowed_peers, min_signers, max_signers);
     let _ = node_state.main_loop().await;
 
     Ok(())

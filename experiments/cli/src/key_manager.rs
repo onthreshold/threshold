@@ -11,24 +11,30 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, process};
 
 #[derive(Serialize, Deserialize)]
-struct EncryptionParams {
-    kdf: String,
-    salt_b64: String,
-    iv_b64: String,
+pub struct EncryptionParams {
+    pub kdf: String,
+    pub salt_b64: String,
+    pub iv_b64: String,
 }
 
 #[derive(Serialize, Deserialize)]
-struct KeyData {
-    public_key_b58: String,
-    encrypted_private_key_b64: String,
-    encryption_params: EncryptionParams,
+pub struct Config {
+    pub allowed_peers: Vec<String>,
+    pub key_data: KeyData,
 }
 
-pub fn get_key_file_path(file_path_option: Option<String>) -> Result<PathBuf, KeygenError> {
+#[derive(Serialize, Deserialize)]
+pub struct KeyData {
+    pub public_key_b58: String,
+    pub encrypted_private_key_b64: String,
+    pub encryption_params: EncryptionParams,
+}
+
+pub fn get_config_file_path(file_path_option: Option<String>) -> Result<PathBuf, KeygenError> {
     if let Some(file_path_str) = file_path_option {
         let mut path = PathBuf::from(file_path_str);
         if path.is_dir() {
-            path.push("identity.key");
+            path.push("config.json");
         }
         println!("Using key file path: {}", path.display());
         Ok(path)
@@ -37,7 +43,7 @@ pub fn get_key_file_path(file_path_option: Option<String>) -> Result<PathBuf, Ke
             KeygenError::DirectoryCreation("Failed to determine project directory".into())
         })?;
         let config_dir = proj_dirs.config_dir();
-        Ok(config_dir.join("identity.key"))
+        Ok(config_dir.join("config.json"))
     }
 }
 
@@ -80,29 +86,26 @@ fn decrypt_private_key(
 }
 
 fn get_password_from_prompt() -> Result<String, KeygenError> {
-    rpassword::prompt_password("Enter password to decrypt identity key: ")
-        .map_err(|e| KeygenError::Io(e))
+    rpassword::prompt_password("Enter password to decrypt identity key: ").map_err(KeygenError::Io)
 }
 
-pub fn load_and_decrypt_keypair(file_base_path: Option<String>) -> Result<Keypair, KeygenError> {
-    let key_file_path = get_key_file_path(file_base_path)?;
-
-    if !key_file_path.exists() {
-        return Err(KeygenError::KeyFileNotFound(
-            key_file_path.display().to_string(),
-        ));
-    }
+pub fn get_config(file_base_path: Option<String>) -> Result<Config, KeygenError> {
+    let key_file_path = get_config_file_path(file_base_path)?;
 
     let file_content = fs::read_to_string(&key_file_path).map_err(KeygenError::Io)?;
-    let key_data: KeyData =
-        serde_json::from_str(&file_content).map_err(|e| KeygenError::JsonError(e))?;
+    let config_data: Config =
+        serde_json::from_str(&file_content).map_err(KeygenError::JsonError)?;
 
+    Ok(config_data)
+}
+
+pub fn load_and_decrypt_keypair(config_data: &Config) -> Result<Keypair, KeygenError> {
     let password = get_password_from_prompt()?;
 
     let private_key_protobuf = decrypt_private_key(
-        &key_data.encrypted_private_key_b64,
+        &config_data.key_data.encrypted_private_key_b64,
         &password,
-        &key_data.encryption_params,
+        &config_data.key_data.encryption_params,
     )?;
 
     Keypair::from_protobuf_encoding(&private_key_protobuf).map_err(|e| {
@@ -117,9 +120,7 @@ pub fn handle_key_error_and_exit(err: KeygenError) -> ! {
     eprintln!("Identity key error: {}", err);
     match err {
         KeygenError::KeyFileNotFound(_) => {
-            eprintln!(
-                "Please ensure 'identity.key' exists in the default configuration directory."
-            );
+            eprintln!("Please ensure 'config.json' exists in the default configuration directory.");
             eprintln!("You can generate one using `vault generate-key --file-path <path>`).");
         }
         KeygenError::Decryption(_) | KeygenError::PasswordMismatch => {

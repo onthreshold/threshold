@@ -44,11 +44,11 @@ fn generate_test_keypair(output_path: Option<PathBuf>, password: &str) -> Result
     };
 
     let json = serde_json::to_string_pretty(&key_data)
-        .map_err(|e| KeygenError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| KeygenError::Io(std::io::Error::other(e)))?;
 
     let key_file_path = if let Some(path) = output_path {
         if path.is_dir() {
-            path.join("identity.key")
+            path.join("config.json")
         } else {
             path
         }
@@ -56,7 +56,7 @@ fn generate_test_keypair(output_path: Option<PathBuf>, password: &str) -> Result
         get_key_file_path()?
     };
 
-    fs::write(&key_file_path, json)?;
+    fs::write(&key_file_path, json).map_err(KeygenError::Io)?;
     Ok(())
 }
 
@@ -94,7 +94,7 @@ fn test_decryption_with_wrong_password() {
 #[test]
 fn test_key_file_operations() {
     let temp_dir = tempdir().unwrap();
-    let output_path = temp_dir.path().join("test_identity.key");
+    let output_path = temp_dir.path().join("test_config.json");
 
     // Test key generation and file writing
     let result = generate_test_keypair(Some(output_path.clone()), "test_password123");
@@ -113,7 +113,7 @@ fn test_key_file_operations() {
 fn test_invalid_directory() {
     // Test with a non-existent directory
     let result = generate_test_keypair(
-        Some(PathBuf::from("/nonexistent/path/identity.key")),
+        Some(PathBuf::from("/nonexistent/path/config.json")),
         "test_password123",
     );
     assert_matches!(result, Err(KeygenError::Io(_)));
