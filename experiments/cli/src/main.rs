@@ -1,5 +1,7 @@
 mod errors;
 mod key_manager;
+mod server;
+
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Key, Nonce,
@@ -24,6 +26,8 @@ use crate::{
     errors::{CliError, KeygenError},
     key_manager::{get_config, EncryptionParams},
 };
+
+use crate::server::run_server;
 
 fn get_key_file_path() -> Result<PathBuf, KeygenError> {
     let proj_dirs = ProjectDirs::from("", "", "TheVault").ok_or_else(|| {
@@ -111,7 +115,33 @@ enum Commands {
     Run {
         #[arg(short, long)]
         config: Option<String>,
+        #[arg(short, long)]
+        port: Option<u16>,
     },
+}
+
+#[tokio::main]
+async fn main() -> Result<(), CliError> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::Setup {
+            output,
+            allowed_peers,
+        } => {
+            setup_config(output, allowed_peers).map_err(|e| {
+                println!("Keygen Error: {}", e);
+                CliError::KeygenError(e)
+            })?;
+        }
+        Commands::Run { config , port } => {
+            start_node(config, port)
+                .await
+                .map_err(|_| CliError::NodeError)?;
+        }
+    };
+
+    Ok(())
 }
 
 fn setup_config(
@@ -164,7 +194,7 @@ fn setup_config(
     Ok(())
 }
 
-async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+async fn start_node(file_path: Option<String>, port: Option<u16>) -> Result<(), Box<dyn std::error::Error>> {
     let config = match get_config(file_path) {
         Ok(config) => config,
         Err(e) => {
@@ -180,6 +210,13 @@ async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error:
             handle_key_error_and_exit(e);
         }
     };
+
+    let server_port = port.unwrap_or(50051);
+    tokio::spawn(async move {
+        if let Err(e) = create_node_server(Some(server_port)).await {
+            eprintln!("gRPC server failed: {}", e);
+        }
+    });
 
     let max_signers = 5;
     let min_signers = 3;
@@ -217,14 +254,18 @@ async fn main() -> Result<(), CliError> {
                 CliError::KeygenError(e)
             })?;
         }
-        Commands::Run { config } => {
-            start_node(config)
+        Commands::Run { config, port } => {
+            start_node(config, port)
                 .await
                 .map_err(|_| CliError::NodeError)?;
         }
     };
 
     Ok(())
+}
+
+async fn create_node_server(port: Option<u16>) -> Result<(), Box<dyn std::error::Error>> {
+    run_server(port.unwrap_or(50051)).await
 }
 
 #[cfg(test)]
