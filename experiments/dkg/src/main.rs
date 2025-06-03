@@ -1,7 +1,7 @@
 mod node;
 mod swarm_manager;
 
-use node::NodeState;
+use crate::node::NodeState;
 use swarm_manager::build_swarm;
 
 #[tokio::main]
