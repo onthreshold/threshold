@@ -5,11 +5,11 @@ use std::{
 };
 
 use frost_secp256k1::keys::dkg::round2;
-use libp2p::{identity::Keypair, request_response::cbor};
 use libp2p::{
     StreamProtocol, Swarm, gossipsub, mdns, noise, request_response, swarm::NetworkBehaviour, tcp,
     yamux,
 };
+use libp2p::{identity::Keypair, request_response::cbor};
 use tokio::io;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
