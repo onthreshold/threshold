@@ -5,7 +5,7 @@ use std::{
 };
 
 use frost_secp256k1::keys::dkg::round2;
-use libp2p::request_response::cbor;
+use libp2p::{identity::Keypair, request_response::cbor};
 use libp2p::{
     StreamProtocol, Swarm, gossipsub, mdns, noise, request_response, swarm::NetworkBehaviour, tcp,
     yamux,
@@ -51,8 +51,8 @@ pub struct NodeError {
     pub message: String,
 }
 
-pub fn build_swarm() -> Result<Swarm<MyBehaviour>, NodeError> {
-    let mut swarm = libp2p::SwarmBuilder::with_new_identity()
+pub fn build_swarm(keypair: Keypair) -> Result<Swarm<MyBehaviour>, NodeError> {
+    let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
         .with_tcp(
             tcp::Config::default(),

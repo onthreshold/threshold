@@ -1,3 +1,5 @@
+mod key_manager;
+
 use libp2p::identity::Keypair;
 use argon2::{
     password_hash::{
@@ -15,6 +17,9 @@ use std::{fs, path::PathBuf};
 use directories::ProjectDirs;
 use clap::{Parser, Subcommand};
 use thiserror::Error;
+use key_manager::{load_and_decrypt_keypair, handle_key_error_and_exit};
+
+use node::{swarm_manager::build_swarm, NodeState};
 
 #[derive(Error, Debug)]
 pub enum KeygenError {
@@ -121,19 +126,28 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Generate a new keypair and save it to a file defined by the --output flag
-    Generate {
+    /// Generate a new keypair and save it to a file set by the --output flag
+    GenerateKey {
         #[arg(short, long)]
         output: Option<String>,
     },
+    /// Run the node and connect to the network
+    Run {
+        #[arg(short, long)]
+        file_path: Option<String>,
+    },
 }
-
-fn main() -> Result<(), KeygenError> {
+        
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Generate { output } => {
+        Commands::GenerateKey { output } => {
             generate_keypair(output)?;
+        }
+        Commands::Run { file_path} => {
+            start_node(file_path).await?;
         }
     }
     
@@ -142,8 +156,7 @@ fn main() -> Result<(), KeygenError> {
 
 fn generate_keypair(output: Option<String>) -> Result<(), KeygenError> {
     let keypair = Keypair::generate_ed25519();
-    let public_key = keypair.public().encode_protobuf();
-    let public_key_b58 = bs58::encode(public_key).into_string();
+    let public_key_b58 = keypair.public().to_peer_id().to_base58();
 
     let user_password = get_password()?;
     
@@ -172,8 +185,32 @@ fn generate_keypair(output: Option<String>) -> Result<(), KeygenError> {
     fs::write(&key_file_path, json)?;
 
     println!("Key data has been saved to {} with the peer id {}", key_file_path.display(), public_key_b58);
+    
     Ok(())
 }
+
+async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    let keypair = match load_and_decrypt_keypair(file_path) {
+        Ok(kp) => kp,
+        Err(e) => handle_key_error_and_exit(e),
+    };
+
+    let max_signers = 5;
+    let min_signers = 3;
+
+    let mut swarm = build_swarm(keypair)
+        .map_err(|node_err: node::swarm_manager::NodeError| {
+            let err_msg = format!("Failed to build swarm: {}", node_err.message);
+            println!("{}", err_msg);
+            Box::new(std::io::Error::new(std::io::ErrorKind::Other, err_msg)) as Box<dyn std::error::Error>
+        })?;
+
+    let mut node_state = NodeState::new(&mut swarm, min_signers, max_signers);
+    let _ = node_state.main_loop().await;
+
+    Ok(())
+}
+
 
 #[cfg(test)]
 mod tests;
