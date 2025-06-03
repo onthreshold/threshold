@@ -4,22 +4,24 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "keygen"
+name = "vault"
 path = "src/main.rs"
 
 [dependencies]
+tokio = { workspace = true, features = ["full"] }
+node = { path = "../../node" }
 libp2p = { workspace = true, features = ["ed25519"] }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 clap = { version = "4.4", features = ["derive"] }
-thiserror = "2.0.12"
-base64 = "0.21"
-rpassword = "7.2"
 bs58 = "0.5"
-directories = "5.0"
+directories = "6.0.0"
 argon2 = "0.5"
 aes-gcm = "0.10"
+thiserror = "2.0.12"
+base64 = "0.22.1"
+rpassword = "7.2"
 
 [dev-dependencies]
 tempfile = "3.8"
