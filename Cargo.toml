@@ -3,6 +3,7 @@ members = [
     "experiments/dkg",
     "experiments/networking",
     "experiments/taproot",
+    "experiments/cli",
 ]
 resolver = "2"
 
