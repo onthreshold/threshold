@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 bitcoin = { workspace = true, features=["rand-std"]}
 frost-secp256k1 = { workspace = true } 
+hex = { workspace = true }

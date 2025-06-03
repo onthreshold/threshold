@@ -297,6 +297,8 @@ impl FrostTaprootWallet {
             .create_sighash(&tx, utxo)
             .map_err(|e| format!("Failed to create sighash: {}", e))?;
 
+        println!("Sighash: {}", hex::encode(sighash));
+
         // 3. FROST Round 1: Generate nonces and commitments
         let (nonces_map, commitments_map) = self
             .frost_round_1(&signing_participants)

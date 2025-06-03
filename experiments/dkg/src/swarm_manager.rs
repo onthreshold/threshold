@@ -5,12 +5,12 @@ use std::{
 };
 
 use frost_secp256k1::keys::dkg::round2;
-use tokio::io;
 use libp2p::request_response::cbor;
 use libp2p::{
     StreamProtocol, Swarm, gossipsub, mdns, noise, request_response, swarm::NetworkBehaviour, tcp,
     yamux,
 };
+use tokio::io;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PingBody {
@@ -21,11 +21,21 @@ pub struct PingBody {
 pub enum PrivateRequest {
     Ping(PingBody),
     Round2Package(round2::Package),
+    SignRequest { sign_id: u64, message: Vec<u8> },
+    SignPackage { sign_id: u64, package: Vec<u8> },
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum PrivateResponse {
     Pong,
+    Commitments {
+        sign_id: u64,
+        commitments: Vec<u8>,
+    },
+    SignatureShare {
+        sign_id: u64,
+        signature_share: Vec<u8>,
+    },
 }
 
 #[derive(NetworkBehaviour)]
@@ -40,7 +50,6 @@ pub struct MyBehaviour {
 pub struct NodeError {
     pub message: String,
 }
-
 
 pub fn build_swarm() -> Result<Swarm<MyBehaviour>, NodeError> {
     let mut swarm = libp2p::SwarmBuilder::with_new_identity()
@@ -103,14 +112,25 @@ pub fn build_swarm() -> Result<Swarm<MyBehaviour>, NodeError> {
         .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
 
+    swarm
+        .listen_on(
+            "/ip4/0.0.0.0/udp/0/quic-v1"
+                .parse()
+                .expect("Failed to deserialize message"),
+        )
+        .map_err(|e| NodeError {
+            message: format!("Failed to listen on quic {}", e),
+        })?;
 
-    swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse().expect("Failed to deserialize message")).map_err(|e| NodeError {
-        message: format!("Failed to listen on quic {}", e),
-    })?;
-
-    swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse().expect("Failed to deserialize message")).map_err(|e| NodeError {
-        message: format!("Failed to listen on tcp {}", e),
-    })?;
+    swarm
+        .listen_on(
+            "/ip4/0.0.0.0/tcp/0"
+                .parse()
+                .expect("Failed to deserialize message"),
+        )
+        .map_err(|e| NodeError {
+            message: format!("Failed to listen on tcp {}", e),
+        })?;
 
     Ok(swarm)
 }

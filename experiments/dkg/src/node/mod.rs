@@ -1,13 +1,13 @@
-use std::collections::BTreeMap;
-use libp2p::PeerId;
 use frost_secp256k1::{
-    self as frost,
+    self as frost, Identifier,
     keys::dkg::{round1, round2},
-    Identifier,
 };
+use libp2p::PeerId;
+use std::collections::BTreeMap;
 
-pub mod main_loop;
 pub mod dkg;
+pub mod main_loop;
+pub mod signing;
 
 pub struct NodeState<'a> {
     // DKG
@@ -24,6 +24,9 @@ pub struct NodeState<'a> {
 
     pub pubkey_package: Option<frost::keys::PublicKeyPackage>,
     pub private_key_package: Option<frost::keys::KeyPackage>,
+
+    // FROST signing
+    pub active_signing: Option<ActiveSigning>,
 }
 
 impl<'a> NodeState<'a> {
@@ -48,6 +51,7 @@ impl<'a> NodeState<'a> {
             rng: frost::rand_core::OsRng,
             pubkey_package: None,
             private_key_package: None,
+            active_signing: None,
         }
     }
 }
@@ -55,4 +59,16 @@ impl<'a> NodeState<'a> {
 pub fn peer_id_to_identifier(peer_id: &PeerId) -> Identifier {
     let bytes = peer_id.to_bytes();
     Identifier::derive(&bytes).unwrap()
+}
+
+// Active signing session tracking
+pub struct ActiveSigning {
+    pub sign_id: u64,
+    pub message: Vec<u8>,
+    pub selected_peers: Vec<PeerId>,
+    pub nonces: frost::round1::SigningNonces,
+    pub commitments: BTreeMap<Identifier, frost::round1::SigningCommitments>,
+    pub signature_shares: BTreeMap<Identifier, frost::round2::SignatureShare>,
+    pub signing_package: Option<frost::SigningPackage>,
+    pub is_coordinator: bool,
 }

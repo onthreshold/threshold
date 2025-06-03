@@ -1,4 +1,6 @@
 use futures::StreamExt;
+use libp2p::PeerId;
+use libp2p::gossipsub::IdentTopic;
 use libp2p::mdns;
 use tokio::io;
 
@@ -14,6 +16,70 @@ use crate::swarm_manager::MyBehaviourEvent;
 use crate::swarm_manager::{PingBody, PrivateRequest, PrivateResponse};
 
 impl<'a> NodeState<'a> {
+    pub fn handle_input(&mut self, line: String, round1_topic: &IdentTopic) {
+        if line.trim() == "/dkg" {
+            // Create start-dkg topic
+            let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
+
+            // Send a message to start DKG
+            let start_message = format!("START_DKG:{}", self.peer_id);
+            let _ = self
+                .swarm
+                .behaviour_mut()
+                .gossipsub
+                .publish(start_dkg_topic.clone(), start_message.as_bytes());
+
+            self.handle_dkg_start(round1_topic);
+
+            println!("Sent DKG start signal");
+        } else if line.trim() == "/peers" {
+            let connected_peers: Vec<_> = self
+                .swarm
+                .behaviour()
+                .gossipsub
+                .all_peers()
+                .map(|(peer_id, _)| peer_id)
+                .collect();
+            println!("Connected peers ({}):", connected_peers.len());
+            for peer_id in connected_peers {
+                println!("  {}", peer_id);
+            }
+        } else if let Some(hex_msg) = line.strip_prefix("/sign ") {
+            self.start_signing_session(hex_msg.trim());
+        } else if let Some(stripped) = line.strip_prefix('@') {
+            let parts: Vec<&str> = stripped.splitn(2, ' ').collect();
+            if parts.len() == 2 {
+                let peer_id_str = parts[0];
+                let message_content = parts[1];
+
+                match peer_id_str.parse::<PeerId>() {
+                    Ok(target_peer_id) => {
+                        let direct_message = format!("From {}: {}", self.peer_id, message_content);
+
+                        let request_id = self.swarm.behaviour_mut().request_response.send_request(
+                            &target_peer_id,
+                            PrivateRequest::Ping(PingBody {
+                                message: direct_message.clone(),
+                            }),
+                        );
+
+                        println!(
+                            "Sending direct message to {}: {}",
+                            target_peer_id, message_content
+                        );
+                        println!("Request ID: {:?}", request_id);
+                    }
+                    Err(e) => {
+                        println!("Invalid peer ID format: {}", e);
+                        println!("Usage: @<peer_id> <message>");
+                    }
+                }
+            } else {
+                println!("Usage: @<peer_id> <message>");
+            }
+        }
+    }
+
     pub async fn main_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Read full lines from stdin
         let mut stdin = io::BufReader::new(io::stdin()).lines();
@@ -92,6 +158,42 @@ impl<'a> NodeState<'a> {
                         }
                     )) => {
                         self.handle_round2_payload(peer, package, channel);
+                    },
+                    // Incoming SignRequest
+                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                        request_response::Event::Message {
+                            peer,
+                            message: request_response::Message::Request { request: PrivateRequest::SignRequest { sign_id, message }, channel, .. }
+                        }
+                    )) => {
+                        self.handle_sign_request(peer, sign_id, message, channel);
+                    },
+                    // Incoming SignPackage request to generate signature share
+                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                        request_response::Event::Message {
+                            peer,
+                            message: request_response::Message::Request { request: PrivateRequest::SignPackage { sign_id, package }, channel, .. }
+                        }
+                    )) => {
+                        self.handle_sign_package(peer, sign_id, package, channel);
+                    },
+                    // Responses with commitments
+                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                        request_response::Event::Message {
+                            peer,
+                            message: request_response::Message::Response { response: PrivateResponse::Commitments { sign_id, commitments }, .. }
+                        }
+                    )) => {
+                        self.handle_commitments_response(peer, sign_id, commitments);
+                    },
+                    // Responses with signature share
+                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                        request_response::Event::Message {
+                            peer,
+                            message: request_response::Message::Response { response: PrivateResponse::SignatureShare { sign_id, signature_share }, .. }
+                        }
+                    )) => {
+                        self.handle_signature_share(peer, sign_id, signature_share);
                     },
                     SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                         println!("Connection established with peer: {peer_id}");

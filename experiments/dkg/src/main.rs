@@ -6,9 +6,8 @@ use swarm_manager::build_swarm;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let max_signers = 3;
-    let min_signers = 2;
-
+    let max_signers = 5;
+    let min_signers = 3;
 
     let mut swarm = build_swarm()
         .map_err(|e| println!("Failed to build swarm {}", e.message))
