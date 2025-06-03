@@ -230,14 +230,18 @@ impl<'a> NodeState<'a> {
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                         for (peer_id, _multiaddr) in list {
-                            println!("mDNS discovered a new peer: {peer_id} {_multiaddr}");
-                            self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                            if self.allowed_peers.contains(&peer_id) {
+                                println!("mDNS discovered a new peer: {peer_id}");
+                                self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                            }
                         }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                         for (peer_id, _multiaddr) in list {
-                            println!("mDNS discover peer has expired: {peer_id}");
-                            self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                            if self.allowed_peers.contains(&peer_id) {
+                                println!("mDNS discover peer has expired: {peer_id}");
+                                self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                            }
                         }
                     },
                     _ => {

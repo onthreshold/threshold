@@ -12,6 +12,8 @@ pub mod swarm_manager;
 pub mod wallet;
 
 pub struct NodeState<'a> {
+    pub allowed_peers: Vec<PeerId>,
+
     // DKG
     pub r1_secret_package: Option<round1::SecretPackage>,
     pub peer_id: PeerId,
@@ -36,6 +38,7 @@ pub struct NodeState<'a> {
 impl<'a> NodeState<'a> {
     pub fn new(
         swarm: &'a mut libp2p::swarm::Swarm<crate::swarm_manager::MyBehaviour>,
+        allowed_peers: Vec<PeerId>,
         min_signers: u16,
         max_signers: u16,
     ) -> Self {
@@ -43,6 +46,7 @@ impl<'a> NodeState<'a> {
         let peer_id = *swarm.local_peer_id();
 
         NodeState {
+            allowed_peers,
             r1_secret_package: None,
             r2_secret_package: None,
             peer_id,
