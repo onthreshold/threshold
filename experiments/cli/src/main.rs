@@ -1,5 +1,7 @@
 mod errors;
 mod key_manager;
+mod server;
+
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Key, Nonce,
@@ -24,6 +26,8 @@ use crate::{
     errors::{CliError, KeygenError},
     key_manager::{get_config, EncryptionParams},
 };
+
+use crate::server::run_server;
 
 fn get_key_file_path() -> Result<PathBuf, KeygenError> {
     let proj_dirs = ProjectDirs::from("", "", "TheVault").ok_or_else(|| {
@@ -111,6 +115,8 @@ enum Commands {
     Run {
         #[arg(short, long)]
         file_path: Option<String>,
+        #[arg(short, long)]
+        port: Option<u16>,
     },
 }
 
@@ -128,8 +134,8 @@ async fn main() -> Result<(), CliError> {
                 CliError::KeygenError(e)
             })?;
         }
-        Commands::Run { file_path } => {
-            start_node(file_path)
+        Commands::Run { file_path, port } => {
+            start_node(file_path, port)
                 .await
                 .map_err(|_| CliError::NodeError)?;
         }
@@ -185,7 +191,7 @@ fn setup_config(
     Ok(())
 }
 
-async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+async fn start_node(file_path: Option<String>, port: Option<u16>) -> Result<(), Box<dyn std::error::Error>> {
     let config = match get_config(file_path) {
         Ok(config) => config,
         Err(e) => handle_key_error_and_exit(e),
@@ -195,6 +201,13 @@ async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error:
         Ok(kp) => kp,
         Err(e) => handle_key_error_and_exit(e),
     };
+
+    let server_port = port.unwrap_or(50051);
+    tokio::spawn(async move {
+        if let Err(e) = create_node_server(Some(server_port)).await {
+            eprintln!("gRPC server failed: {}", e);
+        }
+    });
 
     let max_signers = 5;
     let min_signers = 3;
@@ -215,6 +228,10 @@ async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error:
     let _ = node_state.main_loop().await;
 
     Ok(())
+}
+
+async fn create_node_server(port: Option<u16>) -> Result<(), Box<dyn std::error::Error>> {
+    run_server(port.unwrap_or(50051)).await
 }
 
 #[cfg(test)]
