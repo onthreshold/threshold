@@ -253,23 +253,22 @@ async fn start_node(
 
     let allowed_peers = config.allowed_peers;
 
-    let node_state = NodeState::new_from_config(
+    let mut node_state = NodeState::new_from_config(
         keypair,
         allowed_peers,
         min_signers,
         max_signers,
         config_file_path,
     );
-    let node_state = Arc::new(Mutex::new(node_state));
 
-    let grpc_node_state = Arc::clone(&node_state);
+    let network_handle = node_state.network_handle.clone();
 
     let grpc_handle = tokio::spawn(async move {
-        let addr = format!("[::1]:{}", grpc_port.unwrap_or(50051))
+        let addr = format!("0.0.0.0:{}", grpc_port.unwrap_or(50051))
             .parse()
             .unwrap();
 
-        let node_control_service = NodeControlService::new(grpc_node_state);
+        let node_control_service = NodeControlService::new(network_handle);
 
         println!("gRPC server listening on {}", addr);
 
@@ -281,8 +280,7 @@ async fn start_node(
     });
 
     let main_loop_handle = tokio::spawn(async move {
-        let mut node_state_guard = node_state.lock().await;
-        node_state_guard.main_loop().await
+        node_state.main_loop().await
     });
 
     // Wait for either task to complete (they should run indefinitely)

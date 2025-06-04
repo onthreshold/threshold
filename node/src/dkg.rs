@@ -39,13 +39,13 @@ impl NodeState {
         // Broadcast START_DKG message to the network,
         let start_message = format!("START_DKG:{}", self.peer_id);
         let _ = self
-            .swarm
+            .swarm.inner
             .behaviour_mut()
             .gossipsub
             .publish(self.start_dkg_topic.clone(), start_message.as_bytes());
 
         let _ = self
-            .swarm
+            .swarm.inner
             .behaviour_mut()
             .gossipsub
             .publish(self.round1_topic.clone(), round1_package_bytes);
@@ -92,7 +92,7 @@ impl NodeState {
                             let request = PrivateRequest::Round2Package(package_to_send.clone());
 
                             let _ = self
-                                .swarm
+                                .swarm.inner
                                 .behaviour_mut()
                                 .request_response
                                 .send_request(peer_to_send_to, request);
@@ -125,7 +125,7 @@ impl NodeState {
             .insert(peer_id_to_identifier(&sender_peer_id), package);
 
         let _ = self
-            .swarm
+            .swarm.inner
             .behaviour_mut()
             .request_response
             .send_response(response_channel, PrivateResponse::Pong);

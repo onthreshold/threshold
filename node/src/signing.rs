@@ -85,6 +85,7 @@ impl NodeState {
             };
             let _id = self
                 .swarm
+                .inner
                 .behaviour_mut()
                 .request_response
                 .send_request(peer, req);
@@ -105,13 +106,18 @@ impl NodeState {
         channel: request_response::ResponseChannel<PrivateResponse>,
     ) {
         if self.private_key_package.is_none() {
-            let _ = self.swarm.behaviour_mut().request_response.send_response(
-                channel,
-                PrivateResponse::Commitments {
-                    sign_id,
-                    commitments: Vec::new(),
-                },
-            );
+            let _ = self
+                .swarm
+                .inner
+                .behaviour_mut()
+                .request_response
+                .send_response(
+                    channel,
+                    PrivateResponse::Commitments {
+                        sign_id,
+                        commitments: Vec::new(),
+                    },
+                );
             return;
         }
 
@@ -141,6 +147,7 @@ impl NodeState {
         };
         let _ = self
             .swarm
+            .inner
             .behaviour_mut()
             .request_response
             .send_response(channel, resp);
@@ -197,6 +204,7 @@ impl NodeState {
                 };
                 let _ = self
                     .swarm
+                    .inner
                     .behaviour_mut()
                     .request_response
                     .send_request(peer, req);
@@ -253,6 +261,7 @@ impl NodeState {
         };
         let _ = self
             .swarm
+            .inner
             .behaviour_mut()
             .request_response
             .send_response(channel, resp);
