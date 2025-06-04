@@ -62,15 +62,18 @@ impl NodeState {
                             .request_response
                             .send_response(channel, response);
                     }
-                    Some(NetworkMessage::SendSelfRequest(request)) => {
+                    Some(NetworkMessage::SendSelfRequest{ request, response_channel }) => {
                             match request {
                                 PrivateRequest::StartSigningSession { hex_message } => {
                                     self.start_signing_session(&hex_message);
                                 },
                                 PrivateRequest::Spend { amount_sat } => {
-                                    self.handle_spend_request(amount_sat);
+                                    let response = self.start_spend_request(amount_sat);
+                                    response_channel.send(PrivateResponse::SpendRequestSent { sighash: response.unwrap_or("No sighash".to_string()) }).unwrap();
                                 }
-                                _ => {}
+                                _ => {
+                                    response_channel.send(PrivateResponse::Pong).unwrap();
+                                }
                             }
                     }
                     _ => {}
@@ -197,7 +200,7 @@ impl NodeState {
                     )) => {
                         println!("Spend request from peer: {}", self.peer_name(&peer));
                         if peer == self.peer_id {
-                            self.handle_spend_request(amount_sat);
+                            self.start_spend_request(amount_sat);
 
                             let _ = self
                                 .swarm.inner

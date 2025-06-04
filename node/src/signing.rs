@@ -1,11 +1,10 @@
+use rand::seq::SliceRandom;
 use std::collections::BTreeMap;
 
-use bitcoin::{self};
 use frost_secp256k1::rand_core::RngCore;
 use frost_secp256k1::{self as frost};
 use hex;
 use libp2p::{PeerId, request_response};
-use rand::seq::SliceRandom;
 
 use crate::swarm_manager::{PrivateRequest, PrivateResponse};
 use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
@@ -13,27 +12,28 @@ use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
 impl NodeState {
     /// Coordinator entrypoint. Start a threshold signing session across the network.
     /// `message_hex` must be hex-encoded 32-byte sighash.
-    pub fn start_signing_session(&mut self, message_hex: &str) {
+    /// returns the sign_id which is the signature session
+    pub fn start_signing_session(&mut self, message_hex: &str) -> Option<u64> {
         if self.private_key_package.is_none() || self.pubkey_package.is_none() {
             println!("❌ DKG not completed – cannot start signing");
-            return;
+            return None;
         }
 
         let Ok(message) = hex::decode(message_hex.trim()) else {
             println!("❌ Invalid hex message");
-            return;
+            return None;
         };
         if message.len() != 32 {
             println!(
                 "❌ Message must be 32-byte (sighash) – got {} bytes",
                 message.len()
             );
-            return;
+            return None;
         }
 
         if self.active_signing.is_some() {
             println!("❌ A signing session is already active");
-            return;
+            return None;
         }
 
         let sign_id = self.rng.next_u64();
@@ -43,7 +43,7 @@ impl NodeState {
         let required = (self.min_signers - 1) as usize;
         if self.peers.len() < required {
             println!("❌ Not enough peers – need at least {} others", required);
-            return;
+            return None;
         }
         // Randomly shuffle peers and pick required number
         let mut rng_rand = rand::rng();
@@ -91,10 +91,7 @@ impl NodeState {
                 .send_request(peer, req);
         }
 
-        println!(
-            "🚀 Started signing session {} with {} participants",
-            sign_id, self.min_signers
-        );
+        Some(sign_id)
     }
 
     /// Handle incoming SignRequest (participant side)

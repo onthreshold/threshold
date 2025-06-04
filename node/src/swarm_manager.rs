@@ -29,9 +29,7 @@ pub enum PrivateRequest {
     SignPackage { sign_id: u64, package: Vec<u8> },
 
     StartSigningSession { hex_message: String },
-    Spend {
-        amount_sat: u64,
-    },
+    Spend { amount_sat: u64 },
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -44,6 +42,13 @@ pub enum PrivateResponse {
     SignatureShare {
         sign_id: u64,
         signature_share: Vec<u8>,
+    },
+
+    StartSigningSession {
+        sign_id: u64,
+    },
+    SpendRequestSent {
+        sighash: String,
     },
 }
 
@@ -68,7 +73,10 @@ pub enum NetworkMessage {
     SendPrivateRequest(PeerId, PrivateRequest),
     SendPrivateResponse(ResponseChannel<PrivateResponse>, PrivateResponse),
 
-    SendSelfRequest(PrivateRequest),
+    SendSelfRequest {
+        request: PrivateRequest,
+        response_channel: mpsc::UnboundedSender<PrivateResponse>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -97,10 +105,16 @@ impl NetworkHandle {
         self.tx.send(network_message).unwrap();
     }
 
-    pub fn send_self_request(&self, request: PrivateRequest) {
-        println!("Sending self request");
-        let network_message = NetworkMessage::SendSelfRequest(request);
+    pub async fn send_self_request(&self, request: PrivateRequest) -> Option<PrivateResponse> {
+        let (tx, mut rx) = unbounded_channel::<PrivateResponse>();
+        let network_message = NetworkMessage::SendSelfRequest {
+            request,
+            response_channel: tx,
+        };
         self.tx.send(network_message).unwrap();
+
+        let response = rx.recv().await;
+        response
     }
 }
 

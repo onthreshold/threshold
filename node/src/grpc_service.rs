@@ -2,7 +2,7 @@ use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use tonic::{Request, Response, Status};
 
-use crate::swarm_manager::{NetworkHandle, PingBody, PrivateRequest};
+use crate::swarm_manager::{NetworkHandle, PingBody, PrivateRequest, PrivateResponse};
 
 // Include the generated proto code
 pub mod node_proto {
@@ -57,13 +57,19 @@ impl NodeControl for NodeControlService {
         let amount_sat = request.into_inner().amount_satoshis;
 
         println!("Received request to spend {} satoshis", amount_sat);
-        self.network
-            .send_self_request(PrivateRequest::Spend { amount_sat });
+        let response = self
+            .network
+            .send_self_request(PrivateRequest::Spend { amount_sat })
+            .await;
+
+        let Some(PrivateResponse::SpendRequestSent { sighash }) = response else {
+            return Err(Status::internal("Invalid response from node"));
+        };
 
         Ok(Response::new(SpendFundsResponse {
             success: true,
             message: format!("Spending {} satoshis", amount_sat),
-            transaction_id: String::new(), // Will be filled when transaction is created
+            sighash: sighash.to_string(),
         }))
     }
 
@@ -77,12 +83,16 @@ impl NodeControl for NodeControlService {
             hex_message: hex_msg.clone(),
         };
 
-        self.network.send_self_request(network_request);
+        let response = self.network.send_self_request(network_request).await;
+
+        let Some(PrivateResponse::StartSigningSession { sign_id }) = response else {
+            return Err(Status::internal(format!("Invalid response from node {:?}", response)));
+        };
 
         Ok(Response::new(StartSigningResponse {
             success: true,
             message: "Signing session started".to_string(),
-            sign_id: 0,
+            sign_id,
         }))
     }
 

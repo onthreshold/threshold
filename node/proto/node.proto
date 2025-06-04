@@ -31,7 +31,7 @@ message SpendFundsRequest {
 message SpendFundsResponse {
     bool success = 1;
     string message = 2;
-    string transaction_id = 3;
+    string sighash = 3;
 }
 
 message StartSigningRequest {
