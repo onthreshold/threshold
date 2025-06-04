@@ -7,10 +7,9 @@ use frost_secp256k1::{
     keys::dkg::{round1, round2},
 };
 use libp2p::PeerId;
-use libp2p::gossipsub::IdentTopic;
 
 impl NodeState {
-    pub fn handle_dkg_start(&mut self, round1_topic: &IdentTopic) {
+    pub fn handle_dkg_start(&mut self) {
         // Run the DKG initialization code
         let participant_identifier = peer_id_to_identifier(&self.peer_id);
 
@@ -28,17 +27,25 @@ impl NodeState {
             .serialize()
             .expect("Failed to serialize round1 package");
 
+        // Broadcast START_DKG message to the network,
+        let start_message = format!("START_DKG:{}", self.peer_id);
         let _ = self
             .swarm
             .behaviour_mut()
             .gossipsub
-            .publish(round1_topic.clone(), round1_package_bytes);
+            .publish(self.start_dkg_topic.clone(), start_message.as_bytes());
+
+        let _ = self
+            .swarm
+            .behaviour_mut()
+            .gossipsub
+            .publish(self.round1_topic.clone(), round1_package_bytes);
 
         self.try_enter_round2();
 
         println!(
-            "Generated and published round1 package in response to DKG start signal {}",
-            self.peer_id
+            "Generated and published round1 package in response to DKG start signal from {}",
+            self.peer_name(&self.peer_id)
         );
     }
 
@@ -50,7 +57,7 @@ impl NodeState {
 
         println!(
             "Received round1 package from {} {}",
-            sender_peer_id,
+            self.peer_name(&sender_peer_id),
             self.round1_peer_packages.len()
         );
 
@@ -66,7 +73,7 @@ impl NodeState {
                     frost::keys::dkg::part2(r1_secret_package.clone(), &self.round1_peer_packages);
                 match part2_result {
                     Ok((round2_secret_package, round2_packages)) => {
-                        println!("Successfully completed step 1");
+                        println!("-------------------- ENTERING ROUND 2 ---------------------");
                         self.r1_secret_package = None;
                         self.r2_secret_package = Some(round2_secret_package);
                         for peer_to_send_to in self.peers.iter() {
@@ -81,11 +88,11 @@ impl NodeState {
                                 .request_response
                                 .send_request(peer_to_send_to, request);
 
-                            println!("Sent round2 package to {}", peer_to_send_to);
+                            println!("Sent round2 package to {}", self.peer_name(peer_to_send_to));
                         }
                     }
                     Err(e) => {
-                        println!("DKG failed: {}", e);
+                        println!("DKG round2 failed: {}", e);
                     }
                 }
             }
@@ -100,7 +107,7 @@ impl NodeState {
     ) {
         println!(
             "Received round2 package from {} {}",
-            sender_peer_id,
+            self.peer_name(&sender_peer_id),
             self.round1_peer_packages.len()
         );
 

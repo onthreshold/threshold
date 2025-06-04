@@ -34,9 +34,10 @@ pub enum KeygenError {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
+#[allow(dead_code, clippy::enum_variant_names, clippy::large_enum_variant)]
 pub enum CliError {
     KeygenError(KeygenError),
+    RpcError(tonic::Status),
     NodeError,
 }
 

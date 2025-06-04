@@ -5,7 +5,7 @@ use tonic::transport::Server;
 
 use node::{
     NodeState,
-    grpc_service::{NodeControlService, node_proto::node_control_server::NodeControlServer},
+    grpc_service::NodeControlService,
 };
 
 #[tokio::main]

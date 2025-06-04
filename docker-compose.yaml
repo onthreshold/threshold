@@ -3,15 +3,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: vault-node
     environment:
       - KEY_PASSWORD=main
-    entrypoint: "/app/vault run --config /app/main.key"
+    entrypoint: "/app/vault run --config main.key"
+    ports:
+      - "50051:50051"
     volumes:
       - ./keys/main.key:/app/main.key
-    # networks:
-    #   - vaultnet
+    networks:
+      - vaultnet
 
   node2:
+    image: vault-node
     build:
       context: .
       dockerfile: Dockerfile
@@ -20,46 +24,47 @@ services:
     entrypoint: "/app/vault run --config two.key"
     volumes:
       - ./keys/two.key:/app/two.key
-    # networks:
-    #   - vaultnet
+    networks:
+      - vaultnet
 
   node3:
     build:
       context: .
       dockerfile: Dockerfile
+    image: vault-node
     environment:
       - KEY_PASSWORD=three
     entrypoint: "/app/vault run --config three.key"
     volumes:
       - ./keys/three.key:/app/three.key
-    # networks:
-    #   - vaultnet
+    networks:
+      - vaultnet
 
-  node4:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - KEY_PASSWORD=four
-    entrypoint: "/app/vault run --config four.key"
-    volumes:
-      - ./keys/four.key:/app/four.key
-    # networks:
-    #   - vaultnet
+  # node4:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     - KEY_PASSWORD=four
+  #   entrypoint: "/app/vault run --config four.key"
+  #   volumes:
+  #     - ./keys/four.key:/app/four.key
+  #   # networks:
+  #   #   - vaultnet
+  #
+  # node5:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     - KEY_PASSWORD=five
+  #   entrypoint: "/app/vault run --config five.key"
+  #   volumes:
+  #     - ./keys/five.key:/app/five.key
+  #   # networks:
+  #   #   - vaultnet
+  #
 
-  node5:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - KEY_PASSWORD=five
-    entrypoint: "/app/vault run --config five.key"
-    volumes:
-      - ./keys/five.key:/app/five.key
-    # networks:
-    #   - vaultnet
-
-
-# networks:
-#   vaultnet:
-#     driver: bridge
+networks:
+  vaultnet:
+    driver: bridge

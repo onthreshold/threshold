@@ -7,10 +7,6 @@ edition = "2021"
 name = "vault"
 path = "src/main.rs"
 
-[[bin]]
-name = "helloworld-client"
-path = "src/client.rs"
-
 [dependencies]
 tokio = { workspace = true, features = ["full", "macros", "rt-multi-thread"] }
 node = { path = "../../node" }

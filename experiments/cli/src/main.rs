@@ -1,5 +1,6 @@
 mod errors;
 mod key_manager;
+mod rpc_client;
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -16,12 +17,13 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use key_manager::{handle_key_error_and_exit, load_and_decrypt_keypair, Config, KeyData};
-use libp2p::{identity::Keypair, PeerId};
-use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
+use libp2p::identity::Keypair;
+use rpc_client::rpc_spend;
+use std::{fs, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 use tonic::transport::Server;
 
-use node::{grpc_service::NodeControlService, NodeState};
+use node::{grpc_service::NodeControlService, NodeState, PeerData};
 
 use crate::{
     errors::{CliError, KeygenError},
@@ -115,11 +117,17 @@ enum Commands {
         #[arg(short, long)]
         config: Option<String>,
         #[arg(short, long)]
-        port: Option<u16>,
+        grpc_port: Option<u16>,
+    },
+    Spend {
+        amount: u64,
+        #[arg(short, long)]
+        endpoint: Option<String>,
     },
 }
 
 #[tokio::main]
+#[allow(clippy::result_large_err)]
 async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
 
@@ -133,10 +141,15 @@ async fn main() -> Result<(), CliError> {
                 CliError::KeygenError(e)
             })?;
         }
-        Commands::Run { config , .. } => {
-            start_node(config)
+        Commands::Run { config, grpc_port } => {
+            start_node(config, grpc_port)
                 .await
                 .map_err(|_| CliError::NodeError)?;
+        }
+        Commands::Spend { amount, endpoint } => {
+            rpc_spend(endpoint, amount)
+                .await
+                .map_err(CliError::RpcError)?;
         }
     };
 
@@ -159,8 +172,19 @@ fn setup_config(
         encrypted_private_key_b64: encrypted_private_key,
         encryption_params,
     };
+
+    let allowed_peer_ids = allowed_peers.unwrap_or_default();
+
+    let allowed_peer_data = allowed_peer_ids
+        .iter()
+        .map(|peer_id| PeerData {
+            public_key: peer_id.to_string(),
+            name: peer_id.to_string(),
+        })
+        .collect();
+
     let config = Config {
-        allowed_peers: allowed_peers.unwrap_or_default(),
+        allowed_peers: allowed_peer_data,
         key_data,
     };
 
@@ -172,7 +196,7 @@ fn setup_config(
         if path.is_dir() {
             return Err(KeygenError::KeyFileNotFound(format!(
                 "The path {} is a directory",
-                path.display().to_string()
+                path.display()
             )));
         } else {
             path
@@ -192,7 +216,10 @@ fn setup_config(
     Ok(())
 }
 
-async fn start_node(config_filepath: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+async fn start_node(
+    config_filepath: Option<String>,
+    grpc_port: Option<u16>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let config = match get_config(config_filepath) {
         Ok(config) => config,
         Err(e) => {
@@ -209,14 +236,10 @@ async fn start_node(config_filepath: Option<String>) -> Result<(), Box<dyn std::
         }
     };
 
-    let max_signers = 5;
-    let min_signers = 3;
+    let max_signers = 3;
+    let min_signers = 2;
 
-    let allowed_peers = config
-        .allowed_peers
-        .iter()
-        .map(|peer_id| PeerId::from_str(peer_id).unwrap())
-        .collect();
+    let allowed_peers = config.allowed_peers;
 
     let node_state = NodeState::new(keypair, allowed_peers, min_signers, max_signers);
     let node_state = Arc::new(Mutex::new(node_state));
@@ -224,7 +247,9 @@ async fn start_node(config_filepath: Option<String>) -> Result<(), Box<dyn std::
     let grpc_node_state = Arc::clone(&node_state);
 
     let grpc_handle = tokio::spawn(async move {
-        let addr = "[::1]:50051".parse().unwrap();
+        let addr = format!("[::1]:{}", grpc_port.unwrap_or(50051))
+            .parse()
+            .unwrap();
 
         let node_control_service = NodeControlService::new(grpc_node_state);
 

@@ -57,8 +57,7 @@ impl NodeControl for NodeControlService {
         }
 
         // Handle DKG start locally
-        let round1_topic = IdentTopic::new("round1_topic");
-        node_state.handle_dkg_start(&round1_topic);
+        node_state.handle_dkg_start();
 
         Ok(Response::new(StartDkgResponse {
             success: true,

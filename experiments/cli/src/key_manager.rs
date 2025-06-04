@@ -9,6 +9,7 @@ use directories::ProjectDirs;
 use libp2p::identity::Keypair;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, process};
+use node::PeerData;
 
 #[derive(Serialize, Deserialize)]
 pub struct EncryptionParams {
@@ -19,7 +20,7 @@ pub struct EncryptionParams {
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
-    pub allowed_peers: Vec<String>,
+    pub allowed_peers: Vec<PeerData>,
     pub key_data: KeyData,
 }
 

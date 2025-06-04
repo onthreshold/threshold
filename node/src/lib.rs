@@ -2,8 +2,9 @@ use frost_secp256k1::{
     self as frost, Identifier,
     keys::dkg::{round1, round2},
 };
-use libp2p::{PeerId, identity::Keypair};
-use std::collections::BTreeMap;
+use libp2p::{PeerId, gossipsub, identity::Keypair};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashSet};
 
 use crate::swarm_manager::build_swarm;
 
@@ -16,10 +17,20 @@ pub mod wallet;
 
 pub mod errors;
 
+#[derive(Serialize, Deserialize, PartialEq)]
+pub struct PeerData {
+    pub name: String,
+    pub public_key: String,
+}
+
 pub struct NodeState {
     pub allowed_peers: Vec<PeerId>,
+    pub peers_to_names: BTreeMap<PeerId, String>,
 
     // DKG
+    pub dkg_listeners: HashSet<PeerId>,
+    pub start_dkg_topic: libp2p::gossipsub::IdentTopic,
+    pub round1_topic: libp2p::gossipsub::IdentTopic,
     pub r1_secret_package: Option<round1::SecretPackage>,
     pub peer_id: PeerId,
     pub round1_peer_packages: BTreeMap<Identifier, round1::Package>,
@@ -42,9 +53,16 @@ pub struct NodeState {
 }
 
 impl NodeState {
+    pub fn peer_name(&self, peer_id: &PeerId) -> String {
+        self.peers_to_names
+            .get(peer_id)
+            .unwrap_or(&peer_id.to_string())
+            .clone()
+    }
+
     pub fn new(
         keypair: Keypair,
-        allowed_peers: Vec<PeerId>,
+        peer_data: Vec<PeerData>,
         min_signers: u16,
         max_signers: u16,
     ) -> Self {
@@ -52,8 +70,22 @@ impl NodeState {
         let swarm = build_swarm(keypair.clone()).expect("Failed to build swarm");
         let peer_id = *swarm.local_peer_id();
 
+        let allowed_peers: Vec<PeerId> = peer_data
+            .iter()
+            .map(|peer| peer.public_key.parse().unwrap())
+            .collect();
+
+        let peers_to_names: BTreeMap<PeerId, String> = peer_data
+            .iter()
+            .map(|peer| (peer.public_key.parse().unwrap(), peer.name.clone()))
+            .collect();
+
         NodeState {
             allowed_peers,
+            peers_to_names,
+            dkg_listeners: HashSet::new(),
+            round1_topic: gossipsub::IdentTopic::new("round1_topic"),
+            start_dkg_topic: gossipsub::IdentTopic::new("start-dkg"),
             r1_secret_package: None,
             r2_secret_package: None,
             keypair,

@@ -1,6 +1,5 @@
 use futures::StreamExt;
 use libp2p::PeerId;
-use libp2p::gossipsub::IdentTopic;
 use libp2p::mdns;
 use tokio::io;
 
@@ -17,7 +16,7 @@ use crate::swarm_manager::MyBehaviourEvent;
 use crate::swarm_manager::{PingBody, PrivateRequest, PrivateResponse};
 
 impl NodeState {
-    pub fn handle_input(&mut self, line: String, round1_topic: &IdentTopic) {
+    pub fn handle_input(&mut self, line: String) {
         if line.trim() == "/dkg" {
             // Create start-dkg topic
             let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
@@ -30,7 +29,7 @@ impl NodeState {
                 .gossipsub
                 .publish(start_dkg_topic.clone(), start_message.as_bytes());
 
-            self.handle_dkg_start(round1_topic);
+            self.handle_dkg_start();
 
             println!("Sent DKG start signal");
         } else if line.trim() == "/peers" {
@@ -114,7 +113,7 @@ impl NodeState {
         loop {
             select! {
                 Ok(Some(line)) = stdin.next_line() => {
-                    self.handle_input(line, &round1_topic);
+                    self.handle_input(line);
                 }
                 event = self.swarm.select_next_some() => match event {
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
@@ -123,6 +122,7 @@ impl NodeState {
                     })) => {
                         match message.topic {
                             t if t == round1_topic.hash() => {
+                                println!("Received round1 payload from {}", self.peer_name(&message.source.unwrap()));
                                 let data = frost::keys::dkg::round1::Package::deserialize(&message.data)
                                     .expect("Failed to deserialize round1 package");
                                 if let Some(source_peer) = message.source {
@@ -130,37 +130,12 @@ impl NodeState {
                                 }
                             }
                             t if t == start_dkg_topic.hash() => {
-                                self.handle_dkg_start(&round1_topic);
+                                self.handle_dkg_start();
                             }
                             _ => {
                                 println!("Received unhandled broadcast");
                             }
                         }
-                    },
-                    // Handle direct message requests (incoming)
-                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
-                        request_response::Event::Message {
-                            peer,
-                            message: request_response::Message::Request { request: PrivateRequest::Ping(PingBody { message }), channel, .. }
-                        }
-                    )) => {
-                        println!("💬 Direct message from {}: '{}'", peer, message);
-
-                        // Send acknowledgment
-                        let _response = self
-                            .swarm
-                            .behaviour_mut()
-                            .request_response
-                            .send_response(channel, PrivateResponse::Pong);
-                    },
-                    // Handle direct message responses (outgoing message acknowledgments)
-                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
-                        request_response::Event::Message {
-                            peer,
-                            message: request_response::Message::Response { response: PrivateResponse::Pong, .. }
-                        }
-                    )) => {
-                        println!("✅ Message delivered to {}", peer);
                     },
                     // Handle direct message requests (incoming)
                     SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
@@ -207,43 +182,24 @@ impl NodeState {
                     )) => {
                         self.handle_signature_share(peer, sign_id, signature_share);
                     },
-                    SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                        println!("Connection established with peer: {peer_id}");
-                        let peer_count = self.swarm.behaviour().gossipsub.all_peers().count();
-                        println!("Total connected peers: {}", peer_count);
-                        if peer_count + 1 >= self.max_signers as usize {
-                            let start_message = format!("START_DKG:{}", self.peer_id);
-                            let _ = self
-                                .swarm
-                                .behaviour_mut()
-                                .gossipsub
-                                .publish(start_dkg_topic.clone(), start_message.as_bytes());
-                            }
-                    },
                     SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                        println!("Connection closed with peer: {peer_id}");
                         let peer_count = self.swarm.behaviour().gossipsub.all_peers().count();
-                        println!("Total connected peers: {}", peer_count);
+                        let peer_name = self.peer_name(&peer_id);
+                        println!("Connection closed with peer: {peer_name}, peers: {peer_count}");
                     },
-                    SwarmEvent::NewListenAddr { address, .. } => {
-                        println!("Local node is listening on {address}");
-                    }
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
                         peer_id,
                         topic,
                     })) => {
-                        println!("Peer {peer_id} subscribed to topic {topic}");
-                    },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Unsubscribed {
-                        peer_id,
-                        topic,
-                    })) => {
-                        println!("Peer {peer_id} unsubscribed from topic {topic}");
+                        if topic == start_dkg_topic.hash() {
+                            self.dkg_listeners.insert(peer_id);
+                            println!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_listeners.len());
+                            self.handle_dkg_start();
+                        }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                         for (peer_id, _multiaddr) in list {
                             if self.allowed_peers.contains(&peer_id) {
-                                println!("mDNS discovered a new peer: {peer_id}");
                                 self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                             }
                         }
@@ -251,13 +207,12 @@ impl NodeState {
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                         for (peer_id, _multiaddr) in list {
                             if self.allowed_peers.contains(&peer_id) {
-                                println!("mDNS discover peer has expired: {peer_id}");
                                 self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                             }
                         }
                     },
                     _ => {
-                        println!("Swarm event: {event:?}");
+                        // println!("Swarm event: {event:?}");
                     }
                 }
             }
