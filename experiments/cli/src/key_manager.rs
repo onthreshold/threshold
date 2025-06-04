@@ -7,29 +7,8 @@ use argon2::{password_hash::SaltString, Argon2};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use directories::ProjectDirs;
 use libp2p::identity::Keypair;
-use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, process};
-use node::PeerData;
-
-#[derive(Serialize, Deserialize)]
-pub struct EncryptionParams {
-    pub kdf: String,
-    pub salt_b64: String,
-    pub iv_b64: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Config {
-    pub allowed_peers: Vec<PeerData>,
-    pub key_data: KeyData,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct KeyData {
-    pub public_key_b58: String,
-    pub encrypted_private_key_b64: String,
-    pub encryption_params: EncryptionParams,
-}
+use node::{Config, EncryptionParams};
 
 pub fn get_config_file_path(file_path_option: Option<String>) -> Result<PathBuf, KeygenError> {
     if let Some(file_path_str) = file_path_option {
@@ -96,8 +75,10 @@ pub fn get_config(file_base_path: Option<String>) -> Result<Config, KeygenError>
     println!("Using key file path: {}", key_file_path.display());
     let file_content = fs::read_to_string(&key_file_path).map_err(KeygenError::Io)?;
     println!("Read config file");
-    let config_data: Config =
+    let mut config_data: Config =
         serde_json::from_str(&file_content).map_err(KeygenError::JsonError)?;
+    // Remove dkg_keys field when loading from CLI
+    config_data.dkg_keys = None;
     println!("Deserialized config file");
 
     Ok(config_data)

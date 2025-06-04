@@ -16,19 +16,18 @@ use argon2::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
-use key_manager::{handle_key_error_and_exit, load_and_decrypt_keypair, Config, KeyData};
+use key_manager::{get_config, handle_key_error_and_exit, load_and_decrypt_keypair};
 use libp2p::identity::Keypair;
 use rpc_client::rpc_spend;
 use std::{fs, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 use tonic::transport::Server;
 
-use node::{grpc_service::NodeControlService, NodeState, PeerData};
-
-use crate::{
-    errors::{CliError, KeygenError},
-    key_manager::{get_config, EncryptionParams},
+use node::{
+    grpc_service::NodeControlService, Config, EncryptionParams, KeyData, NodeState, PeerData,
 };
+
+use crate::errors::{CliError, KeygenError};
 
 fn get_key_file_path() -> Result<PathBuf, KeygenError> {
     let proj_dirs = ProjectDirs::from("", "", "TheVault").ok_or_else(|| {
@@ -186,6 +185,7 @@ fn setup_config(
     let config = Config {
         allowed_peers: allowed_peer_data,
         key_data,
+        dkg_keys: None,
     };
 
     let json = serde_json::to_string_pretty(&config)
@@ -220,6 +220,18 @@ async fn start_node(
     config_filepath: Option<String>,
     grpc_port: Option<u16>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let config_file_path = if let Some(path) = config_filepath.clone() {
+        path
+    } else {
+        match get_key_file_path() {
+            Ok(path) => path.to_string_lossy().to_string(),
+            Err(e) => {
+                eprintln!("Failed to get config file path: {}", e);
+                std::process::exit(1);
+            }
+        }
+    };
+
     let config = match get_config(config_filepath) {
         Ok(config) => config,
         Err(e) => {
@@ -241,7 +253,13 @@ async fn start_node(
 
     let allowed_peers = config.allowed_peers;
 
-    let node_state = NodeState::new(keypair, allowed_peers, min_signers, max_signers);
+    let node_state = NodeState::new_from_config(
+        keypair,
+        allowed_peers,
+        min_signers,
+        max_signers,
+        config_file_path,
+    );
     let node_state = Arc::new(Mutex::new(node_state));
 
     let grpc_node_state = Arc::clone(&node_state);
