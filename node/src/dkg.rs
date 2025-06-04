@@ -18,7 +18,15 @@ impl NodeState {
             }
             return;
         }
-        
+
+        if self.dkg_listeners.len() + 1 != self.max_signers as usize {
+            println!(
+                "Not all listeners have subscribed to the DKG topic, not starting DKG process. Listeners: {:?}",
+                self.dkg_listeners.len()
+            );
+            return;
+        }
+
         // Run the DKG initialization code
         let participant_identifier = peer_id_to_identifier(&self.peer_id);
 
@@ -39,13 +47,15 @@ impl NodeState {
         // Broadcast START_DKG message to the network,
         let start_message = format!("START_DKG:{}", self.peer_id);
         let _ = self
-            .swarm.inner
+            .swarm
+            .inner
             .behaviour_mut()
             .gossipsub
             .publish(self.start_dkg_topic.clone(), start_message.as_bytes());
 
         let _ = self
-            .swarm.inner
+            .swarm
+            .inner
             .behaviour_mut()
             .gossipsub
             .publish(self.round1_topic.clone(), round1_package_bytes);
@@ -59,15 +69,19 @@ impl NodeState {
     }
 
     pub fn handle_round1_payload(&mut self, sender_peer_id: PeerId, package: round1::Package) {
-        self.peers.push(sender_peer_id);
-        // add package to peer packages
-        self.round1_peer_packages
-            .insert(peer_id_to_identifier(&sender_peer_id), package);
+        if !self.peers.contains(&sender_peer_id) {
+            self.peers.push(sender_peer_id);
+        }
+
+        let identifier = peer_id_to_identifier(&sender_peer_id);
+        // Add package to peer packages
+        self.round1_peer_packages.insert(identifier, package);
 
         println!(
-            "Received round1 package from {} {}",
+            "Received round1 package from {} ({}/{})",
             self.peer_name(&sender_peer_id),
-            self.round1_peer_packages.len()
+            self.round1_peer_packages.len(),
+            self.max_signers - 1
         );
 
         self.try_enter_round2();
@@ -92,7 +106,8 @@ impl NodeState {
                             let request = PrivateRequest::Round2Package(package_to_send.clone());
 
                             let _ = self
-                                .swarm.inner
+                                .swarm
+                                .inner
                                 .behaviour_mut()
                                 .request_response
                                 .send_request(peer_to_send_to, request);
@@ -114,18 +129,37 @@ impl NodeState {
         package: round2::Package,
         response_channel: libp2p::request_response::ResponseChannel<PrivateResponse>,
     ) {
+        let identifier = peer_id_to_identifier(&sender_peer_id);
+
+        // Skip duplicate packages
+        if self.round2_peer_packages.contains_key(&identifier) {
+            println!(
+                "Duplicate round2 package from {} – already recorded",
+                self.peer_name(&sender_peer_id)
+            );
+            let _ = self
+                .swarm
+                .inner
+                .behaviour_mut()
+                .request_response
+                .send_response(response_channel, PrivateResponse::Pong);
+            return;
+        }
+
+        // Add package to peer packages
+        self.round2_peer_packages.insert(identifier, package);
+
         println!(
-            "Received round2 package from {} {}",
+            "Received round2 package from {} ({}/{})",
             self.peer_name(&sender_peer_id),
-            self.round1_peer_packages.len()
+            self.round2_peer_packages.len(),
+            self.max_signers - 1
         );
 
-        // add package to peer packages
-        self.round2_peer_packages
-            .insert(peer_id_to_identifier(&sender_peer_id), package);
-
+        // Ack the received package
         let _ = self
-            .swarm.inner
+            .swarm
+            .inner
             .behaviour_mut()
             .request_response
             .send_response(response_channel, PrivateResponse::Pong);
@@ -142,14 +176,14 @@ impl NodeState {
                 match part3_result {
                     Ok((private_key_package, pubkey_package)) => {
                         println!(
-                            "!!!!!!! Public key: {:?}!!!!",
+                            "🎉 DKG finished successfully. Public key: {:?}",
                             pubkey_package.verifying_key()
                         );
 
                         self.private_key_package = Some(private_key_package);
                         self.pubkey_package = Some(pubkey_package);
-                        
-                        // Save DKG keys to config file
+
+                        // Persist DKG keys
                         if let Err(e) = self.save_dkg_keys() {
                             println!("Failed to save DKG keys: {}", e);
                         } else {
@@ -157,10 +191,21 @@ impl NodeState {
                         }
                     }
                     Err(e) => {
-                        println!("DKG failed: {}", e);
+                        println!("DKG failed during part3 aggregation: {}", e);
+                        // Reset state so that a fresh DKG can be attempted again later
+                        self.reset_dkg_state();
                     }
                 }
             }
         }
+    }
+
+    /// Reset DKG state after a failed run so that a new DKG round can be initiated.
+    fn reset_dkg_state(&mut self) {
+        self.r1_secret_package = None;
+        self.r2_secret_package = None;
+        self.round1_peer_packages.clear();
+        self.round2_peer_packages.clear();
+        self.peers.clear();
     }
 }

@@ -248,8 +248,8 @@ async fn start_node(
         }
     };
 
-    let max_signers = 3;
-    let min_signers = 2;
+    let max_signers = 5;
+    let min_signers = 3;
 
     let allowed_peers = config.allowed_peers;
 
@@ -279,9 +279,7 @@ async fn start_node(
             .expect("gRPC server failed");
     });
 
-    let main_loop_handle = tokio::spawn(async move {
-        node_state.main_loop().await
-    });
+    let main_loop_handle = tokio::spawn(async move { node_state.main_loop().await });
 
     // Wait for either task to complete (they should run indefinitely)
     tokio::select! {
