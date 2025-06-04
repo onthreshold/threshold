@@ -3,7 +3,9 @@ use frost_secp256k1::{
     keys::dkg::{round1, round2},
 };
 use libp2p::{PeerId, gossipsub, identity::Keypair};
+use swarm_manager::NetworkHandle;
 use serde::{Deserialize, Serialize};
+use swarm_manager::MyBehaviour;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -72,7 +74,7 @@ pub struct NodeState {
     pub round1_peer_packages: BTreeMap<Identifier, round1::Package>,
     pub round2_peer_packages: BTreeMap<Identifier, round2::Package>,
     pub peers: Vec<PeerId>,
-    pub swarm: libp2p::swarm::Swarm<crate::swarm_manager::MyBehaviour>,
+    pub swarm: libp2p::Swarm<MyBehaviour>,
     pub keypair: Keypair,
     pub min_signers: u16,
     pub max_signers: u16,
@@ -89,6 +91,9 @@ pub struct NodeState {
     
     // Config management
     pub config_file: String,
+
+
+    pub network_handle: NetworkHandle,
 }
 
 fn derive_key_from_password(password: &str, salt_str: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
@@ -280,8 +285,8 @@ impl NodeState {
         config_file: String,
     ) -> Self {
         // Node State
-        let swarm = build_swarm(keypair.clone()).expect("Failed to build swarm");
-        let peer_id = *swarm.local_peer_id();
+        let (network_handle, swarm) = build_swarm(keypair.clone()).expect("Failed to build swarm");
+        let peer_id = *swarm.inner.local_peer_id();
 
         let allowed_peers: Vec<PeerId> = peer_data
             .iter()
@@ -294,6 +299,7 @@ impl NodeState {
             .collect();
 
         let mut node_state = NodeState {
+            network_handle,
             allowed_peers,
             peers_to_names,
             dkg_listeners: HashSet::new(),
@@ -305,7 +311,7 @@ impl NodeState {
             peer_id,
             round1_peer_packages: BTreeMap::new(),
             round2_peer_packages: BTreeMap::new(),
-            swarm,
+            swarm: swarm.inner,
             min_signers,
             max_signers,
             peers: Vec::new(),

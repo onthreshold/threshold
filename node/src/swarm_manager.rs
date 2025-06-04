@@ -1,3 +1,4 @@
+use libp2p::PeerId;
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
@@ -10,7 +11,10 @@ use libp2p::{
     yamux,
 };
 use libp2p::{identity::Keypair, request_response::cbor};
-use tokio::io;
+use tokio::{
+    io,
+    sync::mpsc::{self, unbounded_channel},
+};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PingBody {
@@ -51,7 +55,23 @@ pub struct NodeError {
     pub message: String,
 }
 
-pub fn build_swarm(keypair: Keypair) -> Result<Swarm<MyBehaviour>, NodeError> {
+pub enum NetworkMessage {
+    SendBroadcast(Vec<u8>),
+    SendPrivateRequest(PeerId, PrivateRequest),
+    SendPrivateResponse(PeerId, PrivateResponse),
+}
+
+pub struct NetworkHandle {
+    rx: mpsc::UnboundedSender<NetworkMessage>,
+}
+
+pub struct SwarmManager {
+    pub inner: Swarm<MyBehaviour>,
+
+    outgoing_tx: mpsc::UnboundedReceiver<NetworkMessage>,
+}
+
+pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), NodeError> {
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
         .with_tcp(
@@ -132,5 +152,15 @@ pub fn build_swarm(keypair: Keypair) -> Result<Swarm<MyBehaviour>, NodeError> {
             message: format!("Failed to listen on tcp {}", e),
         })?;
 
-    Ok(swarm)
+    let (incoming_rx, outgoing_tx) = unbounded_channel::<NetworkMessage>();
+
+    let network = NetworkHandle { rx: incoming_rx.clone() };
+
+    Ok((
+        network,
+        SwarmManager {
+            inner: swarm,
+            outgoing_tx,
+        },
+    ))
 }
