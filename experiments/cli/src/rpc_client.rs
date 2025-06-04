@@ -20,6 +20,8 @@ pub async fn rpc_spend(
         }))
         .await?;
 
+    println!("Spent {:?} satoshis", spendfunds_response);
+
     Ok(spendfunds_response.into_inner())
 }
 
