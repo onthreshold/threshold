@@ -68,6 +68,10 @@ impl NodeState {
                                     let response = self.start_spend_request(amount_sat);
                                     response_channel.send(PrivateResponse::SpendRequestSent { sighash: response.unwrap_or("No sighash".to_string()) }).unwrap();
                                 }
+                                PrivateRequest::GetFrostPublicKey => {
+                                    let response = self.get_frost_public_key();
+                                    response_channel.send(PrivateResponse::GetFrostPublicKey { public_key: response.unwrap_or("No public key".to_string()) }).unwrap();
+                                }
                                 _ => {}
                             }
                     }
