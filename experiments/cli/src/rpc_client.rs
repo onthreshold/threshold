@@ -1,5 +1,5 @@
 use node::grpc_service::node_proto::{
-    self, node_control_client::NodeControlClient, SpendFundsResponse, StartSigningResponse, SendDirectMessageResponse
+    self, node_control_client::NodeControlClient, CreateDepositIntentResponse, SpendFundsResponse, StartSigningResponse, SendDirectMessageResponse
 };
 use tonic::Status;
 
@@ -67,3 +67,24 @@ pub async fn rpc_send_direct_message(
     Ok(send_direct_message_response.into_inner())
 }
 
+pub async fn rpc_create_deposit_intent(
+    endpoint: Option<String>,
+    peer_id: String,
+    amount: u64,
+) -> Result<CreateDepositIntentResponse, Status> {
+    println!("Creating deposit intent for user {}: {}", peer_id, amount);
+
+    let mut client =
+        NodeControlClient::connect(endpoint.unwrap_or("http://[::1]:50051".to_string()))
+               .await
+            .expect("Failed to connect");
+
+    let create_deposit_intent_response = client
+        .create_deposit_intent(tonic::Request::new(node_proto::CreateDepositIntentRequest {
+            user_id: peer_id,
+            amount_satoshis: amount,
+        }))
+        .await?;
+
+    Ok(create_deposit_intent_response.into_inner())
+}

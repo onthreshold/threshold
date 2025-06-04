@@ -15,6 +15,9 @@ service NodeControl {
     
     // Send a direct message to a peer
     rpc SendDirectMessage(SendDirectMessageRequest) returns (SendDirectMessageResponse);
+
+    // Create a deposit intent
+    rpc CreateDepositIntent(CreateDepositIntentRequest) returns (CreateDepositIntentResponse);
 }
 
 message StartDkgRequest {}
@@ -32,6 +35,18 @@ message SpendFundsResponse {
     bool success = 1;
     string message = 2;
     string sighash = 3;
+}
+
+message CreateDepositIntentRequest {
+    string user_id = 1;
+    uint64 amount_satoshis = 2;
+}
+
+message CreateDepositIntentResponse {
+    bool success = 1;
+    string message = 2;
+    string deposit_tracking_id = 3;
+    string deposit_address = 4;
 }
 
 message StartSigningRequest {
