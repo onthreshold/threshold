@@ -135,18 +135,14 @@ impl NodeControl for NodeControlService {
     ) -> Result<Response<CreateDepositIntentResponse>, Status> {
         let req = request.into_inner();
 
-        let user_id = if req.user_id.parse::<PeerId>().is_ok() {
-            req.user_id
-        } else {
-            return Err(Status::invalid_argument("User ID must be a valid peer ID"));
-        };
+        let user_id = req.user_id.parse::<PeerId>()
+            .map_err(|e| Status::invalid_argument(format!("Invalid peer ID: {}", e)))?;
 
         let amount_sat = if req.amount_satoshis > 0 {
             req.amount_satoshis
         } else {
             return Err(Status::invalid_argument("Amount to deposit must be greater than 0"));
         };
-
 
         let deposit_tracking_id = Uuid::new_v4().to_string();
         

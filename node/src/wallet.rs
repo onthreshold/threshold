@@ -118,7 +118,7 @@ pub struct PendingSpend {
 
 impl NodeState {
     pub fn get_frost_public_key(&self) -> Option<String> {
-        self.pubkey_package.as_ref().map(|p| bs58::encode(p.verifying_key().serialize().unwrap()).into_string())
+        self.pubkey_package.as_ref().map(|p| format!("{:?}", p.verifying_key()).replace("VerifyingKey(", "").replace(")", "").replace("\\", "").replace("\"", ""))
     }
 
     pub fn frost_signature_to_bitcoin(
