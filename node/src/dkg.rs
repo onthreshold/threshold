@@ -10,6 +10,15 @@ use libp2p::PeerId;
 
 impl NodeState {
     pub fn handle_dkg_start(&mut self) {
+        // Check if DKG keys already exist
+        if self.private_key_package.is_some() && self.pubkey_package.is_some() {
+            println!("DKG keys already exist, skipping DKG process");
+            if let Some(pubkey) = &self.pubkey_package {
+                println!("Existing public key: {:?}", pubkey.verifying_key());
+            }
+            return;
+        }
+        
         // Run the DKG initialization code
         let participant_identifier = peer_id_to_identifier(&self.peer_id);
 
@@ -139,6 +148,13 @@ impl NodeState {
 
                         self.private_key_package = Some(private_key_package);
                         self.pubkey_package = Some(pubkey_package);
+                        
+                        // Save DKG keys to config file
+                        if let Err(e) = self.save_dkg_keys() {
+                            println!("Failed to save DKG keys: {}", e);
+                        } else {
+                            println!("DKG keys saved to config file");
+                        }
                     }
                     Err(e) => {
                         println!("DKG failed: {}", e);

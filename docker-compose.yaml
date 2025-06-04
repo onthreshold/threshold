@@ -49,8 +49,8 @@ services:
   #   entrypoint: "/app/vault run --config four.key"
   #   volumes:
   #     - ./keys/four.key:/app/four.key
-  #   # networks:
-  #   #   - vaultnet
+  #   networks:
+  #     - vaultnet
   #
   # node5:
   #   build:
@@ -61,9 +61,9 @@ services:
   #   entrypoint: "/app/vault run --config five.key"
   #   volumes:
   #     - ./keys/five.key:/app/five.key
-  #   # networks:
-  #   #   - vaultnet
-  #
+  #   networks:
+  #     - vaultnet
+
 
 networks:
   vaultnet:

@@ -1,5 +1,4 @@
 use futures::StreamExt;
-use libp2p::PeerId;
 use libp2p::mdns;
 use tokio::io;
 
@@ -13,84 +12,11 @@ use tokio::select;
 use crate::NodeState;
 use crate::errors::NodeError;
 use crate::swarm_manager::MyBehaviourEvent;
-use crate::swarm_manager::{PingBody, PrivateRequest, PrivateResponse};
+use crate::swarm_manager::{PrivateRequest, PrivateResponse};
 
 impl NodeState {
-    pub fn handle_input(&mut self, line: String) {
-        if line.trim() == "/dkg" {
-            // Create start-dkg topic
-            let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
-
-            // Send a message to start DKG
-            let start_message = format!("START_DKG:{}", self.peer_id);
-            let _ = self
-                .swarm
-                .behaviour_mut()
-                .gossipsub
-                .publish(start_dkg_topic.clone(), start_message.as_bytes());
-
-            self.handle_dkg_start();
-
-            println!("Sent DKG start signal");
-        } else if line.trim() == "/peers" {
-            let connected_peers: Vec<_> = self
-                .swarm
-                .behaviour()
-                .gossipsub
-                .all_peers()
-                .map(|(peer_id, _)| peer_id)
-                .collect();
-            println!("Connected peers ({}):", connected_peers.len());
-            for peer_id in connected_peers {
-                println!("  {}", peer_id);
-            }
-        } else if let Some(amount_str) = line.trim().strip_prefix("/spend ") {
-            match amount_str.trim().parse::<u64>() {
-                Ok(amount_sat) => {
-                    self.handle_spend_request(amount_sat);
-                }
-                Err(e) => println!("❌ Invalid amount: {}", e),
-            }
-        } else if let Some(hex_msg) = line.strip_prefix("/sign ") {
-            self.start_signing_session(hex_msg.trim());
-        } else if let Some(stripped) = line.strip_prefix('@') {
-            let parts: Vec<&str> = stripped.splitn(2, ' ').collect();
-            if parts.len() == 2 {
-                let peer_id_str = parts[0];
-                let message_content = parts[1];
-
-                match peer_id_str.parse::<PeerId>() {
-                    Ok(target_peer_id) => {
-                        let direct_message = format!("From {}: {}", self.peer_id, message_content);
-
-                        let request_id = self.swarm.behaviour_mut().request_response.send_request(
-                            &target_peer_id,
-                            PrivateRequest::Ping(PingBody {
-                                message: direct_message.clone(),
-                            }),
-                        );
-
-                        println!(
-                            "Sending direct message to {}: {}",
-                            target_peer_id, message_content
-                        );
-                        println!("Request ID: {:?}", request_id);
-                    }
-                    Err(e) => {
-                        println!("Invalid peer ID format: {}", e);
-                        println!("Usage: @<peer_id> <message>");
-                    }
-                }
-            } else {
-                println!("Usage: @<peer_id> <message>");
-            }
-        }
-    }
-
     pub async fn main_loop(&mut self) -> Result<(), NodeError> {
         // Read full lines from stdin
-        let mut stdin = io::BufReader::new(io::stdin()).lines();
-
         let round1_topic = gossipsub::IdentTopic::new("round1_topic");
         self.swarm
             .behaviour_mut()
@@ -112,9 +38,6 @@ impl NodeState {
 
         loop {
             select! {
-                Ok(Some(line)) = stdin.next_line() => {
-                    self.handle_input(line);
-                }
                 event = self.swarm.select_next_some() => match event {
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                         message,

@@ -3,10 +3,6 @@ name = "node"
 version = "0.1.0"
 edition = "2024"
 
-[[bin]]
-name = "vault-node"
-path = "src/main.rs"
-
 [dependencies]
 libp2p = { workspace = true, features = [
     "noise",
@@ -34,6 +30,10 @@ bitcoin = { workspace = true }
 tonic = "0.13"
 prost = "0.13"
 derive_more = { version = "2.0.1", features = ["full"] }
+aes-gcm = "0.10"
+argon2 = "0.5"
+base64 = "0.22"
+rpassword = "7.3"
 
 [dev-dependencies]
 tempfile = "3.8"
