@@ -10,7 +10,7 @@ use rand::seq::SliceRandom;
 use crate::swarm_manager::{PrivateRequest, PrivateResponse};
 use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
 
-impl<'a> NodeState<'a> {
+impl NodeState {
     /// Coordinator entrypoint. Start a threshold signing session across the network.
     /// `message_hex` must be hex-encoded 32-byte sighash.
     pub fn start_signing_session(&mut self, message_hex: &str) {

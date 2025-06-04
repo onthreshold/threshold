@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package node;
+
+// The node control service
+service NodeControl {
+    // Start DKG process
+    rpc StartDkg(StartDkgRequest) returns (StartDkgResponse);
+    
+    // Get list of connected peers
+    rpc GetPeers(GetPeersRequest) returns (GetPeersResponse);
+    
+    // Create a spending transaction
+    rpc SpendFunds(SpendFundsRequest) returns (SpendFundsResponse);
+    
+    // Start a signing session
+    rpc StartSigning(StartSigningRequest) returns (StartSigningResponse);
+    
+    // Send a direct message to a peer
+    rpc SendDirectMessage(SendDirectMessageRequest) returns (SendDirectMessageResponse);
+    
+    // Get node info
+    rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoResponse);
+}
+
+message StartDkgRequest {}
+
+message StartDkgResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetPeersRequest {}
+
+message GetPeersResponse {
+    repeated string peer_ids = 1;
+    uint32 total_count = 2;
+}
+
+message SpendFundsRequest {
+    uint64 amount_satoshis = 1;
+}
+
+message SpendFundsResponse {
+    bool success = 1;
+    string message = 2;
+    string transaction_id = 3;
+}
+
+message StartSigningRequest {
+    string hex_message = 1;
+}
+
+message StartSigningResponse {
+    bool success = 1;
+    string message = 2;
+    uint64 sign_id = 3;
+}
+
+message SendDirectMessageRequest {
+    string peer_id = 1;
+    string message = 2;
+}
+
+message SendDirectMessageResponse {
+    bool success = 1;
+    string message = 2;
+    string request_id = 3;
+}
+
+message GetNodeInfoRequest {}
+
+message GetNodeInfoResponse {
+    string peer_id = 1;
+    uint32 min_signers = 2;
+    uint32 max_signers = 3;
+    bool has_key_package = 4;
+    uint32 connected_peers = 5;
+} 

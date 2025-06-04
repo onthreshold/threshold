@@ -31,8 +31,14 @@ frost-secp256k1 = { workspace = true }
 rand = { workspace = true }
 hex = { workspace = true }
 bitcoin = { workspace = true }
+tonic = "0.13"
+prost = "0.13"
+derive_more = { version = "2.0.1", features = ["full"] }
 
 [dev-dependencies]
 tempfile = "3.8"
 assert_cmd = "2.0"
 predicates = "3.0"
+
+[build-dependencies]
+tonic-build = "0.13"

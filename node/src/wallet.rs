@@ -113,7 +113,7 @@ pub struct PendingSpend {
     pub tx: Transaction,
 }
 
-impl<'a> NodeState<'a> {
+impl NodeState {
     pub fn frost_signature_to_bitcoin(
         frost_sig: &frost::Signature,
     ) -> Result<bitcoin::secp256k1::schnorr::Signature, String> {
