@@ -7,7 +7,8 @@ use swarm_manager::{NetworkHandle, SwarmManager};
 use crate::{dkg::DkgState, swarm_manager::build_swarm};
 
 pub mod dkg;
-pub mod grpc_service;
+pub mod grpc_handler;
+pub mod grpc_operator;
 pub mod main_loop;
 pub mod signing;
 pub mod swarm_manager;

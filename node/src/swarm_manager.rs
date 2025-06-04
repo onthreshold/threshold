@@ -244,4 +244,3 @@ pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), No
         },
     ))
 }
-
