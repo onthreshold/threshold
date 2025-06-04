@@ -47,14 +47,10 @@ impl NodeState {
                             .publish(topic, message);
                     }
                     Some(NetworkMessage::SendPrivateRequest(peer_id, request)) => {
-                        // HACK hardcode some requests / responses
-                        if peer_id == self.peer_id {
-                        } else {
                         self.swarm.inner
                             .behaviour_mut()
                             .request_response
                             .send_request(&peer_id, request);
-                        }
                     }
                     Some(NetworkMessage::SendPrivateResponse(channel, response)) => {
                         let _ = self.swarm.inner
@@ -63,6 +59,7 @@ impl NodeState {
                             .send_response(channel, response);
                     }
                     Some(NetworkMessage::SendSelfRequest{ request, response_channel }) => {
+                        println!("Received self request {:?}", request);
                             match request {
                                 PrivateRequest::StartSigningSession { hex_message } => {
                                     self.start_signing_session(&hex_message);
@@ -71,9 +68,7 @@ impl NodeState {
                                     let response = self.start_spend_request(amount_sat);
                                     response_channel.send(PrivateResponse::SpendRequestSent { sighash: response.unwrap_or("No sighash".to_string()) }).unwrap();
                                 }
-                                _ => {
-                                    response_channel.send(PrivateResponse::Pong).unwrap();
-                                }
+                                _ => {}
                             }
                     }
                     _ => {}
@@ -89,11 +84,11 @@ impl NodeState {
                                 let data = frost::keys::dkg::round1::Package::deserialize(&message.data)
                                     .expect("Failed to deserialize round1 package");
                                 if let Some(source_peer) = message.source {
-                                    self.dkg_state.handle_round1_payload(source_peer, data);
+                                    self.dkg_state.handle_round1_payload(source_peer, data).await;
                                 }
                             }
                             t if t == start_dkg_topic.hash() => {
-                                self.dkg_state.handle_dkg_start();
+                                self.dkg_state.handle_dkg_start().await;
                             }
                             _ => {
                                 println!("Received unhandled broadcast");
@@ -157,12 +152,14 @@ impl NodeState {
                         if topic == start_dkg_topic.hash() {
                             self.dkg_state.dkg_listeners.insert(peer_id);
                             println!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_state.dkg_listeners.len());
-                            self.dkg_state.handle_dkg_start();
+                            self.dkg_state.handle_dkg_start().await;
                         }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                         for (peer_id, _multiaddr) in list {
                             if self.allowed_peers.contains(&peer_id) {
+                                self.peers.insert(peer_id);
+                                self.dkg_state.peers.insert(peer_id);
                                 self.swarm.inner.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                             }
                         }
@@ -170,6 +167,8 @@ impl NodeState {
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                         for (peer_id, _multiaddr) in list {
                             if self.allowed_peers.contains(&peer_id) {
+                                self.peers.retain(|p| *p != peer_id);
+                                self.dkg_state.peers.retain(|p| *p != peer_id);
                                 self.swarm.inner.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                             }
                         }

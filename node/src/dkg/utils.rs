@@ -103,12 +103,11 @@ impl DkgState {
         network_handle: NetworkHandle,
         min_signers: u16,
         max_signers: u16,
-        peers: Vec<PeerId>,
         peer_id: PeerId,
         peers_to_names: BTreeMap<PeerId, String>,
         config_file: String,
     ) -> Self {
-        let dkg_state = DkgState {
+        let mut dkg_state = DkgState {
             network_handle,
             min_signers,
             max_signers,
@@ -116,7 +115,6 @@ impl DkgState {
             peer_id,
             peers_to_names,
             dkg_listeners: HashSet::new(),
-            peers,
             config_file,
             start_dkg_topic: gossipsub::IdentTopic::new("start-dkg"),
             round1_topic: gossipsub::IdentTopic::new("round1_topic"),
@@ -126,9 +124,17 @@ impl DkgState {
             r2_secret_package: None,
             pubkey_package: None,
             private_key_package: None,
+            peers: HashSet::new(),
+            dkg_started: false,
         };
 
-        DkgState::load_dkg_keys(&dkg_state.config_file).unwrap();
+        let Some((private_key, pubkey)) = DkgState::load_dkg_keys(&dkg_state.config_file).unwrap()
+        else {
+            return dkg_state;
+        };
+
+        dkg_state.private_key_package = Some(private_key);
+        dkg_state.pubkey_package = Some(pubkey);
 
         dkg_state
     }

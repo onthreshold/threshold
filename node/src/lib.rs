@@ -1,7 +1,7 @@
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::{PeerId, identity::Keypair};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use swarm_manager::{NetworkHandle, SwarmManager};
 
 use crate::{dkg::DkgState, swarm_manager::build_swarm};
@@ -57,7 +57,7 @@ pub struct NodeState {
     pub dkg_state: DkgState,
 
     pub peer_id: PeerId,
-    pub peers: Vec<PeerId>,
+    pub peers: HashSet<PeerId>,
     pub swarm: SwarmManager,
 
     pub min_signers: u16,
@@ -116,12 +116,11 @@ impl NodeState {
                 network_handle.clone(),
                 min_signers,
                 max_signers,
-                allowed_peers,
                 peer_id,
                 peers_to_names,
                 config_file.clone(),
             ),
-            peers: Vec::new(),
+            peers: HashSet::new(),
             rng: frost::rand_core::OsRng,
             active_signing: None,
             wallet: crate::wallet::SimpleWallet::new(),

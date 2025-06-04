@@ -113,8 +113,7 @@ impl NetworkHandle {
         };
         self.tx.send(network_message).unwrap();
 
-        let response = rx.recv().await;
-        response
+        rx.recv().await
     }
 }
 
@@ -123,7 +122,6 @@ pub struct SwarmManager {
 
     pub rx: mpsc::UnboundedReceiver<NetworkMessage>,
 }
-
 
 pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), NodeError> {
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)

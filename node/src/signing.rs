@@ -46,7 +46,7 @@ impl NodeState {
         }
         // Randomly shuffle peers and pick required number
         let mut rng_rand = rand::rng();
-        let mut peer_pool = self.peers.clone();
+        let mut peer_pool = self.peers.clone().into_iter().collect::<Vec<_>>();
         peer_pool.shuffle(&mut rng_rand);
 
         let selected_peers: Vec<PeerId> = peer_pool.into_iter().take(required).collect();

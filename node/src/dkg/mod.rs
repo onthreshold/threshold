@@ -13,15 +13,16 @@ use libp2p::PeerId;
 pub mod utils;
 
 pub struct DkgState {
+    pub dkg_started: bool,
     pub network_handle: NetworkHandle,
     pub min_signers: u16,
     pub max_signers: u16,
     pub rng: frost::rand_core::OsRng,
     pub peer_id: PeerId,
+    pub peers: HashSet<PeerId>,
 
     pub peers_to_names: BTreeMap<PeerId, String>,
     pub dkg_listeners: HashSet<PeerId>,
-    pub peers: Vec<PeerId>,
 
     pub config_file: String,
 
@@ -39,7 +40,12 @@ pub struct DkgState {
 }
 
 impl DkgState {
-    pub fn handle_dkg_start(&mut self) {
+    pub async fn handle_dkg_start(&mut self) {
+        if self.dkg_started {
+            println!("DKG already started, skipping DKG process");
+            return;
+        }
+
         // Check if DKG keys already exist
         if self.private_key_package.is_some() && self.pubkey_package.is_some() {
             println!("DKG keys already exist, skipping DKG process");
@@ -48,6 +54,16 @@ impl DkgState {
             }
             return;
         }
+
+        if self.dkg_listeners.len() + 1 != self.max_signers as usize {
+            println!(
+                "Not all listeners have subscribed to the DKG topic, not starting DKG process. Listeners: {:?}",
+                self.dkg_listeners.len()
+            );
+            return;
+        }
+
+        self.dkg_started = true;
 
         // Run the DKG initialization code
         let participant_identifier = peer_id_to_identifier(&self.peer_id);
@@ -76,7 +92,7 @@ impl DkgState {
         self.network_handle
             .send_broadcast(self.round1_topic.clone(), round1_package_bytes);
 
-        self.try_enter_round2();
+        self.try_enter_round2().await;
 
         println!(
             "Generated and published round1 package in response to DKG start signal from {}",
@@ -84,7 +100,11 @@ impl DkgState {
         );
     }
 
-    pub fn handle_round1_payload(&mut self, sender_peer_id: PeerId, package: round1::Package) {
+    pub async fn handle_round1_payload(
+        &mut self,
+        sender_peer_id: PeerId,
+        package: round1::Package,
+    ) {
         let identifier = peer_id_to_identifier(&sender_peer_id);
         // Add package to peer packages
         self.round1_peer_packages.insert(identifier, package);
@@ -96,10 +116,10 @@ impl DkgState {
             self.max_signers - 1
         );
 
-        self.try_enter_round2();
+        self.try_enter_round2().await;
     }
 
-    pub fn try_enter_round2(&mut self) {
+    pub async fn try_enter_round2(&mut self) {
         if let Some(r1_secret_package) = self.r1_secret_package.as_ref() {
             if self.round1_peer_packages.len() + 1 == self.max_signers as usize {
                 println!("Received all round1 packages, entering part2");
@@ -111,6 +131,7 @@ impl DkgState {
                         println!("-------------------- ENTERING ROUND 2 ---------------------");
                         self.r1_secret_package = None;
                         self.r2_secret_package = Some(round2_secret_package);
+
                         for peer_to_send_to in self.peers.iter() {
                             let identifier = peer_id_to_identifier(peer_to_send_to);
                             let package_to_send = round2_packages.get(&identifier).unwrap();
@@ -188,6 +209,8 @@ impl DkgState {
                         } else {
                             println!("DKG keys saved to config file");
                         }
+
+                        self.dkg_started = false;
                     }
                     Err(e) => {
                         println!("DKG failed during part3 aggregation: {}", e);
@@ -201,10 +224,10 @@ impl DkgState {
 
     /// Reset DKG state after a failed run so that a new DKG round can be initiated.
     fn reset_dkg_state(&mut self) {
+        self.dkg_started = false;
         self.r1_secret_package = None;
         self.r2_secret_package = None;
         self.round1_peer_packages.clear();
         self.round2_peer_packages.clear();
-        self.peers.clear();
     }
 }
