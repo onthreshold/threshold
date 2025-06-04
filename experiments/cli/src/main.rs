@@ -18,9 +18,8 @@ use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use key_manager::{get_config, handle_key_error_and_exit, load_and_decrypt_keypair};
 use libp2p::identity::Keypair;
-use rpc_client::rpc_spend;
-use std::{fs, path::PathBuf, sync::Arc};
-use tokio::sync::Mutex;
+use rpc_client::{rpc_send_direct_message, rpc_start_signing, rpc_spend};
+use std::{fs, path::PathBuf};
 use tonic::transport::Server;
 
 use node::{
@@ -123,6 +122,17 @@ enum Commands {
         #[arg(short, long)]
         endpoint: Option<String>,
     },
+    StartSigning {
+        hex_message: String,
+        #[arg(short, long)]
+        endpoint: Option<String>,
+    },
+    SendDirectMessage {
+        peer_id: String,
+        message: String,
+        #[arg(short, long)]
+        endpoint: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -147,6 +157,16 @@ async fn main() -> Result<(), CliError> {
         }
         Commands::Spend { amount, endpoint } => {
             rpc_spend(endpoint, amount)
+                .await
+                .map_err(CliError::RpcError)?;
+        }
+        Commands::StartSigning { hex_message, endpoint } => {
+            rpc_start_signing(endpoint, hex_message)
+                .await
+                .map_err(CliError::RpcError)?;
+        }
+        Commands::SendDirectMessage { peer_id, message, endpoint } => {
+            rpc_send_direct_message(endpoint, peer_id, message)
                 .await
                 .map_err(CliError::RpcError)?;
         }
