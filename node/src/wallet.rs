@@ -6,7 +6,6 @@ use bitcoin::transaction::{OutPoint, Version};
 use bitcoin::witness::Witness;
 use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut, hashes::sha256};
 use hex;
-use bs58;
 
 use crate::NodeState;
 use frost_secp256k1::{self as frost};
@@ -118,7 +117,13 @@ pub struct PendingSpend {
 
 impl NodeState {
     pub fn get_frost_public_key(&self) -> Option<String> {
-        self.pubkey_package.as_ref().map(|p| format!("{:?}", p.verifying_key()).replace("VerifyingKey(", "").replace(")", "").replace("\\", "").replace("\"", ""))
+        self.dkg_state.pubkey_package.as_ref().map(|p| {
+            format!("{:?}", p.verifying_key())
+                .replace("VerifyingKey(", "")
+                .replace(")", "")
+                .replace("\\", "")
+                .replace("\"", "")
+        })
     }
 
     pub fn frost_signature_to_bitcoin(
@@ -159,7 +164,8 @@ impl NodeState {
             Err(e) => {
                 println!("❌ Failed to create spend transaction: {}", e);
                 None
-            },
+            }
         }
     }
 }
+

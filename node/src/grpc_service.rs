@@ -1,14 +1,14 @@
+use crate::swarm_manager::{NetworkHandle, PingBody, PrivateRequest, PrivateResponse};
 use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use tonic::{Request, Response, Status};
-use crate::swarm_manager::{NetworkHandle, PingBody, PrivateRequest, PrivateResponse};
 
-use uuid::Uuid;
-use bitcoin::Network;
-use bitcoin::script::Builder;
-use bitcoin::PublicKey;
 use bitcoin::Address;
+use bitcoin::Network;
+use bitcoin::PublicKey;
+use bitcoin::script::Builder;
 use std::str::FromStr;
+use uuid::Uuid;
 
 // Include the generated proto code
 pub mod node_proto {
@@ -68,7 +68,7 @@ impl NodeControl for NodeControlService {
             .send_self_request(PrivateRequest::Spend { amount_sat })
             .await;
 
-        let Some(PrivateResponse::SpendRequestSent { sighash }) = response else {
+        let Ok(PrivateResponse::SpendRequestSent { sighash }) = response else {
             return Err(Status::internal("Invalid response from node"));
         };
 
@@ -91,8 +91,11 @@ impl NodeControl for NodeControlService {
 
         let response = self.network.send_self_request(network_request).await;
 
-        let Some(PrivateResponse::StartSigningSession { sign_id }) = response else {
-            return Err(Status::internal(format!("Invalid response from node {:?}", response)));
+        let Ok(PrivateResponse::StartSigningSession { sign_id }) = response else {
+            return Err(Status::internal(format!(
+                "Invalid response from node {:?}",
+                response
+            )));
         };
 
         Ok(Response::new(StartSigningResponse {
@@ -135,21 +138,30 @@ impl NodeControl for NodeControlService {
     ) -> Result<Response<CreateDepositIntentResponse>, Status> {
         let req = request.into_inner();
 
-        let user_id = req.user_id.parse::<PeerId>()
+        let user_id = req
+            .user_id
+            .parse::<PeerId>()
             .map_err(|e| Status::invalid_argument(format!("Invalid peer ID: {}", e)))?;
 
         let amount_sat = if req.amount_satoshis > 0 {
             req.amount_satoshis
         } else {
-            return Err(Status::invalid_argument("Amount to deposit must be greater than 0"));
+            return Err(Status::invalid_argument(
+                "Amount to deposit must be greater than 0",
+            ));
         };
 
         let deposit_tracking_id = Uuid::new_v4().to_string();
-        
-        let frost_pubkey_hex = self.network.send_self_request(PrivateRequest::GetFrostPublicKey).await;
 
-        let Some(PrivateResponse::GetFrostPublicKey { public_key }) = frost_pubkey_hex else {
-            return Err(Status::internal("Invalid response from node. No public key found."));
+        let frost_pubkey_hex = self
+            .network
+            .send_self_request(PrivateRequest::GetFrostPublicKey)
+            .await;
+
+        let Ok(PrivateResponse::GetFrostPublicKey { public_key }) = frost_pubkey_hex else {
+            return Err(Status::internal(
+                "Invalid response from node. No public key found.",
+            ));
         };
 
         let public_key = PublicKey::from_str(&public_key)
@@ -162,13 +174,20 @@ impl NodeControl for NodeControlService {
 
         let deposit_address = Address::p2wsh(&witness_script, Network::Testnet);
 
-        println!("Received request to create deposit intent for user {} with amount {}. Tracking ID: {}. Deposit Address: {}", user_id, amount_sat, deposit_tracking_id.clone(), deposit_address.to_string());
+        println!(
+            "Received request to create deposit intent for user {} with amount {}. Tracking ID: {}. Deposit Address: {}",
+            user_id,
+            amount_sat,
+            deposit_tracking_id.clone(),
+            deposit_address.to_string()
+        );
 
         Ok(Response::new(CreateDepositIntentResponse {
             success: true,
             message: format!("Deposit intent created for user {}", user_id),
-            deposit_tracking_id: deposit_tracking_id,
+            deposit_tracking_id,
             deposit_address: deposit_address.to_string(),
         }))
     }
 }
+

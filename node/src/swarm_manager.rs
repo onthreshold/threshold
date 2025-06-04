@@ -16,6 +16,8 @@ use tokio::{
     sync::mpsc::{self, unbounded_channel},
 };
 
+use crate::errors::NetworkError;
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PingBody {
     pub message: String,
@@ -90,34 +92,53 @@ pub struct NetworkHandle {
 }
 
 impl NetworkHandle {
-    pub fn send_broadcast(&self, topic: gossipsub::IdentTopic, message: Vec<u8>) {
+    pub fn send_broadcast(
+        &self,
+        topic: gossipsub::IdentTopic,
+        message: Vec<u8>,
+    ) -> Result<(), NetworkError> {
         let network_message = NetworkMessage::SendBroadcast { topic, message };
-        self.tx.send(network_message).unwrap();
+        self.tx
+            .send(network_message)
+            .map_err(|e| NetworkError::SendError(e))
     }
 
-    pub fn send_private_request(&self, peer_id: PeerId, request: PrivateRequest) {
+    pub fn send_private_request(
+        &self,
+        peer_id: PeerId,
+        request: PrivateRequest,
+    ) -> Result<(), NetworkError> {
         let network_message = NetworkMessage::SendPrivateRequest(peer_id, request);
-        self.tx.send(network_message).unwrap();
+        self.tx
+            .send(network_message)
+            .map_err(|e| NetworkError::SendError(e))
     }
 
     pub fn send_private_response(
         &self,
         channel: ResponseChannel<PrivateResponse>,
         response: PrivateResponse,
-    ) {
+    ) -> Result<(), NetworkError> {
         let network_message = NetworkMessage::SendPrivateResponse(channel, response);
-        self.tx.send(network_message).unwrap();
+        self.tx
+            .send(network_message)
+            .map_err(|e| NetworkError::SendError(e))
     }
 
-    pub async fn send_self_request(&self, request: PrivateRequest) -> Option<PrivateResponse> {
+    pub async fn send_self_request(
+        &self,
+        request: PrivateRequest,
+    ) -> Result<PrivateResponse, NetworkError> {
         let (tx, mut rx) = unbounded_channel::<PrivateResponse>();
         let network_message = NetworkMessage::SendSelfRequest {
             request,
             response_channel: tx,
         };
-        self.tx.send(network_message).unwrap();
+        self.tx
+            .send(network_message)
+            .map_err(|e| NetworkError::SendError(e))?;
 
-        rx.recv().await
+        rx.recv().await.ok_or(NetworkError::RecvError)
     }
 }
 
@@ -223,3 +244,4 @@ pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), No
         },
     ))
 }
+
