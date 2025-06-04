@@ -12,6 +12,7 @@ use tokio::select;
 use crate::NodeState;
 use crate::errors::NodeError;
 use crate::swarm_manager::MyBehaviourEvent;
+use crate::swarm_manager::NetworkMessage;
 use crate::swarm_manager::{PrivateRequest, PrivateResponse};
 
 impl NodeState {
@@ -19,16 +20,18 @@ impl NodeState {
         // Read full lines from stdin
         let round1_topic = gossipsub::IdentTopic::new("round1_topic");
         self.swarm
+            .inner
             .behaviour_mut()
             .gossipsub
             .subscribe(&round1_topic)
             .map_err(|e| NodeError::Error(e.to_string()))?;
 
         // let topic = gossipsub::IdentTopic::new("publish-key");
-        // self.swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
+        // self.swarm.inner.behaviour_mut().gossipsub.subscribe(&topic)?;
 
         let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
         self.swarm
+            .inner
             .behaviour_mut()
             .gossipsub
             .subscribe(&start_dkg_topic)
@@ -38,7 +41,28 @@ impl NodeState {
 
         loop {
             select! {
-                event = self.swarm.select_next_some() => match event {
+                send_message = self.swarm.rx.recv() => match send_message {
+                    Some(NetworkMessage::SendBroadcast { topic, message }) => {
+                        self.swarm.inner
+                            .behaviour_mut()
+                            .gossipsub
+                            .publish(topic, message);
+                    }
+                    Some(NetworkMessage::SendPrivateRequest(peer_id, request)) => {
+                        self.swarm.inner
+                            .behaviour_mut()
+                            .request_response
+                            .send_request(&peer_id, request);
+                    }
+                    Some(NetworkMessage::SendPrivateResponse(channel, response)) => {
+                        self.swarm.inner
+                            .behaviour_mut()
+                            .request_response
+                            .send_response(channel, response);
+                    }
+                    _ => {}
+                },
+                event = self.swarm.inner.select_next_some() => match event {
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                         message,
                         ..
@@ -106,7 +130,7 @@ impl NodeState {
                         self.handle_signature_share(peer, sign_id, signature_share);
                     },
                     SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                        let peer_count = self.swarm.behaviour().gossipsub.all_peers().count();
+                        let peer_count = self.swarm.inner.behaviour().gossipsub.all_peers().count();
                         let peer_name = self.peer_name(&peer_id);
                         println!("Connection closed with peer: {peer_name}, peers: {peer_count}");
                     },
@@ -123,14 +147,14 @@ impl NodeState {
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                         for (peer_id, _multiaddr) in list {
                             if self.allowed_peers.contains(&peer_id) {
-                                self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                                self.swarm.inner.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                             }
                         }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                         for (peer_id, _multiaddr) in list {
                             if self.allowed_peers.contains(&peer_id) {
-                                self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                                self.swarm.inner.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                             }
                         }
                     },

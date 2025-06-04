@@ -1,4 +1,4 @@
-use libp2p::PeerId;
+use libp2p::{request_response::ResponseChannel, PeerId};
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
@@ -56,19 +56,40 @@ pub struct NodeError {
 }
 
 pub enum NetworkMessage {
-    SendBroadcast(Vec<u8>),
+    SendBroadcast {
+        topic: gossipsub::IdentTopic,
+        message: Vec<u8>,
+    },
     SendPrivateRequest(PeerId, PrivateRequest),
-    SendPrivateResponse(PeerId, PrivateResponse),
+    SendPrivateResponse(ResponseChannel<PrivateResponse>, PrivateResponse),
 }
 
+#[derive(Debug, Clone)]
 pub struct NetworkHandle {
-    rx: mpsc::UnboundedSender<NetworkMessage>,
+    tx: mpsc::UnboundedSender<NetworkMessage>,
+}
+
+impl NetworkHandle {
+    pub fn send_broadcast(&self, topic: gossipsub::IdentTopic, message: Vec<u8>) {
+        let network_message = NetworkMessage::SendBroadcast { topic, message };
+        self.tx.send(network_message).unwrap();
+    }
+
+    pub fn send_private_request(&self, peer_id: PeerId, request: PrivateRequest) {
+        let network_message = NetworkMessage::SendPrivateRequest(peer_id, request);
+        self.tx.send(network_message).unwrap();
+    }
+
+    pub fn send_private_response(&self, channel: ResponseChannel<PrivateResponse>, response: PrivateResponse) {
+        let network_message = NetworkMessage::SendPrivateResponse(channel, response);
+        self.tx.send(network_message).unwrap();
+    }
 }
 
 pub struct SwarmManager {
     pub inner: Swarm<MyBehaviour>,
 
-    outgoing_tx: mpsc::UnboundedReceiver<NetworkMessage>,
+    pub rx: mpsc::UnboundedReceiver<NetworkMessage>,
 }
 
 pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), NodeError> {
@@ -152,15 +173,17 @@ pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), No
             message: format!("Failed to listen on tcp {}", e),
         })?;
 
-    let (incoming_rx, outgoing_tx) = unbounded_channel::<NetworkMessage>();
+    let (outgoing_tx, incoming_rx) = unbounded_channel::<NetworkMessage>();
 
-    let network = NetworkHandle { rx: incoming_rx.clone() };
+    let network = NetworkHandle {
+        tx: outgoing_tx.clone(),
+    };
 
     Ok((
         network,
         SwarmManager {
             inner: swarm,
-            outgoing_tx,
+            rx: incoming_rx,
         },
     ))
 }

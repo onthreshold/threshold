@@ -7,9 +7,6 @@ service NodeControl {
     // Start DKG process
     rpc StartDkg(StartDkgRequest) returns (StartDkgResponse);
     
-    // Get list of connected peers
-    rpc GetPeers(GetPeersRequest) returns (GetPeersResponse);
-    
     // Create a spending transaction
     rpc SpendFunds(SpendFundsRequest) returns (SpendFundsResponse);
     
@@ -18,9 +15,6 @@ service NodeControl {
     
     // Send a direct message to a peer
     rpc SendDirectMessage(SendDirectMessageRequest) returns (SendDirectMessageResponse);
-    
-    // Get node info
-    rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoResponse);
 }
 
 message StartDkgRequest {}
@@ -28,13 +22,6 @@ message StartDkgRequest {}
 message StartDkgResponse {
     bool success = 1;
     string message = 2;
-}
-
-message GetPeersRequest {}
-
-message GetPeersResponse {
-    repeated string peer_ids = 1;
-    uint32 total_count = 2;
 }
 
 message SpendFundsRequest {
@@ -65,15 +52,4 @@ message SendDirectMessageRequest {
 message SendDirectMessageResponse {
     bool success = 1;
     string message = 2;
-    string request_id = 3;
 }
-
-message GetNodeInfoRequest {}
-
-message GetNodeInfoResponse {
-    string peer_id = 1;
-    uint32 min_signers = 2;
-    uint32 max_signers = 3;
-    bool has_key_package = 4;
-    uint32 connected_peers = 5;
-} 

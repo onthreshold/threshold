@@ -3,7 +3,7 @@ use frost_secp256k1::{
     keys::dkg::{round1, round2},
 };
 use libp2p::{PeerId, gossipsub, identity::Keypair};
-use swarm_manager::NetworkHandle;
+use swarm_manager::{NetworkHandle, SwarmManager};
 use serde::{Deserialize, Serialize};
 use swarm_manager::MyBehaviour;
 use std::collections::{BTreeMap, HashSet};
@@ -74,7 +74,7 @@ pub struct NodeState {
     pub round1_peer_packages: BTreeMap<Identifier, round1::Package>,
     pub round2_peer_packages: BTreeMap<Identifier, round2::Package>,
     pub peers: Vec<PeerId>,
-    pub swarm: libp2p::Swarm<MyBehaviour>,
+    pub swarm: SwarmManager,
     pub keypair: Keypair,
     pub min_signers: u16,
     pub max_signers: u16,
@@ -311,7 +311,7 @@ impl NodeState {
             peer_id,
             round1_peer_packages: BTreeMap::new(),
             round2_peer_packages: BTreeMap::new(),
-            swarm: swarm.inner,
+            swarm,
             min_signers,
             max_signers,
             peers: Vec::new(),
