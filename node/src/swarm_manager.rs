@@ -30,6 +30,7 @@ pub enum PrivateRequest {
 
     StartSigningSession { hex_message: String },
     Spend { amount_sat: u64 },
+    GetFrostPublicKey,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -49,6 +50,9 @@ pub enum PrivateResponse {
     },
     SpendRequestSent {
         sighash: String,
+    },
+    GetFrostPublicKey {
+        public_key: String,
     },
 }
 

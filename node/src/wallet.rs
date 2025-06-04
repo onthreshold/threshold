@@ -5,6 +5,8 @@ use bitcoin::hex::DisplayHex;
 use bitcoin::transaction::{OutPoint, Version};
 use bitcoin::witness::Witness;
 use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut, hashes::sha256};
+use hex;
+use bs58;
 
 use crate::NodeState;
 use frost_secp256k1::{self as frost};
@@ -115,6 +117,10 @@ pub struct PendingSpend {
 }
 
 impl NodeState {
+    pub fn get_frost_public_key(&self) -> Option<String> {
+        self.pubkey_package.as_ref().map(|p| bs58::encode(p.verifying_key().serialize().unwrap()).into_string())
+    }
+
     pub fn frost_signature_to_bitcoin(
         frost_sig: &frost::Signature,
     ) -> Result<bitcoin::secp256k1::schnorr::Signature, String> {

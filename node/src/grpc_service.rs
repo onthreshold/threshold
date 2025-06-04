@@ -150,10 +150,13 @@ impl NodeControl for NodeControlService {
 
         let deposit_tracking_id = Uuid::new_v4().to_string();
         
-        // USING MOCK PUBLIC KEY FOR NOW
-        let frost_pubkey_hex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+        let frost_pubkey_hex = self.network.send_self_request(PrivateRequest::GetFrostPublicKey).await;
 
-        let public_key = PublicKey::from_str(frost_pubkey_hex)
+        let Some(PrivateResponse::GetFrostPublicKey { public_key }) = frost_pubkey_hex else {
+            return Err(Status::internal("Invalid response from node. No public key found."));
+        };
+
+        let public_key = PublicKey::from_str(&public_key)
             .map_err(|e| Status::internal(format!("Failed to parse public key: {}", e)))?;
 
         let witness_script = Builder::new()
