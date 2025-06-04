@@ -18,12 +18,14 @@ use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use key_manager::{get_config, handle_key_error_and_exit, load_and_decrypt_keypair};
 use libp2p::identity::Keypair;
-use rpc_client::{rpc_send_direct_message, rpc_start_signing, rpc_spend, rpc_create_deposit_intent};
+use rpc_client::{
+    rpc_create_deposit_intent, rpc_send_direct_message, rpc_spend, rpc_start_signing,
+};
 use std::{fs, path::PathBuf};
 use tonic::transport::Server;
 
 use node::{
-    grpc_service::NodeControlService, Config, EncryptionParams, KeyData, NodeState, PeerData,
+    grpc_handler::NodeControlService, Config, EncryptionParams, KeyData, NodeState, PeerData,
 };
 
 use crate::errors::{CliError, KeygenError};
@@ -166,17 +168,28 @@ async fn main() -> Result<(), CliError> {
                 .await
                 .map_err(CliError::RpcError)?;
         }
-        Commands::StartSigning { hex_message, endpoint } => {
+        Commands::StartSigning {
+            hex_message,
+            endpoint,
+        } => {
             rpc_start_signing(endpoint, hex_message)
                 .await
                 .map_err(CliError::RpcError)?;
         }
-        Commands::SendDirectMessage { peer_id, message, endpoint } => {
+        Commands::SendDirectMessage {
+            peer_id,
+            message,
+            endpoint,
+        } => {
             rpc_send_direct_message(endpoint, peer_id, message)
                 .await
                 .map_err(CliError::RpcError)?;
         }
-        Commands::Deposit { peer_id, amount, endpoint } => {
+        Commands::Deposit {
+            peer_id,
+            amount,
+            endpoint,
+        } => {
             rpc_create_deposit_intent(endpoint, peer_id, amount)
                 .await
                 .map_err(CliError::RpcError)?;
