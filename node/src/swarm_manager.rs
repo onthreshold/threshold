@@ -1,4 +1,4 @@
-use libp2p::{request_response::ResponseChannel, PeerId};
+use libp2p::{PeerId, request_response::ResponseChannel};
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
@@ -27,6 +27,11 @@ pub enum PrivateRequest {
     Round2Package(round2::Package),
     SignRequest { sign_id: u64, message: Vec<u8> },
     SignPackage { sign_id: u64, package: Vec<u8> },
+
+    StartSigningSession { hex_message: String },
+    Spend {
+        amount_sat: u64,
+    },
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -62,10 +67,13 @@ pub enum NetworkMessage {
     },
     SendPrivateRequest(PeerId, PrivateRequest),
     SendPrivateResponse(ResponseChannel<PrivateResponse>, PrivateResponse),
+
+    SendSelfRequest(PrivateRequest),
 }
 
 #[derive(Debug, Clone)]
 pub struct NetworkHandle {
+    peer_id: PeerId,
     tx: mpsc::UnboundedSender<NetworkMessage>,
 }
 
@@ -80,8 +88,18 @@ impl NetworkHandle {
         self.tx.send(network_message).unwrap();
     }
 
-    pub fn send_private_response(&self, channel: ResponseChannel<PrivateResponse>, response: PrivateResponse) {
+    pub fn send_private_response(
+        &self,
+        channel: ResponseChannel<PrivateResponse>,
+        response: PrivateResponse,
+    ) {
         let network_message = NetworkMessage::SendPrivateResponse(channel, response);
+        self.tx.send(network_message).unwrap();
+    }
+
+    pub fn send_self_request(&self, request: PrivateRequest) {
+        println!("Sending self request");
+        let network_message = NetworkMessage::SendSelfRequest(request);
         self.tx.send(network_message).unwrap();
     }
 }
@@ -177,6 +195,7 @@ pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), No
 
     let network = NetworkHandle {
         tx: outgoing_tx.clone(),
+        peer_id: *swarm.local_peer_id(),
     };
 
     Ok((

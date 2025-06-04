@@ -38,7 +38,7 @@ impl NodeControl for NodeControlService {
         let start_dkg_topic = IdentTopic::new("start-dkg");
 
         // Send a message to start DKG
-        let start_message = format!("START_DKG");
+        let start_message = "START_DKG".to_string();
         self.network
             .send_broadcast(start_dkg_topic.clone(), start_message.as_bytes().to_vec());
         // // Handle DKG start locally
@@ -57,6 +57,8 @@ impl NodeControl for NodeControlService {
         let amount_sat = request.into_inner().amount_satoshis;
 
         println!("Received request to spend {} satoshis", amount_sat);
+        self.network
+            .send_self_request(PrivateRequest::Spend { amount_sat });
 
         Ok(Response::new(SpendFundsResponse {
             success: true,
@@ -71,12 +73,16 @@ impl NodeControl for NodeControlService {
     ) -> Result<Response<StartSigningResponse>, Status> {
         let hex_msg = request.into_inner().hex_message;
 
-        // node_state.start_signing_session(&hex_msg);
-        //
+        let network_request = PrivateRequest::StartSigningSession {
+            hex_message: hex_msg.clone(),
+        };
+
+        self.network.send_self_request(network_request);
+
         Ok(Response::new(StartSigningResponse {
             success: true,
             message: "Signing session started".to_string(),
-            sign_id: 5,
+            sign_id: 0,
         }))
     }
 

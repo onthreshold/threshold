@@ -7,8 +7,8 @@ use argon2::{password_hash::SaltString, Argon2};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use directories::ProjectDirs;
 use libp2p::identity::Keypair;
-use std::{fs, path::PathBuf, process};
 use node::{Config, EncryptionParams};
+use std::{fs, path::PathBuf, process};
 
 pub fn get_config_file_path(file_path_option: Option<String>) -> Result<PathBuf, KeygenError> {
     if let Some(file_path_str) = file_path_option {

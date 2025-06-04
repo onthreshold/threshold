@@ -1,12 +1,10 @@
 use futures::StreamExt;
 use libp2p::mdns;
-use tokio::io;
 
 use frost_secp256k1::{self as frost};
 use libp2p::gossipsub;
 use libp2p::request_response;
 use libp2p::swarm::SwarmEvent;
-use tokio::io::AsyncBufReadExt;
 use tokio::select;
 
 use crate::NodeState;
@@ -49,16 +47,31 @@ impl NodeState {
                             .publish(topic, message);
                     }
                     Some(NetworkMessage::SendPrivateRequest(peer_id, request)) => {
+                        // HACK hardcode some requests / responses
+                        if peer_id == self.peer_id {
+                        } else {
                         self.swarm.inner
                             .behaviour_mut()
                             .request_response
                             .send_request(&peer_id, request);
+                        }
                     }
                     Some(NetworkMessage::SendPrivateResponse(channel, response)) => {
                         self.swarm.inner
                             .behaviour_mut()
                             .request_response
                             .send_response(channel, response);
+                    }
+                    Some(NetworkMessage::SendSelfRequest(request)) => {
+                            match request {
+                                PrivateRequest::StartSigningSession { hex_message } => {
+                                    self.start_signing_session(&hex_message);
+                                },
+                                PrivateRequest::Spend { amount_sat } => {
+                                    self.handle_spend_request(amount_sat);
+                                }
+                                _ => {}
+                            }
                     }
                     _ => {}
                 },
@@ -141,7 +154,10 @@ impl NodeState {
                         if topic == start_dkg_topic.hash() {
                             self.dkg_listeners.insert(peer_id);
                             println!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_listeners.len());
-                            self.handle_dkg_start();
+                            if self.dkg_listeners.len() + 1 != self.max_signers as usize {
+                                self.handle_dkg_start();
+                            }
+
                         }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
@@ -158,9 +174,39 @@ impl NodeState {
                             }
                         }
                     },
-                    _ => {
-                        // println!("Swarm event: {event:?}");
-                    }
+                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                        request_response::Event::Message {
+                            peer,
+                            message: request_response::Message::Request { request: PrivateRequest::StartSigningSession{ hex_message }, channel, .. }
+                        }
+                    )) => {
+                        if peer == self.peer_id {
+                            self.start_signing_session(&hex_message);
+                            let _ = self
+                                .swarm.inner
+                                .behaviour_mut()
+                                .request_response
+                                .send_response(channel, PrivateResponse::Pong);
+                        }
+                    },
+                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                        request_response::Event::Message {
+                            peer,
+                            message: request_response::Message::Request { request: PrivateRequest::Spend{ amount_sat }, channel, .. }
+                        }
+                    )) => {
+                        println!("Spend request from peer: {}", self.peer_name(&peer));
+                        if peer == self.peer_id {
+                            self.handle_spend_request(amount_sat);
+
+                            let _ = self
+                                .swarm.inner
+                                .behaviour_mut()
+                                .request_response
+                                .send_response(channel, PrivateResponse::Pong);
+                        }
+                    },
+                    _ => {}
                 }
             }
         }
