@@ -132,6 +132,7 @@ impl NodeState {
     }
 
     pub fn handle_spend_request(&mut self, amount_sat: u64) {
+        println!("🚀 Creating spend request for {} sat", amount_sat);
         match self.wallet.create_spend(amount_sat) {
             Ok((tx, sighash)) => {
                 let sighash_hex = hex::encode(sighash);

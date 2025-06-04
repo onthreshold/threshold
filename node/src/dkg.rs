@@ -19,14 +19,6 @@ impl NodeState {
             return;
         }
 
-        if self.dkg_listeners.len() + 1 != self.max_signers as usize {
-            println!(
-                "Not all listeners have subscribed to the DKG topic, not starting DKG process. Listeners: {:?}",
-                self.dkg_listeners.len()
-            );
-            return;
-        }
-
         // Run the DKG initialization code
         let participant_identifier = peer_id_to_identifier(&self.peer_id);
 
@@ -183,7 +175,6 @@ impl NodeState {
                         self.private_key_package = Some(private_key_package);
                         self.pubkey_package = Some(pubkey_package);
 
-                        // Persist DKG keys
                         if let Err(e) = self.save_dkg_keys() {
                             println!("Failed to save DKG keys: {}", e);
                         } else {
