@@ -1,14 +1,44 @@
+use std::collections::{BTreeMap, HashSet};
+
 use crate::{
-    NodeState, peer_id_to_identifier,
-    swarm_manager::{PrivateRequest, PrivateResponse},
+    peer_id_to_identifier,
+    swarm_manager::{NetworkHandle, PrivateRequest, PrivateResponse},
 };
 use frost_secp256k1::{
-    self as frost,
+    self as frost, Identifier,
     keys::dkg::{round1, round2},
 };
 use libp2p::PeerId;
 
-impl NodeState {
+pub mod utils;
+
+pub struct DkgState {
+    pub network_handle: NetworkHandle,
+    pub min_signers: u16,
+    pub max_signers: u16,
+    pub rng: frost::rand_core::OsRng,
+    pub peer_id: PeerId,
+
+    pub peers_to_names: BTreeMap<PeerId, String>,
+    pub dkg_listeners: HashSet<PeerId>,
+    pub peers: Vec<PeerId>,
+
+    pub config_file: String,
+
+    pub start_dkg_topic: libp2p::gossipsub::IdentTopic,
+    pub round1_topic: libp2p::gossipsub::IdentTopic,
+
+    pub round1_peer_packages: BTreeMap<Identifier, round1::Package>,
+    pub round2_peer_packages: BTreeMap<Identifier, round2::Package>,
+
+    pub r1_secret_package: Option<round1::SecretPackage>,
+    pub r2_secret_package: Option<round2::SecretPackage>,
+
+    pub pubkey_package: Option<frost::keys::PublicKeyPackage>,
+    pub private_key_package: Option<frost::keys::KeyPackage>,
+}
+
+impl DkgState {
     pub fn handle_dkg_start(&mut self) {
         // Check if DKG keys already exist
         if self.private_key_package.is_some() && self.pubkey_package.is_some() {
@@ -38,40 +68,30 @@ impl NodeState {
 
         // Broadcast START_DKG message to the network,
         let start_message = format!("START_DKG:{}", self.peer_id);
-        let _ = self
-            .swarm
-            .inner
-            .behaviour_mut()
-            .gossipsub
-            .publish(self.start_dkg_topic.clone(), start_message.as_bytes());
+        self.network_handle.send_broadcast(
+            self.start_dkg_topic.clone(),
+            start_message.as_bytes().to_vec(),
+        );
 
-        let _ = self
-            .swarm
-            .inner
-            .behaviour_mut()
-            .gossipsub
-            .publish(self.round1_topic.clone(), round1_package_bytes);
+        self.network_handle
+            .send_broadcast(self.round1_topic.clone(), round1_package_bytes);
 
         self.try_enter_round2();
 
         println!(
             "Generated and published round1 package in response to DKG start signal from {}",
-            self.peer_name(&self.peer_id)
+            &self.peer_id
         );
     }
 
     pub fn handle_round1_payload(&mut self, sender_peer_id: PeerId, package: round1::Package) {
-        if !self.peers.contains(&sender_peer_id) {
-            self.peers.push(sender_peer_id);
-        }
-
         let identifier = peer_id_to_identifier(&sender_peer_id);
         // Add package to peer packages
         self.round1_peer_packages.insert(identifier, package);
 
         println!(
             "Received round1 package from {} ({}/{})",
-            self.peer_name(&sender_peer_id),
+            sender_peer_id,
             self.round1_peer_packages.len(),
             self.max_signers - 1
         );
@@ -97,14 +117,10 @@ impl NodeState {
 
                             let request = PrivateRequest::Round2Package(package_to_send.clone());
 
-                            let _ = self
-                                .swarm
-                                .inner
-                                .behaviour_mut()
-                                .request_response
-                                .send_request(peer_to_send_to, request);
+                            self.network_handle
+                                .send_private_request(*peer_to_send_to, request);
 
-                            println!("Sent round2 package to {}", self.peer_name(peer_to_send_to));
+                            println!("Sent round2 package to {}", peer_to_send_to);
                         }
                     }
                     Err(e) => {
@@ -127,14 +143,10 @@ impl NodeState {
         if self.round2_peer_packages.contains_key(&identifier) {
             println!(
                 "Duplicate round2 package from {} – already recorded",
-                self.peer_name(&sender_peer_id)
+                sender_peer_id
             );
-            let _ = self
-                .swarm
-                .inner
-                .behaviour_mut()
-                .request_response
-                .send_response(response_channel, PrivateResponse::Pong);
+            self.network_handle
+                .send_private_response(response_channel, PrivateResponse::Pong);
             return;
         }
 
@@ -143,18 +155,14 @@ impl NodeState {
 
         println!(
             "Received round2 package from {} ({}/{})",
-            self.peer_name(&sender_peer_id),
+            sender_peer_id,
             self.round2_peer_packages.len(),
             self.max_signers - 1
         );
 
         // Ack the received package
-        let _ = self
-            .swarm
-            .inner
-            .behaviour_mut()
-            .request_response
-            .send_response(response_channel, PrivateResponse::Pong);
+        self.network_handle
+            .send_private_response(response_channel, PrivateResponse::Pong);
 
         if let Some(r2_secret_package) = self.r2_secret_package.as_ref() {
             if self.round2_peer_packages.len() + 1 == self.max_signers as usize {

@@ -12,9 +12,8 @@ use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
 impl NodeState {
     /// Coordinator entrypoint. Start a threshold signing session across the network.
     /// `message_hex` must be hex-encoded 32-byte sighash.
-    /// returns the sign_id which is the signature session
     pub fn start_signing_session(&mut self, message_hex: &str) -> Option<u64> {
-        if self.private_key_package.is_none() || self.pubkey_package.is_none() {
+        if self.dkg_state.get_private_key().is_none() || self.dkg_state.get_public_key().is_none() {
             println!("❌ DKG not completed – cannot start signing");
             return None;
         }
@@ -59,7 +58,7 @@ impl NodeState {
         }
 
         // Generate nonces & commitments for self
-        let key_pkg = self.private_key_package.as_ref().unwrap();
+        let key_pkg = self.dkg_state.get_private_key().as_ref().unwrap().clone();
         let (nonces, commitments) = frost::round1::commit(key_pkg.signing_share(), &mut self.rng);
 
         let mut commitments_map = BTreeMap::new();
@@ -102,7 +101,7 @@ impl NodeState {
         message: Vec<u8>,
         channel: request_response::ResponseChannel<PrivateResponse>,
     ) {
-        if self.private_key_package.is_none() {
+        if self.dkg_state.get_private_key().is_none() {
             let _ = self
                 .swarm
                 .inner
@@ -118,7 +117,7 @@ impl NodeState {
             return;
         }
 
-        let key_pkg = self.private_key_package.as_ref().unwrap();
+        let key_pkg = self.dkg_state.get_private_key().as_ref().unwrap().clone();
         let (nonces, commitments) = frost::round1::commit(key_pkg.signing_share(), &mut self.rng);
 
         // Save session (one at a time for simplicity)
@@ -211,7 +210,7 @@ impl NodeState {
             let sig_share = frost::round2::sign(
                 &signing_package,
                 &active.nonces,
-                self.private_key_package.as_ref().unwrap(),
+                self.dkg_state.get_private_key().as_ref().unwrap(),
             )
             .expect("Signing share");
             active
@@ -247,7 +246,7 @@ impl NodeState {
         let sig_share = frost::round2::sign(
             &signing_package,
             &active.nonces,
-            self.private_key_package.as_ref().unwrap(),
+            self.dkg_state.get_private_key().as_ref().unwrap(),
         )
         .expect("Sign share");
 
@@ -295,7 +294,7 @@ impl NodeState {
             let group_sig = frost::aggregate(
                 &signing_package,
                 &active.signature_shares,
-                self.pubkey_package.as_ref().unwrap(),
+                self.dkg_state.get_public_key().as_ref().unwrap(),
             )
             .expect("Aggregate");
             let sig_hex = hex::encode(group_sig.serialize().expect("serialize group sig"));

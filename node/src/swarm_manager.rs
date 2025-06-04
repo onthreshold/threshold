@@ -124,6 +124,7 @@ pub struct SwarmManager {
     pub rx: mpsc::UnboundedReceiver<NetworkMessage>,
 }
 
+
 pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), NodeError> {
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()

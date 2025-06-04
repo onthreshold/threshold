@@ -41,7 +41,7 @@ impl NodeState {
             select! {
                 send_message = self.swarm.rx.recv() => match send_message {
                     Some(NetworkMessage::SendBroadcast { topic, message }) => {
-                        self.swarm.inner
+                        let _ = self.swarm.inner
                             .behaviour_mut()
                             .gossipsub
                             .publish(topic, message);
@@ -57,7 +57,7 @@ impl NodeState {
                         }
                     }
                     Some(NetworkMessage::SendPrivateResponse(channel, response)) => {
-                        self.swarm.inner
+                        let _ = self.swarm.inner
                             .behaviour_mut()
                             .request_response
                             .send_response(channel, response);
@@ -89,11 +89,11 @@ impl NodeState {
                                 let data = frost::keys::dkg::round1::Package::deserialize(&message.data)
                                     .expect("Failed to deserialize round1 package");
                                 if let Some(source_peer) = message.source {
-                                    self.handle_round1_payload(source_peer, data);
+                                    self.dkg_state.handle_round1_payload(source_peer, data);
                                 }
                             }
                             t if t == start_dkg_topic.hash() => {
-                                self.handle_dkg_start();
+                                self.dkg_state.handle_dkg_start();
                             }
                             _ => {
                                 println!("Received unhandled broadcast");
@@ -107,7 +107,7 @@ impl NodeState {
                             message: request_response::Message::Request { request: PrivateRequest::Round2Package(package), channel, .. }
                         }
                     )) => {
-                        self.handle_round2_payload(peer, package, channel);
+                        self.dkg_state.handle_round2_payload(peer, package, channel);
                     },
                     // Incoming SignRequest
                     SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
@@ -155,12 +155,9 @@ impl NodeState {
                         topic,
                     })) => {
                         if topic == start_dkg_topic.hash() {
-                            self.dkg_listeners.insert(peer_id);
-                            println!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_listeners.len());
-                            if self.dkg_listeners.len() + 1 != self.max_signers as usize {
-                                self.handle_dkg_start();
-                            }
-
+                            self.dkg_state.dkg_listeners.insert(peer_id);
+                            println!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_state.dkg_listeners.len());
+                            self.dkg_state.handle_dkg_start();
                         }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
