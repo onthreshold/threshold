@@ -1,6 +1,5 @@
 mod errors;
 mod key_manager;
-mod server;
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -18,16 +17,16 @@ use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use key_manager::{handle_key_error_and_exit, load_and_decrypt_keypair, Config, KeyData};
 use libp2p::{identity::Keypair, PeerId};
-use std::{fs, path::PathBuf, str::FromStr};
+use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
+use tokio::sync::Mutex;
+use tonic::transport::Server;
 
-use node::{swarm_manager::build_swarm, NodeState};
+use node::{grpc_service::NodeControlService, NodeState};
 
 use crate::{
     errors::{CliError, KeygenError},
     key_manager::{get_config, EncryptionParams},
 };
-
-use crate::server::run_server;
 
 fn get_key_file_path() -> Result<PathBuf, KeygenError> {
     let proj_dirs = ProjectDirs::from("", "", "TheVault").ok_or_else(|| {
@@ -115,8 +114,6 @@ enum Commands {
     Run {
         #[arg(short, long)]
         file_path: Option<String>,
-        #[arg(short, long)]
-        port: Option<u16>,
     },
 }
 
@@ -134,8 +131,8 @@ async fn main() -> Result<(), CliError> {
                 CliError::KeygenError(e)
             })?;
         }
-        Commands::Run { file_path, port } => {
-            start_node(file_path, port)
+        Commands::Run { file_path } => {
+            start_node(file_path)
                 .await
                 .map_err(|_| CliError::NodeError)?;
         }
@@ -160,7 +157,6 @@ fn setup_config(
         encrypted_private_key_b64: encrypted_private_key,
         encryption_params,
     };
-
     let config = Config {
         allowed_peers: allowed_peers.unwrap_or_default(),
         key_data,
@@ -191,7 +187,7 @@ fn setup_config(
     Ok(())
 }
 
-async fn start_node(file_path: Option<String>, port: Option<u16>) -> Result<(), Box<dyn std::error::Error>> {
+async fn start_node(file_path: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
     let config = match get_config(file_path) {
         Ok(config) => config,
         Err(e) => handle_key_error_and_exit(e),
@@ -202,21 +198,8 @@ async fn start_node(file_path: Option<String>, port: Option<u16>) -> Result<(), 
         Err(e) => handle_key_error_and_exit(e),
     };
 
-    let server_port = port.unwrap_or(50051);
-    tokio::spawn(async move {
-        if let Err(e) = create_node_server(Some(server_port)).await {
-            eprintln!("gRPC server failed: {}", e);
-        }
-    });
-
     let max_signers = 5;
     let min_signers = 3;
-
-    let mut swarm = build_swarm(keypair).map_err(|node_err: node::swarm_manager::NodeError| {
-        let err_msg = format!("Failed to build swarm: {}", node_err.message);
-        println!("{}", err_msg);
-        Box::new(std::io::Error::other(err_msg)) as Box<dyn std::error::Error>
-    })?;
 
     let allowed_peers = config
         .allowed_peers
@@ -224,14 +207,48 @@ async fn start_node(file_path: Option<String>, port: Option<u16>) -> Result<(), 
         .map(|peer_id| PeerId::from_str(peer_id).unwrap())
         .collect();
 
-    let mut node_state = NodeState::new(&mut swarm, allowed_peers, min_signers, max_signers);
-    let _ = node_state.main_loop().await;
+    let node_state = NodeState::new(keypair, allowed_peers, min_signers, max_signers);
+    let node_state = Arc::new(Mutex::new(node_state));
+
+    let grpc_node_state = Arc::clone(&node_state);
+
+    let grpc_handle = tokio::spawn(async move {
+        let addr = "[::1]:50051".parse().unwrap();
+
+        let node_control_service = NodeControlService::new(grpc_node_state);
+
+        println!("gRPC server listening on {}", addr);
+
+        Server::builder()
+            .add_service(node_control_service.into_server())
+            .serve(addr)
+            .await
+            .expect("gRPC server failed");
+    });
+
+    let main_loop_handle = tokio::spawn(async move {
+        let mut node_state_guard = node_state.lock().await;
+        node_state_guard.main_loop().await
+    });
+
+    // Wait for either task to complete (they should run indefinitely)
+    tokio::select! {
+        result = grpc_handle => {
+            match result {
+                Ok(_) => println!("gRPC server stopped"),
+                Err(e) => eprintln!("gRPC server error: {}", e),
+            }
+        }
+        result = main_loop_handle => {
+            match result {
+                Ok(Ok(_)) => println!("Main loop stopped"),
+                Ok(Err(e)) => eprintln!("Main loop error: {}", e),
+                Err(e) => eprintln!("Main loop task error: {}", e),
+            }
+        }
+    }
 
     Ok(())
-}
-
-async fn create_node_server(port: Option<u16>) -> Result<(), Box<dyn std::error::Error>> {
-    run_server(port.unwrap_or(50051)).await
 }
 
 #[cfg(test)]

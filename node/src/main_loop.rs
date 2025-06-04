@@ -12,10 +12,11 @@ use tokio::io::AsyncBufReadExt;
 use tokio::select;
 
 use crate::NodeState;
+use crate::errors::NodeError;
 use crate::swarm_manager::MyBehaviourEvent;
 use crate::swarm_manager::{PingBody, PrivateRequest, PrivateResponse};
 
-impl<'a> NodeState<'a> {
+impl NodeState {
     pub fn handle_input(&mut self, line: String, round1_topic: &IdentTopic) {
         if line.trim() == "/dkg" {
             // Create start-dkg topic
@@ -87,7 +88,7 @@ impl<'a> NodeState<'a> {
         }
     }
 
-    pub async fn main_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn main_loop(&mut self) -> Result<(), NodeError> {
         // Read full lines from stdin
         let mut stdin = io::BufReader::new(io::stdin()).lines();
 
@@ -95,7 +96,8 @@ impl<'a> NodeState<'a> {
         self.swarm
             .behaviour_mut()
             .gossipsub
-            .subscribe(&round1_topic)?;
+            .subscribe(&round1_topic)
+            .map_err(|e| NodeError::Error(e.to_string()))?;
 
         // let topic = gossipsub::IdentTopic::new("publish-key");
         // self.swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
@@ -104,7 +106,9 @@ impl<'a> NodeState<'a> {
         self.swarm
             .behaviour_mut()
             .gossipsub
-            .subscribe(&start_dkg_topic)?;
+            .subscribe(&start_dkg_topic)
+            .map_err(|e| NodeError::Error(e.to_string()))?;
+
         println!("Local peer id: {}", self.peer_id);
 
         loop {

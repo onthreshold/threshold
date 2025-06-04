@@ -9,7 +9,7 @@ use frost_secp256k1::{
 use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 
-impl<'a> NodeState<'a> {
+impl NodeState {
     pub fn handle_dkg_start(&mut self, round1_topic: &IdentTopic) {
         // Run the DKG initialization code
         let participant_identifier = peer_id_to_identifier(&self.peer_id);

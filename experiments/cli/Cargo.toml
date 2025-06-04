@@ -26,12 +26,8 @@ aes-gcm = "0.10"
 base64 = "0.22.1"
 rpassword = "7.2"
 derive_more = { version = "2.0.1", features = ["full"] }
-tonic = "0.13.1"
-prost = "0.13"
+tonic = "0.13"
 
 [dev-dependencies]
 tempfile = "3.8"
 assert_matches = "1.5"
-
-[build-dependencies]
-tonic-build = "0.13.1"

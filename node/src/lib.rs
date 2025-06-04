@@ -2,16 +2,21 @@ use frost_secp256k1::{
     self as frost, Identifier,
     keys::dkg::{round1, round2},
 };
-use libp2p::PeerId;
+use libp2p::{PeerId, identity::Keypair};
 use std::collections::BTreeMap;
 
+use crate::swarm_manager::build_swarm;
+
 pub mod dkg;
+pub mod grpc_service;
 pub mod main_loop;
 pub mod signing;
 pub mod swarm_manager;
 pub mod wallet;
 
-pub struct NodeState<'a> {
+pub mod errors;
+
+pub struct NodeState {
     pub allowed_peers: Vec<PeerId>,
 
     // DKG
@@ -20,7 +25,8 @@ pub struct NodeState<'a> {
     pub round1_peer_packages: BTreeMap<Identifier, round1::Package>,
     pub round2_peer_packages: BTreeMap<Identifier, round2::Package>,
     pub peers: Vec<PeerId>,
-    pub swarm: &'a mut libp2p::swarm::Swarm<crate::swarm_manager::MyBehaviour>,
+    pub swarm: libp2p::swarm::Swarm<crate::swarm_manager::MyBehaviour>,
+    pub keypair: Keypair,
     pub min_signers: u16,
     pub max_signers: u16,
     pub rng: frost::rand_core::OsRng,
@@ -35,20 +41,22 @@ pub struct NodeState<'a> {
     pub pending_spends: std::collections::BTreeMap<u64, crate::wallet::PendingSpend>,
 }
 
-impl<'a> NodeState<'a> {
+impl NodeState {
     pub fn new(
-        swarm: &'a mut libp2p::swarm::Swarm<crate::swarm_manager::MyBehaviour>,
+        keypair: Keypair,
         allowed_peers: Vec<PeerId>,
         min_signers: u16,
         max_signers: u16,
     ) -> Self {
         // Node State
+        let swarm = build_swarm(keypair.clone()).expect("Failed to build swarm");
         let peer_id = *swarm.local_peer_id();
 
         NodeState {
             allowed_peers,
             r1_secret_package: None,
             r2_secret_package: None,
+            keypair,
             peer_id,
             round1_peer_packages: BTreeMap::new(),
             round2_peer_packages: BTreeMap::new(),
