@@ -1,8 +1,14 @@
 use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use tonic::{Request, Response, Status};
-
 use crate::swarm_manager::{NetworkHandle, PingBody, PrivateRequest, PrivateResponse};
+
+use uuid::Uuid;
+use bitcoin::Network;
+use bitcoin::script::Builder;
+use bitcoin::PublicKey;
+use bitcoin::Address;
+use std::str::FromStr;
 
 // Include the generated proto code
 pub mod node_proto {
@@ -120,6 +126,50 @@ impl NodeControl for NodeControlService {
         Ok(Response::new(SendDirectMessageResponse {
             success: true,
             message: format!("Message sent to {}", target_peer_id),
+        }))
+    }
+
+    async fn create_deposit_intent(
+        &self,
+        request: Request<CreateDepositIntentRequest>,
+    ) -> Result<Response<CreateDepositIntentResponse>, Status> {
+        let req = request.into_inner();
+
+        let user_id = if req.user_id.parse::<PeerId>().is_ok() {
+            req.user_id
+        } else {
+            return Err(Status::invalid_argument("User ID must be a valid peer ID"));
+        };
+
+        let amount_sat = if req.amount_satoshis > 0 {
+            req.amount_satoshis
+        } else {
+            return Err(Status::invalid_argument("Amount to deposit must be greater than 0"));
+        };
+
+
+        let deposit_tracking_id = Uuid::new_v4().to_string();
+        
+        // USING MOCK PUBLIC KEY FOR NOW
+        let frost_pubkey_hex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+
+        let public_key = PublicKey::from_str(frost_pubkey_hex)
+            .map_err(|e| Status::internal(format!("Failed to parse public key: {}", e)))?;
+
+        let witness_script = Builder::new()
+            .push_key(&public_key)
+            .push_opcode(bitcoin::opcodes::all::OP_CHECKSIG)
+            .into_script();
+
+        let deposit_address = Address::p2wsh(&witness_script, Network::Testnet);
+
+        println!("Received request to create deposit intent for user {} with amount {}. Tracking ID: {}. Deposit Address: {}", user_id, amount_sat, deposit_tracking_id.clone(), deposit_address.to_string());
+
+        Ok(Response::new(CreateDepositIntentResponse {
+            success: true,
+            message: format!("Deposit intent created for user {}", user_id),
+            deposit_tracking_id: deposit_tracking_id,
+            deposit_address: deposit_address.to_string(),
         }))
     }
 }
