@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashSet};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     errors::NodeError,
@@ -43,21 +44,21 @@ pub struct DkgState {
 impl DkgState {
     pub fn handle_dkg_start(&mut self) -> Result<(), NodeError> {
         if self.dkg_started {
-            println!("DKG already started, skipping DKG process");
+            debug!("DKG already started, skipping DKG process");
             return Ok(());
         }
 
         // Check if DKG keys already exist
         if self.private_key_package.is_some() && self.pubkey_package.is_some() {
-            println!("DKG keys already exist, skipping DKG process");
+            info!("DKG keys already exist, skipping DKG process");
             if let Some(pubkey) = &self.pubkey_package {
-                println!("Existing public key: {:?}", pubkey.verifying_key());
+                info!("Existing public key: {:?}", pubkey.verifying_key());
             }
             return Ok(());
         }
 
         if self.dkg_listeners.len() + 1 != self.max_signers as usize {
-            println!(
+            debug!(
                 "Not all listeners have subscribed to the DKG topic, not starting DKG process. Listeners: {:?}",
                 self.dkg_listeners.len()
             );
@@ -114,15 +115,13 @@ impl DkgState {
 
         match self.try_enter_round2() {
             Ok(_) => {
-                println!(
+                info!(
                     "Generated and published round1 package in response to DKG start signal from {}",
                     &self.peer_id
                 );
                 Ok(())
             }
-            Err(e) => {
-                Err(NodeError::Error(format!("Failed to enter round2: {}", e)))
-            }
+            Err(e) => Err(NodeError::Error(format!("Failed to enter round2: {}", e))),
         }
     }
 
@@ -144,7 +143,7 @@ impl DkgState {
         // Add package to peer packages
         self.round1_peer_packages.insert(identifier, package);
 
-        println!(
+        debug!(
             "Received round1 package from {} ({}/{})",
             sender_peer_id,
             self.round1_peer_packages.len(),
@@ -159,13 +158,13 @@ impl DkgState {
     pub fn try_enter_round2(&mut self) -> Result<(), NodeError> {
         if let Some(r1_secret_package) = self.r1_secret_package.as_ref() {
             if self.round1_peer_packages.len() + 1 == self.max_signers as usize {
-                println!("Received all round1 packages, entering part2");
+                info!("Received all round1 packages, entering part2");
                 // all packages received
                 let part2_result =
                     frost::keys::dkg::part2(r1_secret_package.clone(), &self.round1_peer_packages);
                 match part2_result {
                     Ok((round2_secret_package, round2_packages)) => {
-                        println!("-------------------- ENTERING ROUND 2 ---------------------");
+                        info!("-------------------- ENTERING ROUND 2 ---------------------");
                         self.r1_secret_package = None;
                         self.r2_secret_package = Some(round2_secret_package);
 
@@ -174,7 +173,7 @@ impl DkgState {
                             let package_to_send = match round2_packages.get(&identifier) {
                                 Some(package) => package,
                                 None => {
-                                    println!("Round2 package not found for {}", peer_to_send_to);
+                                    warn!("Round2 package not found for {}", peer_to_send_to);
                                     return Err(NodeError::Error(format!(
                                         "Round2 package not found for {}",
                                         peer_to_send_to
@@ -190,7 +189,7 @@ impl DkgState {
                             {
                                 Ok(_) => (),
                                 Err(e) => {
-                                    println!("Round2 package not found for {}", peer_to_send_to);
+                                    error!("Round2 package not found for {}", peer_to_send_to);
                                     return Err(NodeError::Error(format!(
                                         "Failed to send private request: {:?}",
                                         e
@@ -198,7 +197,7 @@ impl DkgState {
                                 }
                             }
 
-                            println!("Sent round2 package to {}", peer_to_send_to);
+                            debug!("Sent round2 package to {}", peer_to_send_to);
                         }
                     }
                     Err(e) => {
@@ -235,7 +234,7 @@ impl DkgState {
         // Add package to peer packages
         self.round2_peer_packages.insert(identifier, package);
 
-        println!(
+        debug!(
             "Received round2 package from {} ({}/{})",
             sender_peer_id,
             self.round2_peer_packages.len(),
@@ -244,7 +243,7 @@ impl DkgState {
 
         if let Some(r2_secret_package) = self.r2_secret_package.as_ref() {
             if self.round2_peer_packages.len() + 1 == self.max_signers as usize {
-                println!("Received all round2 packages, entering part3");
+                info!("Received all round2 packages, entering part3");
                 let part3_result = frost::keys::dkg::part3(
                     &r2_secret_package.clone(),
                     &self.round1_peer_packages,
@@ -253,7 +252,7 @@ impl DkgState {
 
                 match part3_result {
                     Ok((private_key_package, pubkey_package)) => {
-                        println!(
+                        info!(
                             "🎉 DKG finished successfully. Public key: {:?}",
                             pubkey_package.verifying_key()
                         );
@@ -262,15 +261,15 @@ impl DkgState {
                         self.pubkey_package = Some(pubkey_package);
 
                         if let Err(e) = self.save_dkg_keys() {
-                            println!("Failed to save DKG keys: {}", e);
+                            error!("Failed to save DKG keys: {}", e);
                         } else {
-                            println!("DKG keys saved to config file");
+                            info!("DKG keys saved to config file");
                         }
 
                         self.dkg_started = false;
                     }
                     Err(e) => {
-                        println!("DKG failed during part3 aggregation: {}", e);
+                        error!("DKG failed during part3 aggregation: {}", e);
                         // Reset state so that a fresh DKG can be attempted again later
                         self.reset_dkg_state();
                     }

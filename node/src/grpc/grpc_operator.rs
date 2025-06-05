@@ -7,6 +7,7 @@ use crate::swarm_manager::{NetworkHandle, PingBody, PrivateRequest, PrivateRespo
 use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use tonic::{Request, Response, Status};
+use tracing::{debug, info};
 
 use bitcoin::Address;
 use bitcoin::Network;
@@ -40,7 +41,7 @@ pub async fn spend_funds(
 ) -> Result<Response<SpendFundsResponse>, Status> {
     let amount_sat = request.into_inner().amount_satoshis;
 
-    println!("Received request to spend {} satoshis", amount_sat);
+    debug!("Received request to spend {} satoshis", amount_sat);
     let response = network
         .send_self_request(PrivateRequest::Spend { amount_sat }, true)
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
@@ -161,7 +162,7 @@ pub async fn create_deposit_intent(
 
     let deposit_address = Address::p2wsh(&witness_script, Network::Testnet);
 
-    println!(
+    info!(
         "Received request to create deposit intent for user {} with amount {}. Tracking ID: {}. Deposit Address: {}",
         user_id,
         amount_sat,

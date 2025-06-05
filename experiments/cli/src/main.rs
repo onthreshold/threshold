@@ -1,5 +1,4 @@
 mod errors;
-mod key_manager;
 mod rpc_client;
 
 use aes_gcm::{
@@ -16,18 +15,13 @@ use argon2::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
-use key_manager::{get_config, handle_key_error_and_exit, load_and_decrypt_keypair};
 use libp2p::identity::Keypair;
 use rpc_client::{
     rpc_create_deposit_intent, rpc_send_direct_message, rpc_spend, rpc_start_signing,
 };
 use std::{fs, path::PathBuf};
-use tonic::transport::Server;
 
-use node::{
-    grpc::grpc_handler::NodeControlService, swarm_manager::build_swarm, Config, EncryptionParams,
-    KeyData, NodeState, PeerData,
-};
+use node::{start_node::start_node, Config, EncryptionParams, KeyData, PeerData};
 
 use crate::errors::{CliError, KeygenError};
 
@@ -40,6 +34,16 @@ fn get_key_file_path() -> Result<PathBuf, KeygenError> {
     fs::create_dir_all(config_dir).map_err(|e| KeygenError::DirectoryCreation(e.to_string()))?;
 
     Ok(config_dir.join("config.json"))
+}
+
+fn get_log_file_path() -> Result<PathBuf, KeygenError> {
+    let proj_dirs = ProjectDirs::from("", "", "TheVault").ok_or_else(|| {
+        KeygenError::DirectoryCreation("Failed to determine project directory".into())
+    })?;
+
+    let log_dir = proj_dirs.config_dir();
+    let path = log_dir.join("node.log");
+    Ok(path)
 }
 
 fn generate_key(password: &str, salt: &SaltString) -> Result<Vec<u8>, KeygenError> {
@@ -119,6 +123,12 @@ enum Commands {
         config: Option<String>,
         #[arg(short, long)]
         grpc_port: Option<u16>,
+        #[arg(short, long)]
+        log_file: Option<String>,
+        #[arg(short = 'n', long)]
+        max_signers: Option<u16>,
+        #[arg(short = 't', long)]
+        min_signers: Option<u16>,
     },
     Spend {
         amount: u64,
@@ -159,8 +169,14 @@ async fn main() -> Result<(), CliError> {
                 CliError::KeygenError(e)
             })?;
         }
-        Commands::Run { config, grpc_port } => {
-            start_node(config, grpc_port)
+        Commands::Run {
+            config,
+            grpc_port,
+            log_file,
+            max_signers,
+            min_signers,
+        } => {
+            start_node_cli(config, grpc_port, log_file, max_signers, min_signers)
                 .await
                 .map_err(|_| CliError::NodeError)?;
         }
@@ -231,6 +247,7 @@ fn setup_config(
         allowed_peers: allowed_peer_data,
         key_data,
         dkg_keys: None,
+        log_file_path: Some(get_log_file_path()?),
     };
 
     let json = serde_json::to_string_pretty(&config)
@@ -261,103 +278,21 @@ fn setup_config(
     Ok(())
 }
 
-async fn start_node(
+async fn start_node_cli(
     config_filepath: Option<String>,
     grpc_port: Option<u16>,
+    log_file: Option<String>,
+    max_signers: Option<u16>,
+    min_signers: Option<u16>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let config_file_path = if let Some(path) = config_filepath.clone() {
-        path
-    } else {
-        match get_key_file_path() {
-            Ok(path) => path.to_string_lossy().to_string(),
-            Err(e) => {
-                eprintln!("Failed to get config file path: {}", e);
-                std::process::exit(1);
-            }
-        }
-    };
-
-    let config = match get_config(config_filepath) {
-        Ok(config) => config,
-        Err(e) => {
-            println!("Failed to get config: {}", e);
-            handle_key_error_and_exit(e);
-        }
-    };
-
-    let keypair = match load_and_decrypt_keypair(&config) {
-        Ok(kp) => kp,
-        Err(e) => {
-            println!("Failed to decrypt key: {}", e);
-            handle_key_error_and_exit(e);
-        }
-    };
-
-    let max_signers = 3;
-    let min_signers = 2;
-
-    let allowed_peers = config.allowed_peers;
-
-    let (network_handle, mut swarm, network_events_stream) =
-        build_swarm(keypair.clone(), allowed_peers.clone()).expect("Failed to build swarm");
-
-    let mut node_state = NodeState::new_from_config(
-        network_handle,
-        allowed_peers,
-        min_signers,
+    start_node(
         max_signers,
-        config_file_path,
-        network_events_stream,
+        min_signers,
+        config_filepath,
+        grpc_port,
+        log_file.map(PathBuf::from),
     )
-    .expect("Failed to create node");
-
-    let network_handle = node_state.network_handle.clone();
-
-    let swarm_handle = tokio::spawn(async move {
-        swarm.start().await;
-    });
-
-    let grpc_handle = tokio::spawn(async move {
-        let addr = format!("0.0.0.0:{}", grpc_port.unwrap_or(50051))
-            .parse()
-            .unwrap();
-
-        let node_control_service = NodeControlService::new(network_handle);
-
-        println!("gRPC server listening on {}", addr);
-
-        Server::builder()
-            .add_service(node_control_service.into_server())
-            .serve(addr)
-            .await
-            .expect("gRPC server failed");
-    });
-
-    let main_loop_handle = tokio::spawn(async move { node_state.start().await });
-
-    // Wait for either task to complete (they should run indefinitely)
-    tokio::select! {
-        result = grpc_handle => {
-            match result {
-                Ok(_) => println!("gRPC server stopped"),
-                Err(e) => eprintln!("gRPC server error: {}", e),
-            }
-        }
-        result = swarm_handle => {
-            match result {
-                Ok(_) => println!("Swarm stopped"),
-                Err(e) => eprintln!("Swarm error: {}", e),
-            }
-        }
-        result = main_loop_handle => {
-            match result {
-                Ok(Ok(_)) => println!("Main loop stopped"),
-                Ok(Err(e)) => eprintln!("Main loop error: {}", e),
-                Err(e) => eprintln!("Main loop task error: {}", e),
-            }
-        }
-    }
-
+    .await?;
     Ok(())
 }
 

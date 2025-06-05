@@ -4,6 +4,7 @@ use libp2p::gossipsub;
 use libp2p::request_response;
 use libp2p::swarm::SwarmEvent;
 use tokio::select;
+use tracing::{debug, error, info};
 
 use crate::NodeState;
 use crate::errors::NodeError;
@@ -13,7 +14,7 @@ use crate::swarm_manager::{
 
 impl NodeState {
     pub async fn start(&mut self) -> Result<(), NodeError> {
-        println!("Local peer id: {}", self.peer_id);
+        info!("Local peer id: {}", self.peer_id);
 
         let round1_topic = gossipsub::IdentTopic::new("round1_topic");
         let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
@@ -21,7 +22,7 @@ impl NodeState {
             select! {
                 send_message = self.network_events_stream.recv() => match send_message {
                     Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequest { request, response_channel: None })) => {
-                        println!("Received self request {:?}", request);
+                        debug!("Received self request {:?}", request);
                             match request {
                                 PrivateRequest::InsertBlock { hash, block } => {
                                     match self.db.insert_block(hash, block) {
@@ -35,7 +36,7 @@ impl NodeState {
                             }
                     }
                     Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequest { request, response_channel: Some(response_channel) })) => {
-                        println!("Received self request {:?}", request);
+                        debug!("Received self request {:?}", request);
                             match request {
                                 PrivateRequest::StartSigningSession { hex_message } => {
                                     match self.start_signing_session(&hex_message) {
@@ -79,7 +80,7 @@ impl NodeState {
                         match message.topic {
                             t if t == round1_topic.hash() => {
                                 if let Some(source_peer) = message.source {
-                                    println!("Received round1 payload from {}", self.peer_name(&source_peer));
+                                    info!("Received round1 payload from {}", self.peer_name(&source_peer));
                                 } else {
                                     return Err(NodeError::Error("No source peer".to_string()));
                                 }
@@ -88,7 +89,7 @@ impl NodeState {
                                     match self.dkg_state.handle_round1_payload(source_peer, message.data) {
                                         Ok(_) => (),
                                         Err(e) => {
-                                            println!("❌ Failed to handle round1 payload: {}", e);
+                                            error!("❌ Failed to handle round1 payload: {}", e);
                                         }
                                     }
                                 }
@@ -97,12 +98,12 @@ impl NodeState {
                                 match self.dkg_state.handle_dkg_start() {
                                     Ok(_) => (),
                                     Err(e) => {
-                                        println!("❌ Failed to handle DKG start: {}", e);
+                                        error!("❌ Failed to handle DKG start: {}", e);
                                     }
                                 }
                             }
                             _ => {
-                                println!("Received unhandled broadcast");
+                                debug!("Received unhandled broadcast");
                             }
                         }
                     },
@@ -116,7 +117,7 @@ impl NodeState {
                         match self.dkg_state.handle_round2_payload(peer, package, channel) {
                             Ok(_) => (),
                             Err(e) => {
-                                println!("❌ Failed to handle round2 payload: {}", e);
+                                error!("❌ Failed to handle round2 payload: {}", e);
                             }
                         }
                     },
@@ -130,7 +131,7 @@ impl NodeState {
                         match self.handle_sign_request(peer, sign_id, message, channel) {
                             Ok(_) => (),
                             Err(e) => {
-                                println!("❌ Failed to handle sign request: {}", e);
+                                error!("❌ Failed to handle sign request: {}", e);
                             }
                         }
                     },
@@ -144,7 +145,7 @@ impl NodeState {
                         match self.handle_sign_package(peer, sign_id, package, channel) {
                             Ok(_) => (),
                             Err(e) => {
-                                println!("❌ Failed to handle sign package: {}", e);
+                                error!("❌ Failed to handle sign package: {}", e);
                             }
                         }
                     },
@@ -154,9 +155,9 @@ impl NodeState {
                     })))) => {
                         if topic == start_dkg_topic.hash() {
                             self.dkg_state.dkg_listeners.insert(peer_id);
-                            println!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_state.dkg_listeners.len());
+                            info!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_state.dkg_listeners.len());
                             if let Err(e) = self.dkg_state.handle_dkg_start() {
-                                println!("❌ Failed to handle DKG start: {}", e);
+                                error!("❌ Failed to handle DKG start: {}", e);
                             }
                         }
                     },
@@ -170,7 +171,7 @@ impl NodeState {
                         match self.handle_commitments_response(peer, sign_id, commitments) {
                             Ok(_) => (),
                             Err(e) => {
-                                println!("❌ Failed to handle commitments response: {}", e);
+                                error!("❌ Failed to handle commitments response: {}", e);
                             }
                         }
                     },
@@ -184,7 +185,7 @@ impl NodeState {
                         match self.handle_signature_share(peer, sign_id, signature_share) {
                             Ok(_) => (),
                             Err(e) => {
-                                println!("❌ Failed to handle signature share: {}", e);
+                                error!("❌ Failed to handle signature share: {}", e);
                             }
                         }
                     },

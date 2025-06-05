@@ -170,6 +170,7 @@ impl DkgState {
                     },
                 },
                 dkg_keys: None,
+                log_file_path: None,
             }
         };
 

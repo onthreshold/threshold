@@ -1,11 +1,11 @@
 use bitcoin::absolute::LockTime;
 use bitcoin::consensus::encode::serialize;
 use bitcoin::hashes::Hash;
-use bitcoin::hex::DisplayHex;
 use bitcoin::transaction::{OutPoint, Version};
 use bitcoin::witness::Witness;
 use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut, hashes::sha256};
 use hex;
+use tracing::{error, info};
 
 use crate::NodeState;
 use frost_secp256k1::{self as frost};
@@ -144,14 +144,14 @@ impl NodeState {
     }
 
     pub fn start_spend_request(&mut self, amount_sat: u64) -> Option<String> {
-        println!("🚀 Creating spend request for {} sat", amount_sat);
+        info!("🚀 Creating spend request for {} sat", amount_sat);
         match self.wallet.create_spend(amount_sat) {
             Ok((tx, sighash)) => {
                 let sighash_hex = hex::encode(sighash);
                 match self.start_signing_session(&sighash_hex) {
                     Ok(_) => (),
                     Err(e) => {
-                        println!("❌ Failed to start signing session: {}", e);
+                        error!("❌ Failed to start signing session: {}", e);
                         return None;
                     }
                 }
@@ -159,16 +159,16 @@ impl NodeState {
                 if let Some(active) = &self.active_signing {
                     self.pending_spends
                         .insert(active.sign_id, crate::wallet::PendingSpend { tx });
-                    println!("🚀 Spend request prepared (session id {})", active.sign_id);
+                    info!("🚀 Spend request prepared (session id {})", active.sign_id);
 
-                    Some(sighash.to_lower_hex_string())
+                    Some(hex::encode(sighash))
                 } else {
-                    println!("❌ Failed to start signing session");
+                    error!("❌ Failed to start signing session");
                     None
                 }
             }
             Err(e) => {
-                println!("❌ Failed to create spend transaction: {}", e);
+                error!("❌ Failed to create spend transaction: {}", e);
                 None
             }
         }
