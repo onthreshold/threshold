@@ -8,22 +8,31 @@ pub type TransactionId = [u8; 32];
 pub struct Transaction {
     pub version: u32,
     pub timestamp: u64,
+    pub r#type: TransactionType,
     pub operations: Vec<Operation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq)]
+pub enum TransactionType {
+    Deposit,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq)]
 pub enum Operation {
-    OpIncrementBalance { account_id: String, amount: u64 },
+    OpPushAddress { address: String },
+    OpPushAmount { amount: u64 },
+    OpIncrementBalance,
 }
 
 impl Transaction {
-    pub fn new(operations: Vec<Operation>) -> Self {
+    pub fn new(r#type: TransactionType, operations: Vec<Operation>) -> Self {
         Transaction {
             version: 1,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
+            r#type,
             operations,
         }
     }
@@ -42,14 +51,5 @@ impl Transaction {
         let mut id = [0u8; 32];
         id.copy_from_slice(&result);
         id
-    }
-
-    pub fn total_value(&self) -> u64 {
-        self.operations
-            .iter()
-            .map(|op| match op {
-                Operation::OpIncrementBalance { amount, .. } => *amount,
-            })
-            .sum()
     }
 }
