@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "experiments/taproot",
     "experiments/cli",
     "node", "bin/esplora-client",
 ]

@@ -2,6 +2,7 @@ use futures::StreamExt;
 use libp2p::{PeerId, request_response::ResponseChannel, swarm::SwarmEvent};
 use std::{
     collections::{BTreeMap, HashSet, hash_map::DefaultHasher},
+    future::Future,
     hash::{Hash, Hasher},
     pin::Pin,
     time::Duration,
@@ -85,6 +86,9 @@ pub enum NetworkMessage {
     },
 }
 
+type NetworkResponseFuture =
+    Pin<Box<dyn Future<Output = Result<PrivateResponse, NetworkError>> + Send>>;
+
 #[derive(Debug, Clone)]
 pub struct NetworkHandle {
     peer_id: PeerId,
@@ -133,10 +137,7 @@ impl NetworkHandle {
         &self,
         request: PrivateRequest,
         sync: bool,
-    ) -> Result<
-        Option<Pin<Box<dyn Future<Output = Result<PrivateResponse, NetworkError>> + Send>>>,
-        NetworkError,
-    > {
+    ) -> Result<Option<NetworkResponseFuture>, NetworkError> {
         if sync {
             let (tx, mut rx) = unbounded_channel::<PrivateResponse>();
 

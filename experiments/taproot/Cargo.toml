@@ -1,9 +1,0 @@
-[package]
-name = "taproot"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-bitcoin = { workspace = true, features=["rand-std"]}
-frost-secp256k1 = { workspace = true } 
-hex = { workspace = true }
