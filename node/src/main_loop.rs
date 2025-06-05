@@ -1,6 +1,7 @@
 use futures::StreamExt;
 use libp2p::mdns;
 
+use frost_secp256k1::{self as frost};
 use libp2p::gossipsub;
 use libp2p::request_response;
 use libp2p::swarm::SwarmEvent;
@@ -8,69 +9,41 @@ use tokio::select;
 
 use crate::NodeState;
 use crate::errors::NodeError;
-use crate::swarm_manager::MyBehaviourEvent;
-use crate::swarm_manager::NetworkMessage;
-use crate::swarm_manager::{PrivateRequest, PrivateResponse};
+use crate::swarm_manager::{
+    MyBehaviourEvent, NetworkEvent, NetworkMessage, PrivateRequest, PrivateResponse,
+};
 
 impl NodeState {
-    pub async fn main_loop(&mut self) -> Result<(), NodeError> {
-        // Read full lines from stdin
-        let round1_topic = gossipsub::IdentTopic::new("round1_topic");
-        self.swarm
-            .inner
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&round1_topic)
-            .map_err(|e| NodeError::Error(e.to_string()))?;
-
-        // let topic = gossipsub::IdentTopic::new("publish-key");
-        // self.swarm.inner.behaviour_mut().gossipsub.subscribe(&topic)?;
-
-        let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
-        self.swarm
-            .inner
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&start_dkg_topic)
-            .map_err(|e| NodeError::Error(e.to_string()))?;
-
+    pub async fn start(&mut self) -> Result<(), NodeError> {
         println!("Local peer id: {}", self.peer_id);
 
+        let round1_topic = gossipsub::IdentTopic::new("round1_topic");
+        let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
         loop {
             select! {
-                send_message = self.swarm.rx.recv() => match send_message {
-                    Some(NetworkMessage::SendBroadcast { topic, message }) => {
-                        let _ = self.swarm.inner
-                            .behaviour_mut()
-                            .gossipsub
-                            .publish(topic, message);
-                    }
-                    Some(NetworkMessage::SendPrivateRequest(peer_id, request)) => {
-                        self.swarm.inner
-                            .behaviour_mut()
-                            .request_response
-                            .send_request(&peer_id, request);
-                    }
-                    Some(NetworkMessage::SendPrivateResponse(channel, response)) => {
-                        let _ = self.swarm.inner
-                            .behaviour_mut()
-                            .request_response
-                            .send_response(channel, response);
-                    }
-                    Some(NetworkMessage::SendSelfRequest{ request }) => {
-                        match request {
-                            PrivateRequest::InsertBlock { hash, block } => {
-                                match self.db.insert_block(hash, block) {
-                                    Ok(_) => (),
-                                    Err(e) => {
-                                        return Err(NodeError::Error(format!("Failed to start signing session: {}", e)));
+                send_message = self.network_events_stream.recv() => match send_message {
+                    Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequest { request })) => {
+                        println!("Received self request {:?}", request);
+                            match request {
+                                PrivateRequest::StartSigningSession { hex_message } => {
+                                    match self.start_signing_session(&hex_message) {
+                                        Ok(_) => (),
+                                        Err(e) => {
+                                            return Err(NodeError::Error(format!("Failed to start signing session: {}", e)));
+                                        }
                                     }
+                                },
+                                PrivateRequest::Spend { amount_sat } => {
+                                    let response = self.start_spend_request(amount_sat);
                                 }
+                                PrivateRequest::GetFrostPublicKey => {
+                                    let response = self.get_frost_public_key();
+                                }
+                                _ => {}
                             }
-                            _ => {}
-                        }
                     }
-                    Some(NetworkMessage::SendSelfRequestSync{ request, response_channel }) => {
+                    Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequestSync { request, response_channel })) => {
+                        println!("Received self request {:?}", request);
                             match request {
                                 PrivateRequest::StartSigningSession { hex_message } => {
                                     match self.start_signing_session(&hex_message) {
@@ -101,13 +74,16 @@ impl NodeState {
                                 _ => {}
                             }
                     }
-                    _ => {}
-                },
-                event = self.swarm.inner.select_next_some() => match event {
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                    Some(NetworkEvent::SwarmEvent(SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))))) => {
+                        for (peer_id, _multiaddr) in list {
+                            self.peers.insert(peer_id);
+                            self.dkg_state.peers.insert(peer_id);
+                        }
+                    },
+                    Some(NetworkEvent::SwarmEvent(SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                         message,
                         ..
-                    })) => {
+                    })))) => {
                         match message.topic {
                             t if t == round1_topic.hash() => {
                                 if let Some(source_peer) = message.source {
@@ -139,12 +115,12 @@ impl NodeState {
                         }
                     },
                     // Handle direct message requests (incoming)
-                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                    Some(NetworkEvent::SwarmEvent(SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
                         request_response::Event::Message {
                             peer,
                             message: request_response::Message::Request { request: PrivateRequest::Round2Package(package), channel, .. }
                         }
-                    )) => {
+                    )))) => {
                         match self.dkg_state.handle_round2_payload(peer, package, channel) {
                             Ok(_) => (),
                             Err(e) => {
@@ -153,12 +129,12 @@ impl NodeState {
                         }
                     },
                     // Incoming SignRequest
-                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                    Some(NetworkEvent::SwarmEvent(SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
                         request_response::Event::Message {
                             peer,
                             message: request_response::Message::Request { request: PrivateRequest::SignRequest { sign_id, message }, channel, .. }
                         }
-                    )) => {
+                    )))) => {
                         match self.handle_sign_request(peer, sign_id, message, channel) {
                             Ok(_) => (),
                             Err(e) => {
@@ -167,12 +143,12 @@ impl NodeState {
                         }
                     },
                     // Incoming SignPackage request to generate signature share
-                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                    Some(NetworkEvent::SwarmEvent(SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
                         request_response::Event::Message {
                             peer,
                             message: request_response::Message::Request { request: PrivateRequest::SignPackage { sign_id, package }, channel, .. }
                         }
-                    )) => {
+                    )))) => {
                         match self.handle_sign_package(peer, sign_id, package, channel) {
                             Ok(_) => (),
                             Err(e) => {
@@ -180,43 +156,10 @@ impl NodeState {
                             }
                         }
                     },
-                    // Responses with commitments
-                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
-                        request_response::Event::Message {
-                            peer,
-                            message: request_response::Message::Response { response: PrivateResponse::Commitments { sign_id, commitments }, .. }
-                        }
-                    )) => {
-                        match self.handle_commitments_response(peer, sign_id, commitments) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                println!("❌ Failed to handle commitments response: {}", e);
-                            }
-                        }
-                    },
-                    // Responses with signature share
-                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
-                        request_response::Event::Message {
-                            peer,
-                            message: request_response::Message::Response { response: PrivateResponse::SignatureShare { sign_id, signature_share }, .. }
-                        }
-                    )) => {
-                        match self.handle_signature_share(peer, sign_id, signature_share) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                println!("❌ Failed to handle signature share: {}", e);
-                            }
-                        }
-                    },
-                    SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                        let peer_count = self.swarm.inner.behaviour().gossipsub.all_peers().count();
-                        let peer_name = self.peer_name(&peer_id);
-                        println!("Connection closed with peer: {peer_name}, peers: {peer_count}");
-                    },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
+                    Some(NetworkEvent::SwarmEvent(SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
                         peer_id,
                         topic,
-                    })) => {
+                    })))) => {
                         if topic == start_dkg_topic.hash() {
                             self.dkg_state.dkg_listeners.insert(peer_id);
                             println!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_state.dkg_listeners.len());
@@ -225,59 +168,32 @@ impl NodeState {
                             }
                         }
                     },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                        for (peer_id, _multiaddr) in list {
-                            if self.allowed_peers.contains(&peer_id) {
-                                self.peers.insert(peer_id);
-                                self.dkg_state.peers.insert(peer_id);
-                                self.swarm.inner.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-                            }
-                        }
-                    },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                        for (peer_id, _multiaddr) in list {
-                            if self.allowed_peers.contains(&peer_id) {
-                                self.peers.retain(|p| *p != peer_id);
-                                self.dkg_state.peers.retain(|p| *p != peer_id);
-                                self.swarm.inner.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                            }
-                        }
-                    },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                    // Responses with commitments
+                    Some(NetworkEvent::SwarmEvent(SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
                         request_response::Event::Message {
                             peer,
-                            message: request_response::Message::Request { request: PrivateRequest::StartSigningSession{ hex_message }, channel, .. }
+                            message: request_response::Message::Response { response: PrivateResponse::Commitments { sign_id, commitments }, .. }
                         }
-                    )) => {
-                        if peer == self.peer_id {
-                            match self.start_signing_session(&hex_message) {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    println!("❌ Failed to start signing session: {}", e);
-                                }
+                    )))) => {
+                        match self.handle_commitments_response(peer, sign_id, commitments) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                println!("❌ Failed to handle commitments response: {}", e);
                             }
-                            let _ = self
-                                .swarm.inner
-                                .behaviour_mut()
-                                .request_response
-                                .send_response(channel, PrivateResponse::Pong);
                         }
                     },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
+                    // Responses with signature share
+                    Some(NetworkEvent::SwarmEvent(SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
                         request_response::Event::Message {
                             peer,
-                            message: request_response::Message::Request { request: PrivateRequest::Spend{ amount_sat }, channel, .. }
+                            message: request_response::Message::Response { response: PrivateResponse::SignatureShare { sign_id, signature_share }, .. }
                         }
-                    )) => {
-                        println!("Spend request from peer: {}", self.peer_name(&peer));
-                        if peer == self.peer_id {
-                            self.start_spend_request(amount_sat);
-
-                            let _ = self
-                                .swarm.inner
-                                .behaviour_mut()
-                                .request_response
-                                .send_response(channel, PrivateResponse::Pong);
+                    )))) => {
+                        match self.handle_signature_share(peer, sign_id, signature_share) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                println!("❌ Failed to handle signature share: {}", e);
+                            }
                         }
                     },
                     _ => {}

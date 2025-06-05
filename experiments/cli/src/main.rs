@@ -25,7 +25,13 @@ use std::{fs, path::PathBuf};
 use tonic::transport::Server;
 
 use node::{
-    grpc_handler::NodeControlService, Config, EncryptionParams, KeyData, NodeState, PeerData,
+    grpc_handler::NodeControlService,
+    swarm_manager::build_swarm,
+    Config,
+    EncryptionParams,
+    KeyData,
+    NodeState,
+    PeerData,
 };
 
 use crate::errors::{CliError, KeygenError};
@@ -292,23 +298,34 @@ async fn start_node(
         }
     };
 
-    let max_signers = 5;
-    let min_signers = 3;
+    let max_signers = 3;
+    let min_signers = 2;
 
     let allowed_peers = config.allowed_peers;
 
+    let (network_handle, mut swarm, network_events_stream) =
+        build_swarm(keypair.clone(), allowed_peers.clone()).expect("Failed to build swarm");
+
     let mut node_state = NodeState::new_from_config(
-        keypair,
+        network_handle,
         allowed_peers,
         min_signers,
         max_signers,
         config_file_path,
-    ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        network_events_stream,
+    )
+    .expect("Failed to create node");
 
     let network_handle = node_state.network_handle.clone();
 
+    let swarm_handle = tokio::spawn(async move {
+        swarm.start().await;
+    });
+
     let grpc_handle = tokio::spawn(async move {
-        let addr = format!("0.0.0.0:{}", grpc_port.unwrap_or(50051)).parse().unwrap();
+        let addr = format!("0.0.0.0:{}", grpc_port.unwrap_or(50051))
+            .parse()
+            .unwrap();
 
         let node_control_service = NodeControlService::new(network_handle);
 
@@ -321,7 +338,7 @@ async fn start_node(
             .expect("gRPC server failed");
     });
 
-    let main_loop_handle = tokio::spawn(async move { node_state.main_loop().await });
+    let main_loop_handle = tokio::spawn(async move { node_state.start().await });
 
     // Wait for either task to complete (they should run indefinitely)
     tokio::select! {
@@ -329,6 +346,12 @@ async fn start_node(
             match result {
                 Ok(_) => println!("gRPC server stopped"),
                 Err(e) => eprintln!("gRPC server error: {}", e),
+            }
+        }
+        result = swarm_handle => {
+            match result {
+                Ok(_) => println!("Swarm stopped"),
+                Err(e) => eprintln!("Swarm error: {}", e),
             }
         }
         result = main_loop_handle => {

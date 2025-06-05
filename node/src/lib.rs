@@ -1,9 +1,9 @@
 use frost_secp256k1::{self as frost, Identifier};
-use libp2p::{PeerId, identity::Keypair};
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
-use swarm_manager::{NetworkHandle, SwarmManager};
-
+use swarm_manager::{NetworkEvent, NetworkHandle};
+use tokio::sync::mpsc::UnboundedReceiver;
 use crate::{db::Db, dkg::DkgState, errors::NodeError, swarm_manager::build_swarm};
 
 pub mod block;
@@ -18,7 +18,7 @@ pub mod wallet;
 
 pub mod errors;
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct PeerData {
     pub name: String,
     pub public_key: String,
@@ -62,7 +62,6 @@ pub struct NodeState {
 
     pub peer_id: PeerId,
     pub peers: HashSet<PeerId>,
-    pub swarm: SwarmManager,
 
     pub min_signers: u16,
     pub max_signers: u16,
@@ -77,6 +76,8 @@ pub struct NodeState {
     pub config_file: String,
 
     pub network_handle: NetworkHandle,
+
+    pub network_events_stream: UnboundedReceiver<NetworkEvent>,
 }
 
 impl NodeState {
@@ -88,61 +89,52 @@ impl NodeState {
     }
 
     pub fn new_from_config(
-        keypair: Keypair,
+        network_handle: NetworkHandle,
         peer_data: Vec<PeerData>,
         min_signers: u16,
         max_signers: u16,
         config_file: String,
+        network_events_emitter: UnboundedReceiver<NetworkEvent>,
     ) -> Result<Self, NodeError> {
-        // Node State
-        let (network_handle, swarm) = build_swarm(keypair.clone()).expect("Failed to build swarm");
-        let peer_id = *swarm.inner.local_peer_id();
-
         let allowed_peers: Vec<PeerId> = peer_data
             .iter()
-            .map(|peer| {
+            .filter_map(|peer| {
                 peer.public_key
                     .parse()
-                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))
+                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e))).ok()
             })
-            .collect::<Result<Vec<PeerId>, NodeError>>()?;
+            .collect::<Vec<PeerId>>();
 
         let peers_to_names: BTreeMap<PeerId, String> = peer_data
             .iter()
-            .map(|peer| {
+            .filter_map(|peer| {
                 let peer_id = peer
                     .public_key
                     .parse()
-                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))?;
-                Ok((peer_id, peer.name.clone()))
+                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e))).ok()?;
+                Some((peer_id, peer.name.clone()))
             })
-            .collect::<Result<BTreeMap<PeerId, String>, NodeError>>()?;
+            .collect::<BTreeMap<PeerId, String>>();
+
+        let dkg_state = DkgState::new(
+            network_handle.clone(),
+            min_signers,
+            max_signers,
+            network_handle.peer_id(),
+            peers_to_names.clone(),
+            config_file.clone(),
+        )?;
 
         Ok(NodeState {
             network_handle: network_handle.clone(),
             allowed_peers: allowed_peers.clone(),
+            network_events_stream: network_events_emitter,
             peers_to_names: peers_to_names.clone(),
-            peer_id,
-            swarm,
+            peer_id: network_handle.peer_id(),
             min_signers,
             max_signers,
             db: Db::new("node_db.db"),
-            dkg_state: match DkgState::new(
-                network_handle.clone(),
-                min_signers,
-                max_signers,
-                peer_id,
-                peers_to_names,
-                config_file.clone(),
-            ) {
-                Ok(dkg_state) => dkg_state,
-                Err(e) => {
-                    return Err(NodeError::Error(format!(
-                        "Failed to create DKG state: {}",
-                        e
-                    )));
-                }
-            },
+            dkg_state,
             peers: HashSet::new(),
             rng: frost::rand_core::OsRng,
             active_signing: None,
@@ -150,28 +142,6 @@ impl NodeState {
             pending_spends: BTreeMap::new(),
             config_file: config_file.clone(),
         })
-    }
-
-    // Keep the old new() for backwards compatibility
-    pub fn new(
-        keypair: Keypair,
-        peer_data: Vec<PeerData>,
-        min_signers: u16,
-        max_signers: u16,
-    ) -> Result<Self, NodeError> {
-        match Self::new_from_config(
-            keypair,
-            peer_data,
-            min_signers,
-            max_signers,
-            "node_config.json".to_string(),
-        ) {
-            Ok(node_state) => Ok(node_state),
-            Err(e) => Err(NodeError::Error(format!(
-                "Failed to create node state: {}",
-                e
-            ))),
-        }
     }
 }
 

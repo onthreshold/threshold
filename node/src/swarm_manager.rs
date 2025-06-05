@@ -1,6 +1,7 @@
-use libp2p::{PeerId, request_response::ResponseChannel};
+use futures::StreamExt;
+use libp2p::{PeerId, request_response::ResponseChannel, swarm::SwarmEvent};
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{BTreeMap, HashSet, hash_map::DefaultHasher},
     hash::{Hash, Hasher},
     time::Duration,
 };
@@ -13,10 +14,13 @@ use libp2p::{
 use libp2p::{identity::Keypair, request_response::cbor};
 use tokio::{
     io,
-    sync::mpsc::{self, unbounded_channel},
+    sync::mpsc::{self, UnboundedReceiver, unbounded_channel},
 };
 
-use crate::errors::NetworkError;
+use crate::{
+    PeerData,
+    errors::{NetworkError, NodeError},
+};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct PingBody {
@@ -65,12 +69,6 @@ pub struct MyBehaviour {
     pub request_response: cbor::Behaviour<PrivateRequest, PrivateResponse>,
 }
 
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct NodeError {
-    pub message: String,
-}
-
 pub enum NetworkMessage {
     SendBroadcast {
         topic: gossipsub::IdentTopic,
@@ -94,6 +92,10 @@ pub struct NetworkHandle {
 }
 
 impl NetworkHandle {
+    pub fn peer_id(&self) -> PeerId {
+        self.peer_id
+    }
+
     pub fn send_broadcast(
         &self,
         topic: gossipsub::IdentTopic,
@@ -154,13 +156,154 @@ impl NetworkHandle {
     }
 }
 
+pub enum NetworkEvent {
+    SwarmEvent(SwarmEvent<MyBehaviourEvent>),
+    NetworkMessage(NetworkMessage),
+}
+
 pub struct SwarmManager {
     pub inner: Swarm<MyBehaviour>,
 
-    pub rx: mpsc::UnboundedReceiver<NetworkMessage>,
+    pub network_manager_rx: mpsc::UnboundedReceiver<NetworkMessage>,
+    pub network_events: mpsc::UnboundedSender<NetworkEvent>,
+
+    pub allowed_peers: Vec<PeerId>,
+    pub peers_to_names: BTreeMap<PeerId, String>,
+
+    pub live_peers: HashSet<PeerId>,
+
+    pub round1_topic: gossipsub::IdentTopic,
+    pub start_dkg_topic: gossipsub::IdentTopic,
 }
 
-pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), NodeError> {
+impl SwarmManager {
+    pub fn new(
+        mut swarm: Swarm<MyBehaviour>,
+        peer_data: Vec<PeerData>,
+    ) -> Result<(Self, NetworkHandle, UnboundedReceiver<NetworkEvent>), NodeError> {
+        let (send_commands, receiving_commands) = unbounded_channel::<NetworkMessage>();
+
+        let (network_events_emitter, network_events_stream) = unbounded_channel::<NetworkEvent>();
+
+        let network_handle = NetworkHandle {
+            peer_id: *swarm.local_peer_id(),
+            tx: send_commands,
+        };
+
+        // Read full lines from stdin
+        let round1_topic = gossipsub::IdentTopic::new("round1_topic");
+        swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&round1_topic)
+            .map_err(|e| NodeError::Error(e.to_string()))?;
+
+        let allowed_peers: Vec<PeerId> = peer_data
+            .iter()
+            .map(|peer| peer.public_key.parse().unwrap())
+            .collect();
+
+        let peers_to_names: BTreeMap<PeerId, String> = peer_data
+            .iter()
+            .map(|peer| (peer.public_key.parse().unwrap(), peer.name.clone()))
+            .collect();
+
+        let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
+        swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&start_dkg_topic)
+            .map_err(|e| NodeError::Error(e.to_string()))?;
+
+        Ok((
+            Self {
+                round1_topic,
+                live_peers: HashSet::new(),
+                start_dkg_topic,
+                inner: swarm,
+                network_manager_rx: receiving_commands,
+                network_events: network_events_emitter,
+                allowed_peers,
+                peers_to_names,
+            },
+            network_handle,
+            network_events_stream,
+        ))
+    }
+
+    pub fn peer_name(&self, peer_id: &PeerId) -> String {
+        self.peers_to_names
+            .get(peer_id)
+            .unwrap_or(&peer_id.to_string())
+            .clone()
+    }
+
+    pub async fn start(&mut self) {
+        println!("Starting swarm manager");
+        loop {
+            tokio::select! {
+                send_message = self.network_manager_rx.recv() => match send_message {
+                    Some(NetworkMessage::SendBroadcast { topic, message }) => {
+                        let _ = self.inner
+                            .behaviour_mut()
+                            .gossipsub
+                            .publish(topic, message);
+                    }
+                    Some(NetworkMessage::SendPrivateRequest(peer_id, request)) => {
+                        self.inner
+                            .behaviour_mut()
+                            .request_response
+                            .send_request(&peer_id, request);
+                    }
+                    Some(NetworkMessage::SendPrivateResponse(channel, response)) => {
+                        let _ = self.inner
+                            .behaviour_mut()
+                            .request_response
+                            .send_response(channel, response);
+                    }
+                    Some(message) => {
+                        self.network_events.send(NetworkEvent::NetworkMessage(message)).unwrap();
+                    }
+                    _ => {
+                    }
+                },
+                event = self.inner.select_next_some() => {
+                    match &event {
+                        SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
+                            for (peer_id, _multiaddr) in list {
+                                if self.allowed_peers.contains(&peer_id) {
+                                    println!("Discovered peer: {}", self.peer_name(&peer_id));
+                                    self.live_peers.insert(*peer_id);
+                                    self.inner.behaviour_mut().gossipsub.add_explicit_peer(peer_id);
+                                }
+                            }
+                            self.network_events.send(NetworkEvent::SwarmEvent(event)).unwrap();
+                        },
+                        SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
+                            for (peer_id, _multiaddr) in list {
+                                if self.allowed_peers.contains(&peer_id) {
+                                    println!("Peer expired: {}", self.peer_name(&peer_id));
+                                    self.live_peers.retain(|p| *p != *peer_id);
+                                    self.inner.behaviour_mut().gossipsub.remove_explicit_peer(peer_id);
+                                }
+                            }
+                            self.network_events.send(NetworkEvent::SwarmEvent(event)).unwrap();
+                        },
+                        _ => {
+                            self.network_events.send(NetworkEvent::SwarmEvent(event)).unwrap();
+                        }
+                    }
+                }
+
+            }
+        }
+    }
+}
+
+pub fn build_swarm(
+    keypair: Keypair,
+    peer_data: Vec<PeerData>,
+) -> Result<(NetworkHandle, SwarmManager, UnboundedReceiver<NetworkEvent>), NodeError> {
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
         .with_tcp(
@@ -168,9 +311,7 @@ pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), No
             noise::Config::new,
             yamux::Config::default,
         )
-        .map_err(|e| NodeError {
-            message: format!("Failed to add tcp {}", e),
-        })?
+        .map_err(|e| NodeError::Error(format!("Failed to add tcp {}", e)))?
         .with_quic()
         .with_behaviour(|key| {
             // To content-address message, we can take the hash of message and use it as an ID.
@@ -215,9 +356,7 @@ pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), No
                 request_response,
             })
         })
-        .map_err(|e| NodeError {
-            message: format!("Failed to add behaviour {}", e),
-        })?
+        .map_err(|e| NodeError::Error(format!("Failed to add behaviour {}", e)))?
         .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
 
@@ -227,9 +366,7 @@ pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), No
                 .parse()
                 .expect("Failed to deserialize message"),
         )
-        .map_err(|e| NodeError {
-            message: format!("Failed to listen on quic {}", e),
-        })?;
+        .map_err(|e| NodeError::Error(format!("Failed to listen on quic {}", e)))?;
 
     swarm
         .listen_on(
@@ -237,22 +374,10 @@ pub fn build_swarm(keypair: Keypair) -> Result<(NetworkHandle, SwarmManager), No
                 .parse()
                 .expect("Failed to deserialize message"),
         )
-        .map_err(|e| NodeError {
-            message: format!("Failed to listen on tcp {}", e),
-        })?;
+        .map_err(|e| NodeError::Error(format!("Failed to listen on tcp {}", e)))?;
 
-    let (outgoing_tx, incoming_rx) = unbounded_channel::<NetworkMessage>();
+    let (swarm_manager, network, network_events_stream) = SwarmManager::new(swarm, peer_data)
+        .map_err(|e| NodeError::Error(format!("Failed to create swarm manager: {}", e)))?;
 
-    let network = NetworkHandle {
-        tx: outgoing_tx.clone(),
-        peer_id: *swarm.local_peer_id(),
-    };
-
-    Ok((
-        network,
-        SwarmManager {
-            inner: swarm,
-            rx: incoming_rx,
-        },
-    ))
+    Ok((network, swarm_manager, network_events_stream))
 }
