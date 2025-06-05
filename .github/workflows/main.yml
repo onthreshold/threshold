@@ -1,0 +1,67 @@
+name: Rust Test Suite
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - "./"
+
+jobs:
+  cargo-fmt:
+    runs-on: blacksmith-2vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update 1.87
+      - run: rustup default 1.87
+      - run: rustup component add rustfmt
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+        
+  cargo-build:
+    runs-on: blacksmith-2vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update 1.87
+      - run: rustup default 1.87
+      - name: Cargo build
+        run: cargo build --all
+
+  cargo-test:
+    runs-on: blacksmith-2vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update 1.87
+      - run: rustup default 1.87
+      - name: Cargo build
+        run: cargo test --all
+
+  clippy_check:
+    runs-on: blacksmith-8vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+      - name: Caching Rust Dep
+        uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: rustup update 1.87
+      - run: rustup default 1.87
+      - run: rustup component add clippy
+      - uses: clechasseur/rs-clippy-check@v3
+        with:
+          args: --features runtime-env --manifest-path ./Cargo.toml -- -D clippy::print_stdout -D warnings
+      - uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.labels }}-rust-${{ matrix.rust }}-
