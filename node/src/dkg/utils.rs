@@ -12,8 +12,8 @@ use libp2p::{PeerId, gossipsub};
 
 use crate::{
     Config, DkgKeys, EncryptionParams, KeyData, NodeError, PeerData,
-    block::{Block, GenesisBlock},
     dkg::DkgState,
+    protocol::block::{ChainConfig, GenesisBlock, ValidatorInfo},
     swarm_manager::{NetworkHandle, PrivateRequest},
 };
 
@@ -217,15 +217,34 @@ impl DkgState {
                 },
                 pubkey_package_b64,
             });
-            let genesis_block =
-                GenesisBlock::new(pubkey.serialize().map_err(|e| {
+            let validators = self
+                .peers
+                .iter()
+                .map(|peer_id| ValidatorInfo {
+                    pub_key: peer_id.to_bytes(),
+                    stake: 100,
+                })
+                .collect();
+
+            let chain_config = ChainConfig {
+                block_time_seconds: 10,
+                min_signers: self.min_signers,
+                max_signers: self.max_signers,
+                min_stake: 100,
+                max_block_size: 1000,
+            };
+
+            let genesis_block = GenesisBlock::new(
+                validators,
+                chain_config,
+                pubkey.serialize().map_err(|e| {
                     NodeError::Error(format!("Failed to serialize public key: {}", e))
-                })?);
+                })?,
+            );
             self.network_handle
                 .send_self_request(
                     PrivateRequest::InsertBlock {
-                        hash: genesis_block.get_hash(),
-                        block: genesis_block.serialize(),
+                        block: genesis_block.to_block(),
                     },
                     false,
                 )

@@ -24,8 +24,8 @@ impl NodeState {
                     Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequest { request, response_channel: None })) => {
                         debug!("Received self request {:?}", request);
                             match request {
-                                PrivateRequest::InsertBlock { hash, block } => {
-                                    match self.db.insert_block(hash, block) {
+                                PrivateRequest::InsertBlock { block } => {
+                                    match self.db.insert_block(block) {
                                         Ok(_) => (),
                                         Err(e) => {
                                             return Err(NodeError::Error(format!("Failed to handle genesis block: {}", e)));

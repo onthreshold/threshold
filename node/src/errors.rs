@@ -22,4 +22,10 @@ impl From<SendError<NetworkMessage>> for NetworkError {
     }
 }
 
+impl From<rocksdb::Error> for NodeError {
+    fn from(e: rocksdb::Error) -> Self {
+        NodeError::Error(e.to_string())
+    }
+}
+
 impl Error for NodeError {}
