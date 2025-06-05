@@ -3,6 +3,7 @@ use libp2p::{PeerId, request_response::ResponseChannel, swarm::SwarmEvent};
 use std::{
     collections::{BTreeMap, HashSet, hash_map::DefaultHasher},
     hash::{Hash, Hasher},
+    pin::Pin,
     time::Duration,
 };
 
@@ -78,10 +79,7 @@ pub enum NetworkMessage {
     SendPrivateResponse(ResponseChannel<PrivateResponse>, PrivateResponse),
     SendSelfRequest {
         request: PrivateRequest,
-    },
-    SendSelfRequestSync {
-        request: PrivateRequest,
-        response_channel: mpsc::UnboundedSender<PrivateResponse>,
+        response_channel: Option<mpsc::UnboundedSender<PrivateResponse>>,
     },
 }
 
@@ -104,7 +102,7 @@ impl NetworkHandle {
         let network_message = NetworkMessage::SendBroadcast { topic, message };
         self.tx
             .send(network_message)
-            .map_err(NetworkError::SendError)
+            .map_err(|e| NetworkError::SendError(e.to_string()))
     }
 
     pub fn send_private_request(
@@ -115,7 +113,7 @@ impl NetworkHandle {
         let network_message = NetworkMessage::SendPrivateRequest(peer_id, request);
         self.tx
             .send(network_message)
-            .map_err(NetworkError::SendError)
+            .map_err(|e| NetworkError::SendError(e.to_string()))
     }
 
     pub fn send_private_response(
@@ -126,33 +124,44 @@ impl NetworkHandle {
         let network_message = NetworkMessage::SendPrivateResponse(channel, response);
         self.tx
             .send(network_message)
-            .map_err(NetworkError::SendError)
+            .map_err(|e| NetworkError::SendError(e.to_string()))
     }
 
-    pub fn send_self_request(&self, request: PrivateRequest) -> Result<(), NetworkError> {
-        let network_message = NetworkMessage::SendSelfRequest { request };
-
-        self.tx
-            .send(network_message)
-            .map_err(NetworkError::SendError)?;
-
-        Ok(())
-    }
-
-    pub async fn send_self_request_sync(
+    pub fn send_self_request(
         &self,
         request: PrivateRequest,
-    ) -> Result<PrivateResponse, NetworkError> {
-        let (tx, mut rx) = unbounded_channel::<PrivateResponse>();
-        let network_message = NetworkMessage::SendSelfRequestSync {
-            request,
-            response_channel: tx,
-        };
-        self.tx
-            .send(network_message)
-            .map_err(NetworkError::SendError)?;
+        sync: bool,
+    ) -> Result<
+        Option<Pin<Box<dyn Future<Output = Result<PrivateResponse, NetworkError>> + Send>>>,
+        NetworkError,
+    > {
+        if sync {
+            let (tx, mut rx) = unbounded_channel::<PrivateResponse>();
 
-        rx.recv().await.ok_or(NetworkError::RecvError)
+            let network_message = NetworkMessage::SendSelfRequest {
+                request,
+                response_channel: Some(tx),
+            };
+
+            self.tx
+                .send(network_message)
+                .map_err(|e| NetworkError::SendError(e.to_string()))?;
+
+            Ok(Some(Box::pin(async move {
+                rx.recv().await.ok_or(NetworkError::RecvError)
+            })))
+        } else {
+            let network_message = NetworkMessage::SendSelfRequest {
+                request,
+                response_channel: None,
+            };
+
+            self.tx
+                .send(network_message)
+                .map_err(|e| NetworkError::SendError(e.to_string()))?;
+
+            Ok(None)
+        }
     }
 }
 
@@ -271,8 +280,8 @@ impl SwarmManager {
                     match &event {
                         SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                             for (peer_id, _multiaddr) in list {
-                                if self.allowed_peers.contains(&peer_id) {
-                                    println!("Discovered peer: {}", self.peer_name(&peer_id));
+                                if self.allowed_peers.contains(peer_id) {
+                                    println!("Discovered peer: {}", self.peer_name(peer_id));
                                     self.live_peers.insert(*peer_id);
                                     self.inner.behaviour_mut().gossipsub.add_explicit_peer(peer_id);
                                 }
@@ -281,8 +290,8 @@ impl SwarmManager {
                         },
                         SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                             for (peer_id, _multiaddr) in list {
-                                if self.allowed_peers.contains(&peer_id) {
-                                    println!("Peer expired: {}", self.peer_name(&peer_id));
+                                if self.allowed_peers.contains(peer_id) {
+                                    println!("Peer expired: {}", self.peer_name(peer_id));
                                     self.live_peers.retain(|p| *p != *peer_id);
                                     self.inner.behaviour_mut().gossipsub.remove_explicit_peer(peer_id);
                                 }

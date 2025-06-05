@@ -30,9 +30,7 @@ pub async fn start_dkg(
             success: true,
             message: "DKG process started".to_string(),
         })),
-        Err(e) => {
-            Err(Status::internal(format!("Network error: {:?}", e)))
-        }
+        Err(e) => Err(Status::internal(format!("Network error: {:?}", e))),
     }
 }
 
@@ -44,7 +42,9 @@ pub async fn spend_funds(
 
     println!("Received request to spend {} satoshis", amount_sat);
     let response = network
-        .send_self_request_sync(PrivateRequest::Spend { amount_sat })
+        .send_self_request(PrivateRequest::Spend { amount_sat }, true)
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .ok_or(Status::internal("No response from node"))?
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
@@ -70,7 +70,9 @@ pub async fn start_signing(
     };
 
     let response = network
-        .send_self_request_sync(network_request)
+        .send_self_request(network_request, true)
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .ok_or(Status::internal("No response from node"))?
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
@@ -137,7 +139,9 @@ pub async fn create_deposit_intent(
     let deposit_tracking_id = Uuid::new_v4().to_string();
 
     let frost_pubkey_hex = network
-        .send_self_request_sync(PrivateRequest::GetFrostPublicKey)
+        .send_self_request(PrivateRequest::GetFrostPublicKey, true)
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .ok_or(Status::internal("No response from node"))?
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 

@@ -221,10 +221,13 @@ impl DkgState {
                     NodeError::Error(format!("Failed to serialize public key: {}", e))
                 })?);
             self.network_handle
-                .send_self_request(PrivateRequest::InsertBlock {
-                    hash: genesis_block.get_hash(),
-                    block: genesis_block.serialize(),
-                })
+                .send_self_request(
+                    PrivateRequest::InsertBlock {
+                        hash: genesis_block.get_hash(),
+                        block: genesis_block.serialize(),
+                    },
+                    false,
+                )
                 .map_err(|e| NodeError::Error(format!("Failed to send genesis block: {:?}", e)))?;
         }
 

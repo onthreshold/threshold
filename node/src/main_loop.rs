@@ -1,7 +1,5 @@
-use futures::StreamExt;
 use libp2p::mdns;
 
-use frost_secp256k1::{self as frost};
 use libp2p::gossipsub;
 use libp2p::request_response;
 use libp2p::swarm::SwarmEvent;
@@ -22,27 +20,21 @@ impl NodeState {
         loop {
             select! {
                 send_message = self.network_events_stream.recv() => match send_message {
-                    Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequest { request })) => {
+                    Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequest { request, response_channel: None })) => {
                         println!("Received self request {:?}", request);
                             match request {
-                                PrivateRequest::StartSigningSession { hex_message } => {
-                                    match self.start_signing_session(&hex_message) {
+                                PrivateRequest::InsertBlock { hash, block } => {
+                                    match self.db.insert_block(hash, block) {
                                         Ok(_) => (),
                                         Err(e) => {
-                                            return Err(NodeError::Error(format!("Failed to start signing session: {}", e)));
+                                            return Err(NodeError::Error(format!("Failed to handle genesis block: {}", e)));
                                         }
                                     }
-                                },
-                                PrivateRequest::Spend { amount_sat } => {
-                                    let response = self.start_spend_request(amount_sat);
-                                }
-                                PrivateRequest::GetFrostPublicKey => {
-                                    let response = self.get_frost_public_key();
                                 }
                                 _ => {}
                             }
                     }
-                    Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequestSync { request, response_channel })) => {
+                    Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequest { request, response_channel: Some(response_channel) })) => {
                         println!("Received self request {:?}", request);
                             match request {
                                 PrivateRequest::StartSigningSession { hex_message } => {
