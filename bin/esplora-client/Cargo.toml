@@ -1,0 +1,11 @@
+[package]
+name = "esplora-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitcoin = { workspace = true }
+esplora-client = { version = "*", default-features = false, features = ["async-https"] }
+tokio = { workspace = true, features = ["full"] }
+node = { path = "../../node" }
+async-trait = "0.1.88"
