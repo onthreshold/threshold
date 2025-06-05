@@ -62,15 +62,30 @@ impl NodeState {
                         println!("Received self request {:?}", request);
                             match request {
                                 PrivateRequest::StartSigningSession { hex_message } => {
-                                    self.start_signing_session(&hex_message);
+                                    match self.start_signing_session(&hex_message) {
+                                        Ok(_) => (),
+                                        Err(e) => {
+                                            return Err(NodeError::Error(format!("Failed to start signing session: {}", e)));
+                                        }
+                                    }
                                 },
                                 PrivateRequest::Spend { amount_sat } => {
                                     let response = self.start_spend_request(amount_sat);
-                                    response_channel.send(PrivateResponse::SpendRequestSent { sighash: response.unwrap_or("No sighash".to_string()) }).unwrap();
+                                    match response_channel.send(PrivateResponse::SpendRequestSent { sighash: response.unwrap_or("No sighash".to_string()) }) {
+                                        Ok(_) => (),
+                                        Err(e) => {
+                                            return Err(NodeError::Error(format!("Failed to send response: {}", e)));
+                                        }
+                                    }
                                 }
                                 PrivateRequest::GetFrostPublicKey => {
                                     let response = self.get_frost_public_key();
-                                    response_channel.send(PrivateResponse::GetFrostPublicKey { public_key: response.unwrap_or("No public key".to_string()) }).unwrap();
+                                    match response_channel.send(PrivateResponse::GetFrostPublicKey { public_key: response.unwrap_or("No public key".to_string()) }) {
+                                        Ok(_) => (),
+                                        Err(e) => {
+                                            return Err(NodeError::Error(format!("Failed to send response: {}", e)));
+                                        }
+                                    }
                                 }
                                 _ => {}
                             }
@@ -84,15 +99,35 @@ impl NodeState {
                     })) => {
                         match message.topic {
                             t if t == round1_topic.hash() => {
-                                println!("Received round1 payload from {}", self.peer_name(&message.source.unwrap()));
-                                let data = frost::keys::dkg::round1::Package::deserialize(&message.data)
-                                    .expect("Failed to deserialize round1 package");
                                 if let Some(source_peer) = message.source {
-                                    self.dkg_state.handle_round1_payload(source_peer, data).await;
+                                    println!("Received round1 payload from {}", self.peer_name(&source_peer));
+                                } else {
+                                    return Err(NodeError::Error("No source peer".to_string()));
+                                }
+
+                                let data = match frost::keys::dkg::round1::Package::deserialize(&message.data) {
+                                    Ok(data) => data,
+                                    Err(e) => {
+                                        return Err(NodeError::Error(format!("Failed to deserialize round1 package: {}", e)));
+                                    }
+                                };
+                                
+                                if let Some(source_peer) = message.source {
+                                    match self.dkg_state.handle_round1_payload(source_peer, data).await {
+                                        Ok(_) => (),
+                                        Err(e) => {
+                                            println!("❌ Failed to handle round1 payload: {}", e);
+                                        }
+                                    }
                                 }
                             }
                             t if t == start_dkg_topic.hash() => {
-                                self.dkg_state.handle_dkg_start().await;
+                                match self.dkg_state.handle_dkg_start().await {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        println!("❌ Failed to handle DKG start: {}", e);
+                                    }
+                                }
                             }
                             _ => {
                                 println!("Received unhandled broadcast");
@@ -106,7 +141,12 @@ impl NodeState {
                             message: request_response::Message::Request { request: PrivateRequest::Round2Package(package), channel, .. }
                         }
                     )) => {
-                        self.dkg_state.handle_round2_payload(peer, package, channel);
+                        match self.dkg_state.handle_round2_payload(peer, package, channel) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                println!("❌ Failed to handle round2 payload: {}", e);
+                            }
+                        }
                     },
                     // Incoming SignRequest
                     SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
@@ -115,7 +155,12 @@ impl NodeState {
                             message: request_response::Message::Request { request: PrivateRequest::SignRequest { sign_id, message }, channel, .. }
                         }
                     )) => {
-                        self.handle_sign_request(peer, sign_id, message, channel);
+                        match self.handle_sign_request(peer, sign_id, message, channel) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                println!("❌ Failed to handle sign request: {}", e);
+                            }
+                        }
                     },
                     // Incoming SignPackage request to generate signature share
                     SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
@@ -124,7 +169,12 @@ impl NodeState {
                             message: request_response::Message::Request { request: PrivateRequest::SignPackage { sign_id, package }, channel, .. }
                         }
                     )) => {
-                        self.handle_sign_package(peer, sign_id, package, channel);
+                        match self.handle_sign_package(peer, sign_id, package, channel) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                println!("❌ Failed to handle sign package: {}", e);
+                            }
+                        }
                     },
                     // Responses with commitments
                     SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
@@ -133,7 +183,12 @@ impl NodeState {
                             message: request_response::Message::Response { response: PrivateResponse::Commitments { sign_id, commitments }, .. }
                         }
                     )) => {
-                        self.handle_commitments_response(peer, sign_id, commitments);
+                        match self.handle_commitments_response(peer, sign_id, commitments) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                println!("❌ Failed to handle commitments response: {}", e);
+                            }
+                        }
                     },
                     // Responses with signature share
                     SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(
@@ -142,7 +197,12 @@ impl NodeState {
                             message: request_response::Message::Response { response: PrivateResponse::SignatureShare { sign_id, signature_share }, .. }
                         }
                     )) => {
-                        self.handle_signature_share(peer, sign_id, signature_share);
+                        match self.handle_signature_share(peer, sign_id, signature_share) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                println!("❌ Failed to handle signature share: {}", e);
+                            }
+                        }
                     },
                     SwarmEvent::ConnectionClosed { peer_id, .. } => {
                         let peer_count = self.swarm.inner.behaviour().gossipsub.all_peers().count();
@@ -156,7 +216,9 @@ impl NodeState {
                         if topic == start_dkg_topic.hash() {
                             self.dkg_state.dkg_listeners.insert(peer_id);
                             println!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_state.dkg_listeners.len());
-                            self.dkg_state.handle_dkg_start().await;
+                            if let Err(e) = self.dkg_state.handle_dkg_start().await {
+                                println!("❌ Failed to handle DKG start: {}", e);
+                            }
                         }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
@@ -184,7 +246,12 @@ impl NodeState {
                         }
                     )) => {
                         if peer == self.peer_id {
-                            self.start_signing_session(&hex_message);
+                            match self.start_signing_session(&hex_message) {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    println!("❌ Failed to start signing session: {}", e);
+                                }
+                            }
                             let _ = self
                                 .swarm.inner
                                 .behaviour_mut()

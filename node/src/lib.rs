@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use swarm_manager::{NetworkHandle, SwarmManager};
 
-use crate::{dkg::DkgState, swarm_manager::build_swarm};
+use crate::{dkg::DkgState, errors::NodeError, swarm_manager::build_swarm};
 
 pub mod dkg;
 pub mod grpc_handler;
@@ -90,22 +90,25 @@ impl NodeState {
         min_signers: u16,
         max_signers: u16,
         config_file: String,
-    ) -> Self {
+    ) -> Result<Self, NodeError> {
         // Node State
         let (network_handle, swarm) = build_swarm(keypair.clone()).expect("Failed to build swarm");
         let peer_id = *swarm.inner.local_peer_id();
 
         let allowed_peers: Vec<PeerId> = peer_data
             .iter()
-            .map(|peer| peer.public_key.parse().unwrap())
-            .collect();
+            .map(|peer| peer.public_key.parse().map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e))))
+            .collect::<Result<Vec<PeerId>, NodeError>>()?;
 
         let peers_to_names: BTreeMap<PeerId, String> = peer_data
             .iter()
-            .map(|peer| (peer.public_key.parse().unwrap(), peer.name.clone()))
-            .collect();
+            .map(|peer| {
+                let peer_id = peer.public_key.parse().map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))?;
+                Ok((peer_id, peer.name.clone()))
+            })
+            .collect::<Result<BTreeMap<PeerId, String>, NodeError>>()?;
 
-        NodeState {
+        Ok(NodeState {
             network_handle: network_handle.clone(),
             allowed_peers: allowed_peers.clone(),
             peers_to_names: peers_to_names.clone(),
@@ -113,21 +116,26 @@ impl NodeState {
             swarm,
             min_signers,
             max_signers,
-            dkg_state: DkgState::new(
+            dkg_state: match DkgState::new(
                 network_handle.clone(),
                 min_signers,
                 max_signers,
                 peer_id,
                 peers_to_names,
                 config_file.clone(),
-            ),
+            ) {
+                Ok(dkg_state) => dkg_state,
+                Err(e) => {
+                    return Err(NodeError::Error(format!("Failed to create DKG state: {}", e)));
+                }
+            },
             peers: HashSet::new(),
             rng: frost::rand_core::OsRng,
             active_signing: None,
             wallet: crate::wallet::SimpleWallet::new(),
             pending_spends: BTreeMap::new(),
             config_file: config_file.clone(),
-        }
+        })
     }
 
     // Keep the old new() for backwards compatibility
@@ -136,20 +144,29 @@ impl NodeState {
         peer_data: Vec<PeerData>,
         min_signers: u16,
         max_signers: u16,
-    ) -> Self {
-        Self::new_from_config(
+    ) -> Result<Self, NodeError> {
+        match Self::new_from_config(
             keypair,
             peer_data,
             min_signers,
             max_signers,
             "node_config.json".to_string(),
-        )
+        ) {
+            Ok(node_state) => Ok(node_state),
+            Err(e) => Err(NodeError::Error(format!("Failed to create node state: {}", e))),
+        }
     }
 }
 
 pub fn peer_id_to_identifier(peer_id: &PeerId) -> Identifier {
     let bytes = peer_id.to_bytes();
-    Identifier::derive(&bytes).unwrap()
+    match Identifier::derive(&bytes) {
+        Ok(identifier) => identifier,
+        Err(e) => {
+            println!("Failed to derive identifier: {}", e);
+            panic!("Failed to derive identifier");
+        }
+    }
 }
 
 // Active signing session tracking
