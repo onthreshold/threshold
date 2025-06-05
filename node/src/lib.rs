@@ -10,11 +10,11 @@ use swarm_manager::{NetworkEvent, NetworkHandle};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tracing::error;
 
-pub mod block;
 pub mod db;
 pub mod dkg;
 pub mod grpc;
 pub mod main_loop;
+pub mod protocol;
 pub mod signing;
 pub mod start_node;
 pub mod swarm_manager;

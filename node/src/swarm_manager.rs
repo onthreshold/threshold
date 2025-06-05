@@ -22,6 +22,7 @@ use tokio::{
 use crate::{
     PeerData,
     errors::{NetworkError, NodeError},
+    protocol::block::Block,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -35,7 +36,7 @@ pub enum PrivateRequest {
     Round2Package(round2::Package),
     SignRequest { sign_id: u64, message: Vec<u8> },
     SignPackage { sign_id: u64, package: Vec<u8> },
-    InsertBlock { hash: Vec<u8>, block: Vec<u8> },
+    InsertBlock { block: Block },
     StartSigningSession { hex_message: String },
     Spend { amount_sat: u64 },
     GetFrostPublicKey,
