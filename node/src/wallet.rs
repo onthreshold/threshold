@@ -38,7 +38,13 @@ impl SimpleWallet {
             utxos: vec![
                 Utxo {
                     outpoint: OutPoint {
-                        txid: bitcoin::Txid::from_slice(&[0u8; 32]).unwrap(),
+                        txid: match bitcoin::Txid::from_slice(&[0u8; 32]) {
+                            Ok(txid) => txid,
+                            Err(e) => {
+                                println!("❌ Failed to create UTXO: {}", e);
+                                return Self::default();
+                            }
+                        },
                         vout: 0,
                     },
                     value: Amount::from_sat(100_000),
@@ -46,7 +52,13 @@ impl SimpleWallet {
                 },
                 Utxo {
                     outpoint: OutPoint {
-                        txid: bitcoin::Txid::from_slice(&[1u8; 32]).unwrap(),
+                        txid: match bitcoin::Txid::from_slice(&[1u8; 32]) {
+                            Ok(txid) => txid,
+                            Err(e) => {
+                                println!("❌ Failed to create UTXO: {}", e);
+                                return Self::default();
+                            }
+                        },
                         vout: 0,
                     },
                     value: Amount::from_sat(50_000),
@@ -54,7 +66,13 @@ impl SimpleWallet {
                 },
                 Utxo {
                     outpoint: OutPoint {
-                        txid: bitcoin::Txid::from_slice(&[2u8; 32]).unwrap(),
+                        txid: match bitcoin::Txid::from_slice(&[2u8; 32]) {
+                            Ok(txid) => txid,
+                            Err(e) => {
+                                println!("❌ Failed to create UTXO: {}", e);
+                                return Self::default();
+                            }
+                        },
                         vout: 0,
                     },
                     value: Amount::from_sat(20_000),
@@ -148,7 +166,13 @@ impl NodeState {
         match self.wallet.create_spend(amount_sat) {
             Ok((tx, sighash)) => {
                 let sighash_hex = hex::encode(sighash);
-                self.start_signing_session(&sighash_hex);
+                match self.start_signing_session(&sighash_hex) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        println!("❌ Failed to start signing session: {}", e);
+                        return None;
+                    }
+                }
 
                 if let Some(active) = &self.active_signing {
                     self.pending_spends

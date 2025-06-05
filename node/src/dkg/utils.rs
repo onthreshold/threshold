@@ -11,7 +11,7 @@ use frost_secp256k1::{self as frost};
 use libp2p::{PeerId, gossipsub};
 
 use crate::{
-    Config, DkgKeys, EncryptionParams, KeyData, PeerData, dkg::DkgState,
+    Config, DkgKeys, EncryptionParams, KeyData, NodeError, PeerData, dkg::DkgState,
     swarm_manager::NetworkHandle,
 };
 
@@ -106,7 +106,7 @@ impl DkgState {
         peer_id: PeerId,
         peers_to_names: BTreeMap<PeerId, String>,
         config_file: String,
-    ) -> Self {
+    ) -> Result<Self, NodeError> {
         let mut dkg_state = DkgState {
             network_handle,
             min_signers,
@@ -128,15 +128,15 @@ impl DkgState {
             dkg_started: false,
         };
 
-        let Some((private_key, pubkey)) = DkgState::load_dkg_keys(&dkg_state.config_file).unwrap()
-        else {
-            return dkg_state;
-        };
+        let keys = DkgState::load_dkg_keys(&dkg_state.config_file)
+            .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
 
-        dkg_state.private_key_package = Some(private_key);
-        dkg_state.pubkey_package = Some(pubkey);
+        if let Some((private_key, pubkey)) = keys {
+            dkg_state.private_key_package = Some(private_key);
+            dkg_state.pubkey_package = Some(pubkey);
+        }
 
-        dkg_state
+        Ok(dkg_state)
     }
 
     pub fn save_dkg_keys(&self) -> Result<(), Box<dyn std::error::Error>> {

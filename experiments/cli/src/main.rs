@@ -303,14 +303,12 @@ async fn start_node(
         min_signers,
         max_signers,
         config_file_path,
-    );
+    ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
     let network_handle = node_state.network_handle.clone();
 
     let grpc_handle = tokio::spawn(async move {
-        let addr = format!("0.0.0.0:{}", grpc_port.unwrap_or(50051))
-            .parse()
-            .unwrap();
+        let addr = format!("0.0.0.0:{}", grpc_port.unwrap_or(50051)).parse().unwrap();
 
         let node_control_service = NodeControlService::new(network_handle);
 

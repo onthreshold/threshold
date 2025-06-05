@@ -24,12 +24,16 @@ pub async fn start_dkg(
 
     // Send a message to start DKG
     let start_message = "START_DKG".to_string();
-    network.send_broadcast(start_dkg_topic.clone(), start_message.as_bytes().to_vec());
 
-    Ok(Response::new(StartDkgResponse {
-        success: true,
-        message: "DKG process started".to_string(),
-    }))
+    match network.send_broadcast(start_dkg_topic.clone(), start_message.as_bytes().to_vec()) {
+        Ok(_) => Ok(Response::new(StartDkgResponse {
+            success: true,
+            message: "DKG process started".to_string(),
+        })),
+        Err(e) => {
+            return Err(Status::internal(format!("Network error: {:?}", e)));
+        }
+    }
 }
 
 pub async fn spend_funds(
@@ -92,17 +96,20 @@ pub async fn send_direct_message(
 
     let direct_message = format!("From: {}", req.message);
 
-    network.send_private_request(
+    match network.send_private_request(
         target_peer_id,
         PrivateRequest::Ping(PingBody {
             message: direct_message,
         }),
-    );
+    ) {
+        Ok(_) => Ok(Response::new(SendDirectMessageResponse {
+            success: true,
+            message: format!("Message sent to {}", target_peer_id),
+        })),
+        Err(e) => Err(Status::internal(format!("Network error: {:?}", e))),
+    }
 
-    Ok(Response::new(SendDirectMessageResponse {
-        success: true,
-        message: format!("Message sent to {}", target_peer_id),
-    }))
+
 }
 
 pub async fn create_deposit_intent(
