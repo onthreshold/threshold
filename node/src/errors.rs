@@ -12,8 +12,14 @@ pub enum NodeError {
 
 #[derive(Debug)]
 pub enum NetworkError {
-    SendError(SendError<NetworkMessage>),
+    SendError(String),
     RecvError,
+}
+
+impl From<SendError<NetworkMessage>> for NetworkError {
+    fn from(e: SendError<NetworkMessage>) -> Self {
+        NetworkError::SendError(e.to_string())
+    }
 }
 
 impl Error for NodeError {}

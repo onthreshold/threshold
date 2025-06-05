@@ -92,7 +92,11 @@ impl NodeState {
                 sign_id,
                 message: message.clone(),
             };
-            self.network_handle.send_private_request(peer.clone(), req);
+            self.network_handle
+                .send_private_request(*peer, req)
+                .map_err(|e| {
+                    NodeError::Error(format!("Failed to send private request: {:?}", e))
+                })?;
         }
 
         Ok(Some(sign_id))
@@ -205,7 +209,7 @@ impl NodeState {
                     sign_id,
                     package: pkg_bytes.clone(),
                 };
-                let _ = self.network_handle.send_private_request(peer.clone(), req);
+                let _ = self.network_handle.send_private_request(*peer, req);
             }
 
             // Generate our signature share
@@ -277,9 +281,7 @@ impl NodeState {
                     sign_id,
                     signature_share: sig_bytes,
                 };
-                let _ = self
-                    .network_handle
-                    .send_private_response(channel, resp);
+                let _ = self.network_handle.send_private_response(channel, resp);
             }
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to sign: {}", e)));

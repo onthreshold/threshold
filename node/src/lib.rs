@@ -1,10 +1,10 @@
+use crate::{db::Db, dkg::DkgState, errors::NodeError};
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use swarm_manager::{NetworkEvent, NetworkHandle};
 use tokio::sync::mpsc::UnboundedReceiver;
-use crate::{db::Db, dkg::DkgState, errors::NodeError, swarm_manager::build_swarm};
 
 pub mod block;
 pub mod db;
@@ -100,7 +100,8 @@ impl NodeState {
             .filter_map(|peer| {
                 peer.public_key
                     .parse()
-                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e))).ok()
+                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))
+                    .ok()
             })
             .collect::<Vec<PeerId>>();
 
@@ -110,7 +111,8 @@ impl NodeState {
                 let peer_id = peer
                     .public_key
                     .parse()
-                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e))).ok()?;
+                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))
+                    .ok()?;
                 Some((peer_id, peer.name.clone()))
             })
             .collect::<BTreeMap<PeerId, String>>();
