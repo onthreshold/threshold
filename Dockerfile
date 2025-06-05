@@ -12,10 +12,10 @@ RUN cargo chef prepare  --recipe-path recipe.json
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies - this is the caching Docker layer!
-RUN cargo chef cook --recipe-path recipe.json --bin "vault"
+RUN cargo chef cook --recipe-path recipe.json --bin "cli"
 # Build application
 COPY . .
-RUN cargo build --bin "vault"
+RUN cargo build --bin "cli"
 
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
@@ -31,7 +31,7 @@ RUN apt-get update -y; \
     unzip \
     ;
 
-COPY --from=builder /app/target/debug/vault /app/vault
+COPY --from=builder /app/target/debug/cli /app/cli
 
 EXPOSE 8090
-ENTRYPOINT ["/app/vault"]
+ENTRYPOINT ["/app/cli"]

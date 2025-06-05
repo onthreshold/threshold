@@ -6,7 +6,7 @@ services:
     image: vault-node
     environment:
       - KEY_PASSWORD=main
-    entrypoint: "/app/vault run --config main.key"
+    entrypoint: "/app/cli run --config main.key"
     ports:
       - "50051:50051"
     volumes:
@@ -21,7 +21,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - KEY_PASSWORD=two
-    entrypoint: "/app/vault run --config two.key"
+    entrypoint: "/app/cli run --config two.key"
     volumes:
       - ./keys/two.key:/app/two.key
     networks:
@@ -34,7 +34,7 @@ services:
     image: vault-node
     environment:
       - KEY_PASSWORD=three
-    entrypoint: "/app/vault run --config three.key"
+    entrypoint: "/app/cli run --config three.key"
     volumes:
       - ./keys/three.key:/app/three.key
     networks:
@@ -46,7 +46,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - KEY_PASSWORD=four
-    entrypoint: "/app/vault run --config four.key"
+    entrypoint: "/app/cli run --config four.key"
     volumes:
       - ./keys/four.key:/app/four.key
     networks:
@@ -58,7 +58,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - KEY_PASSWORD=five
-    entrypoint: "/app/vault run --config five.key"
+    entrypoint: "/app/cli run --config five.key"
     volumes:
       - ./keys/five.key:/app/five.key
     networks:

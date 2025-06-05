@@ -1,7 +1,9 @@
 [workspace]
 members = [
-    "experiments/cli",
-    "node", "bin/esplora-client",
+    "node",
+
+    "bin/cli",
+    "bin/esplora-client",
 ]
 resolver = "2"
 
