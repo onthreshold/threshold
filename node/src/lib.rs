@@ -9,8 +9,7 @@ use crate::{db::Db, dkg::DkgState, errors::NodeError, swarm_manager::build_swarm
 pub mod block;
 pub mod db;
 pub mod dkg;
-pub mod grpc_handler;
-pub mod grpc_operator;
+pub mod grpc;
 pub mod main_loop;
 pub mod signing;
 pub mod swarm_manager;

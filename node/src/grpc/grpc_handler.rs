@@ -1,7 +1,7 @@
 use crate::swarm_manager::NetworkHandle;
 use tonic::{Request, Response, Status};
 
-use crate::grpc_operator;
+use crate::grpc::grpc_operator;
 
 // Include the generated proto code
 pub mod node_proto {
