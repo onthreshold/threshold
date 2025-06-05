@@ -2,7 +2,7 @@
 members = [
     "experiments/taproot",
     "experiments/cli",
-    "node",
+    "node", "bin/esplora-client",
 ]
 resolver = "2"
 
