@@ -18,9 +18,6 @@ pub struct BlockHeader {
     /// Hash of the previous block
     pub previous_block_hash: BlockHash,
 
-    /// Merkle root of the state after applying this block
-    pub state_root: StateRoot,
-
     /// Unix timestamp when block was created
     pub timestamp: u64,
 
@@ -79,7 +76,6 @@ impl BlockHeader {
 
         hasher.update(self.version.to_le_bytes());
         hasher.update(self.previous_block_hash);
-        hasher.update(self.state_root);
         hasher.update(self.timestamp.to_le_bytes());
         hasher.update(self.height.to_le_bytes());
         hasher.update(&self.proposer);
@@ -97,13 +93,11 @@ impl Block {
         previous_block_hash: BlockHash,
         height: u64,
         transactions: Vec<Transaction>,
-        state_root: StateRoot,
         proposer: Vec<u8>,
     ) -> Self {
         let header = BlockHeader {
             version: 1,
             previous_block_hash,
-            state_root,
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
@@ -173,7 +167,6 @@ impl GenesisBlock {
             [0u8; 32], // No previous block
             0,         // Height 0
             vec![],    // No transactions in genesis
-            state_root,
             self.initial_state
                 .validators
                 .first()
@@ -194,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_block_creation_and_hashing() {
-        let block = Block::new([0u8; 32], 1, vec![], [1u8; 32], vec![1, 2, 3]);
+        let block = Block::new([0u8; 32], 1, vec![], vec![1, 2, 3]);
 
         let hash1 = block.hash();
         let hash2 = block.hash();
