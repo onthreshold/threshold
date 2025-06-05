@@ -23,17 +23,11 @@ impl NodeState {
                 send_message = self.network_events_stream.recv() => match send_message {
                     Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequest { request, response_channel: None })) => {
                         debug!("Received self request {:?}", request);
-                            match request {
-                                PrivateRequest::InsertBlock { block } => {
-                                    match self.db.insert_block(block) {
-                                        Ok(_) => (),
-                                        Err(e) => {
-                                            return Err(NodeError::Error(format!("Failed to handle genesis block: {}", e)));
-                                        }
-                                    }
-                                }
-                                _ => {}
+                        if let PrivateRequest::InsertBlock { block } = request {
+                            if let Err(e) = self.db.insert_block(block) {
+                                return Err(NodeError::Error(format!("Failed to handle genesis block: {}", e)));
                             }
+                        }
                     }
                     Some(NetworkEvent::NetworkMessage(NetworkMessage::SendSelfRequest { request, response_channel: Some(response_channel) })) => {
                         debug!("Received self request {:?}", request);
