@@ -3,6 +3,7 @@ use std::str::FromStr;
 use esplora_client::{AsyncClient, Builder};
 use async_trait::async_trait;
 use tokio::time::{sleep, Duration};
+use tokio::sync::broadcast;
 
 #[derive(Debug)]
 pub enum NodeError {
@@ -24,11 +25,18 @@ pub trait WindowedConfirmedTransactionProvider {
     async fn poll_new_transactions(
         &self,
         address: Address,
-    ) -> Result<(), NodeError>;
+    );
 }
 
 pub struct EsploraApiClient {
     client: AsyncClient,
+    tx_channel: broadcast::Sender<Transaction>,
+}
+
+impl EsploraApiClient {
+    pub fn new(client: AsyncClient, capacity: usize) -> Self {
+        Self { client, tx_channel: broadcast::channel(capacity).0}
+    }
 }
 
 
@@ -88,76 +96,95 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
     async fn poll_new_transactions(
         &self,
         address: Address,
-    ) -> Result<(), NodeError> {
-        let mut last_known_height = self.client
-            .get_height().await
-            .map_err(|e| NodeError::Error(format!("Cannot retrieve height of blockchain: {}", e)))?;
-        
-        println!("Polling for new transactions for address {}, starting from height {}", address, last_known_height);
+    ) {
+        let mut last_confirmed_height = match self.client
+            .get_height().await {
+                Ok(height) => height - 6,
+                Err(e) => {
+                    eprintln!("Cannot retrieve height of blockchain: {}", e);
+                    return;
+                }
+            };
+
+        println!("Polling for new transactions for address {}, starting from confirmed height {}", address, last_confirmed_height);
 
         loop {
             sleep(Duration::from_secs(60)).await;
 
-            let current_height = self.client
-                .get_height().await
-                .map_err(|e| NodeError::Error(format!("Cannot retrieve height of blockchain: {}", e)))?;
+            let current_height = match self.client.get_height().await {
+                Ok(height) => height,
+                Err(e) => {
+                    eprintln!("Cannot retrieve height of blockchain: {}", e);
+                    continue;
+                }
+            };
             
-            if current_height > last_known_height {
-                println!("New block(s) detected. Current height: {}", current_height);
-                // We check for transactions with at least 6 confirmations.
-                let new_max_height = current_height.saturating_sub(6);
+            let new_confirmed_height = current_height - 6;
 
-                let mut last_seen_txid = None;
-                'fetch_loop: loop {
-                    let address_txs = self.client
-                        .scripthash_txs(&address.script_pubkey(), last_seen_txid).await
-                        .map_err(|e|
-                            NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
-                        )?;
-
-                    if address_txs.is_empty() {
-                        break 'fetch_loop;
+            if new_confirmed_height > last_confirmed_height {
+                println!("New confirmed block found. From height {} to {}", last_confirmed_height + 1, new_confirmed_height);
+                
+                let new_txs = match self.get_confirmed_transactions(address.clone(), last_confirmed_height + 1, new_confirmed_height).await {
+                    Ok(txs) => txs,
+                    Err(e) => {
+                        eprintln!("Error getting confirmed transactions: {:?}", e);
+                        continue;
                     }
-                    
-                    last_seen_txid = address_txs.last().map(|tx| tx.txid);
+                };
 
-                    for tx_info in address_txs {
-                        if let Some(block_height) = tx_info.status.block_height {
-                            if block_height > last_known_height && block_height <= new_max_height {
-                                // This is a new confirmed transaction.
-                                if let Ok(Some(full_tx)) = self.client.get_tx(&tx_info.txid).await {
-                                    if let Ok(bitcoin_tx) = consensus::deserialize::<Transaction>(&consensus::serialize(&full_tx)) {
-                                        println!("Found new confirmed transaction: {}", bitcoin_tx.compute_txid());
-                                    }
-                                }
-                            } else if block_height <= last_known_height {
-                                // Since transactions are in reverse chronological order, we can stop fetching more pages.
-                                break 'fetch_loop;
-                            }
+                for tx in new_txs {
+                    println!("Found new confirmed transaction: {}", tx.compute_txid());
+                    match self.tx_channel.send(tx) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            eprintln!("Error sending transaction to channel: {:?}", e);
                         }
                     }
                 }
                 
-                last_known_height = current_height;
+                last_confirmed_height = new_confirmed_height;
             }
         }
     }
 }
 
-fn main() {
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
-        let client = EsploraApiClient {
-            client: Builder::new("https://blockstream.info/api").build_async().unwrap(),
-        };
+#[tokio::main]
+async fn main() {
+    let client = EsploraApiClient::new(Builder::new("https://blockstream.info/api").build_async().unwrap(), 100);
 
+    let address = Address::from_str("bc1qezwz3yt46nsgzcwlg0dsw680nryjpq5u8pvzts")
+        .unwrap()
+        .require_network(Network::Bitcoin)
+        .unwrap();
+
+    let transactions = client.get_confirmed_transactions(address.clone(), 899900, 900000).await.unwrap();
+    println!("Found {} transactions.", transactions.len());
+    for tx in transactions {
+        println!("Transaction ID: {}", tx.compute_txid());
+    }
+
+    client.poll_new_transactions(address).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_confirmed_transactions() {
+        let client = EsploraApiClient::new(Builder::new("https://blockstream.info/api").build_async().unwrap(), 100);
         let address = Address::from_str("bc1qezwz3yt46nsgzcwlg0dsw680nryjpq5u8pvzts")
             .unwrap()
             .require_network(Network::Bitcoin)
             .unwrap();
+        let transactions = client.get_confirmed_transactions(address.clone(), 899900, 899930).await.unwrap();
 
-        if let Err(e) = client.poll_new_transactions(address).await {
-            eprintln!("Polling failed: {:?}", e);
+        let correct_txs = vec!["99c024e891c3110297513a1bc8c6f36948b36461096e664be72c3ac96e958c5c",  "1d0249929acaf31c2c6b6e6f9c72f44bd663a426cb146afe0b7bbaa66e0bc0df", "fdcd9cf8d660e359a6ab2993d649276fca60be01c2b4327f95ad2527cbe3db08", "3fd280c3ccc13f0f88433f0ce95aeebacc249565c8e8b671005302de0616babe", "a8705186a9d6b5063484a8029b0e2c4064e3e2723ea61ea10b6bc38d0abbc77a"];
+        
+        assert_eq!(transactions.len(), correct_txs.len());
+            
+        for tx in transactions {
+            assert!(correct_txs.contains(&tx.compute_txid().to_string().as_str()));
         }
-    });
+    }
 }
