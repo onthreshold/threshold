@@ -1,0 +1,81 @@
+name: Code Coverage
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+      - name: Caching Rust Dependencies
+        uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: rustup update 1.87
+      - run: rustup default 1.87
+      # - run: cargo install cargo-tarpaulin
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+      - name: Run Code Coverage
+        run: cargo tarpaulin --all-targets --exclude-files "target/*" --count --out xml
+      - name: Show coverage report for debugging
+        if: always()
+        run: cat cobertura.xml
+      - name: Setup Python for Badge
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Create coverage summary for Badge
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        shell: python
+        run: |
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+
+          tree = ET.parse('cobertura.xml')
+          root = tree.getroot()
+          line_rate = float(root.get('line-rate')) * 100
+          branch_rate_str = root.get('branch-rate')
+          # Use 100% branch coverage if no branches are found
+          branch_rate = float(branch_rate_str) * 100 if branch_rate_str is not None else 100.0
+
+          summary = {
+            "total": {
+              "lines": {
+                "pct": line_rate
+              },
+              "statements": {
+                "pct": line_rate
+              },
+              "functions": {
+                "pct": line_rate
+              },
+              "branches": {
+                "pct": branch_rate
+              }
+            }
+          }
+
+          if not os.path.exists('coverage'):
+            os.makedirs('coverage')
+
+          with open('coverage/coverage-summary.json', 'w') as f:
+            json.dump(summary, f)
+      - name: Update Coverage Badge
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: we-cli/coverage-badge-action@main
+      - name: Post Coverage Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: 5monkeys/cobertura-action@v14
+        with:
+          path: cobertura.xml
+          minimum_coverage: 0
+          show_branch: true
+          show_line: true
