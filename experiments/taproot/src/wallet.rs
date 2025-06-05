@@ -16,6 +16,7 @@ use crate::dkg::{DkgResult, perform_distributed_key_generation};
 
 /// Represents a UTXO that can be spent with FROST threshold signatures
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Utxo {
     pub outpoint: bitcoin::transaction::OutPoint,
     pub output: TxOut,
@@ -24,6 +25,7 @@ pub struct Utxo {
 
 /// Simplified FROST + Taproot wallet using ZCash Foundation's FROST library
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct FrostTaprootWallet {
     /// FROST key packages for each participant (contains signing shares)
     key_packages: HashMap<frost::Identifier, KeyPackage>,
