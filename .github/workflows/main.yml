@@ -9,7 +9,7 @@ on:
 
 jobs:
   cargo-fmt:
-    runs-on: blacksmith-2vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
       - run: rustup update 1.87
@@ -19,13 +19,9 @@ jobs:
         run: cargo fmt --all -- --check
 
   cargo-build:
-    runs-on: blacksmith-2vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
-      - run: rustup update 1.87
-      - run: rustup default 1.87
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
       - name: Caching Rust Dependencies
         uses: useblacksmith/cache@v5
         with:
@@ -34,17 +30,17 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: rustup update 1.87
+      - run: rustup default 1.87
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
       - name: Cargo build
         run: cargo build --all
 
   cargo-test:
-    runs-on: blacksmith-2vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
-      - run: rustup update 1.87
-      - run: rustup default 1.87
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
       - name: Caching Rust Dependencies
         uses: useblacksmith/cache@v5
         with:
@@ -53,15 +49,17 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: rustup update 1.87
+      - run: rustup default 1.87
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
       - name: Cargo test
         run: cargo test --all
 
   clippy_check:
-    runs-on: blacksmith-8vcpu-ubuntu-2204
+    runs-on: blacksmith-16vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
       - name: Caching Rust Dependencies
         uses: useblacksmith/cache@v5
         with:
@@ -72,6 +70,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: rustup update 1.87
       - run: rustup default 1.87
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
       - run: rustup component add clippy
       - uses: clechasseur/rs-clippy-check@v3
         with:
