@@ -1,4 +1,4 @@
-use crate::grpc_handler::node_proto::{
+use crate::grpc::grpc_handler::node_proto::{
     CreateDepositIntentRequest, CreateDepositIntentResponse, SendDirectMessageRequest,
     SendDirectMessageResponse, SpendFundsRequest, SpendFundsResponse, StartDkgRequest,
     StartDkgResponse, StartSigningRequest, StartSigningResponse,
