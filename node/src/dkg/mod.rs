@@ -174,6 +174,7 @@ impl DkgState {
                             let package_to_send = match round2_packages.get(&identifier) {
                                 Some(package) => package,
                                 None => {
+                                    println!("Round2 package not found for {}", peer_to_send_to);
                                     return Err(NodeError::Error(format!(
                                         "Round2 package not found for {}",
                                         peer_to_send_to
@@ -189,6 +190,7 @@ impl DkgState {
                             {
                                 Ok(_) => (),
                                 Err(e) => {
+                                    println!("Round2 package not found for {}", peer_to_send_to);
                                     return Err(NodeError::Error(format!(
                                         "Failed to send private request: {:?}",
                                         e
@@ -217,39 +219,6 @@ impl DkgState {
     ) -> Result<(), NodeError> {
         let identifier = peer_id_to_identifier(&sender_peer_id);
 
-        // Skip duplicate packages
-        if self.round2_peer_packages.contains_key(&identifier) {
-            println!(
-                "Duplicate round2 package from {} – already recorded",
-                sender_peer_id
-            );
-            match self
-                .network_handle
-                .send_private_response(response_channel, PrivateResponse::Pong)
-            {
-                Ok(_) => (),
-                Err(e) => {
-                    return Err(NodeError::Error(format!(
-                        "Failed to send private response: {:?}",
-                        e
-                    )));
-                }
-            }
-
-            return Ok(());
-        }
-
-        // Add package to peer packages
-        self.round2_peer_packages.insert(identifier, package);
-
-        println!(
-            "Received round2 package from {} ({}/{})",
-            sender_peer_id,
-            self.round2_peer_packages.len(),
-            self.max_signers - 1
-        );
-
-        // Ack the received package
         match self
             .network_handle
             .send_private_response(response_channel, PrivateResponse::Pong)
@@ -262,6 +231,16 @@ impl DkgState {
                 )));
             }
         }
+
+        // Add package to peer packages
+        self.round2_peer_packages.insert(identifier, package);
+
+        println!(
+            "Received round2 package from {} ({}/{})",
+            sender_peer_id,
+            self.round2_peer_packages.len(),
+            self.max_signers - 1
+        );
 
         if let Some(r2_secret_package) = self.r2_secret_package.as_ref() {
             if self.round2_peer_packages.len() + 1 == self.max_signers as usize {

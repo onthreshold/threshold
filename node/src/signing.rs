@@ -28,12 +28,16 @@ impl NodeState {
                 "❌ Message must be 32-byte (sighash) – got {} bytes",
                 message.len()
             );
-            return Err(NodeError::Error("Message must be 32-byte (sighash)".to_string()));
+            return Err(NodeError::Error(
+                "Message must be 32-byte (sighash)".to_string(),
+            ));
         }
 
         if self.active_signing.is_some() {
             println!("❌ A signing session is already active");
-            return Err(NodeError::Error("A signing session is already active".to_string()));
+            return Err(NodeError::Error(
+                "A signing session is already active".to_string(),
+            ));
         }
 
         let sign_id = self.rng.next_u64();
@@ -88,12 +92,7 @@ impl NodeState {
                 sign_id,
                 message: message.clone(),
             };
-            let _id = self
-                .swarm
-                .inner
-                .behaviour_mut()
-                .request_response
-                .send_request(peer, req);
+            self.network_handle.send_private_request(peer.clone(), req);
         }
 
         Ok(Some(sign_id))
@@ -108,18 +107,13 @@ impl NodeState {
         channel: request_response::ResponseChannel<PrivateResponse>,
     ) -> Result<(), NodeError> {
         if self.dkg_state.get_private_key().is_none() {
-            let _ = self
-                .swarm
-                .inner
-                .behaviour_mut()
-                .request_response
-                .send_response(
-                    channel,
-                    PrivateResponse::Commitments {
-                        sign_id,
-                        commitments: Vec::new(),
-                    },
-                );
+            let _ = self.network_handle.send_private_response(
+                channel,
+                PrivateResponse::Commitments {
+                    sign_id,
+                    commitments: Vec::new(),
+                },
+            );
             return Ok(());
         }
 
@@ -144,19 +138,16 @@ impl NodeState {
         });
 
         let Ok(commit_bytes) = commitments.serialize() else {
-            return Err(NodeError::Error("Failed to serialize commitments".to_string()));
+            return Err(NodeError::Error(
+                "Failed to serialize commitments".to_string(),
+            ));
         };
 
         let resp = PrivateResponse::Commitments {
             sign_id,
             commitments: commit_bytes,
         };
-        let _ = self
-            .swarm
-            .inner
-            .behaviour_mut()
-            .request_response
-            .send_response(channel, resp);
+        let _ = self.network_handle.send_private_response(channel, resp);
 
         println!(
             "🔐 Provided commitments for sign_id {} to {}",
@@ -183,7 +174,9 @@ impl NodeState {
         let Ok(commitments) = frost::round1::SigningCommitments::deserialize(&commitments_bytes)
         else {
             println!("Failed to deserialize commitments from {}", peer);
-            return Err(NodeError::Error("Failed to deserialize commitments".to_string()));
+            return Err(NodeError::Error(
+                "Failed to deserialize commitments".to_string(),
+            ));
         };
         let identifier = peer_id_to_identifier(&peer);
         active.commitments.insert(identifier, commitments);
@@ -201,7 +194,9 @@ impl NodeState {
             active.signing_package = Some(signing_package.clone());
             let Ok(pkg_bytes) = signing_package.serialize() else {
                 println!("Failed to serialize signing package");
-                return Err(NodeError::Error("Failed to serialize signing package".to_string()));
+                return Err(NodeError::Error(
+                    "Failed to serialize signing package".to_string(),
+                ));
             };
 
             // Send package to participants (excluding self)
@@ -210,12 +205,7 @@ impl NodeState {
                     sign_id,
                     package: pkg_bytes.clone(),
                 };
-                let _ = self
-                    .swarm
-                    .inner
-                    .behaviour_mut()
-                    .request_response
-                    .send_request(peer, req);
+                let _ = self.network_handle.send_private_request(peer.clone(), req);
             }
 
             // Generate our signature share
@@ -239,7 +229,7 @@ impl NodeState {
                     return Err(NodeError::Error(format!("Failed to sign: {}", e)));
                 }
             }
-            
+
             println!("📦 Distributed signing package for session {}", sign_id);
         }
 
@@ -265,7 +255,9 @@ impl NodeState {
 
         let Ok(signing_package) = frost::SigningPackage::deserialize(&package_bytes) else {
             println!("Failed to deserialize signing package");
-            return Err(NodeError::Error("Failed to deserialize signing package".to_string()));
+            return Err(NodeError::Error(
+                "Failed to deserialize signing package".to_string(),
+            ));
         };
 
         let sig_share = frost::round2::sign(
@@ -286,11 +278,8 @@ impl NodeState {
                     signature_share: sig_bytes,
                 };
                 let _ = self
-                    .swarm
-                    .inner
-                    .behaviour_mut()
-                    .request_response
-                    .send_response(channel, resp);
+                    .network_handle
+                    .send_private_response(channel, resp);
             }
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to sign: {}", e)));
@@ -306,7 +295,12 @@ impl NodeState {
     }
 
     /// Coordinator handles incoming signature share
-    pub fn handle_signature_share(&mut self, peer: PeerId, sign_id: u64, sig_bytes: Vec<u8>) -> Result<(), NodeError> {
+    pub fn handle_signature_share(
+        &mut self,
+        peer: PeerId,
+        sign_id: u64,
+        sig_bytes: Vec<u8>,
+    ) -> Result<(), NodeError> {
         let Some(active) = self.active_signing.as_mut() else {
             return Err(NodeError::Error("No active session".to_string()));
         };
@@ -316,7 +310,9 @@ impl NodeState {
 
         let Ok(sig_share) = frost::round2::SignatureShare::deserialize(&sig_bytes) else {
             println!("Failed to deserialize signature share from {}", peer);
-            return Err(NodeError::Error("Failed to deserialize signature share".to_string()));
+            return Err(NodeError::Error(
+                "Failed to deserialize signature share".to_string(),
+            ));
         };
         let identifier = peer_id_to_identifier(&peer);
         active.signature_shares.insert(identifier, sig_share);
