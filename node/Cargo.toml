@@ -38,6 +38,7 @@ uuid = { version = "1.17.0", features = ["v4"] }
 rocksdb = "0.23.0"
 sha2 = "0.10.9"
 bincode = { version = "2.0.1", features = ["serde"] }
+esplora-client = { version = "*", default-features = false, features = ["async-https"] }
 
 [dev-dependencies]
 tempfile = "3.8"
