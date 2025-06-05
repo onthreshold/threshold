@@ -29,7 +29,7 @@ pub enum PrivateRequest {
     Round2Package(round2::Package),
     SignRequest { sign_id: u64, message: Vec<u8> },
     SignPackage { sign_id: u64, package: Vec<u8> },
-
+    InsertBlock { hash: Vec<u8>, block: Vec<u8> },
     StartSigningSession { hex_message: String },
     Spend { amount_sat: u64 },
     GetFrostPublicKey,
@@ -78,8 +78,10 @@ pub enum NetworkMessage {
     },
     SendPrivateRequest(PeerId, PrivateRequest),
     SendPrivateResponse(ResponseChannel<PrivateResponse>, PrivateResponse),
-
     SendSelfRequest {
+        request: PrivateRequest,
+    },
+    SendSelfRequestSync {
         request: PrivateRequest,
         response_channel: mpsc::UnboundedSender<PrivateResponse>,
     },
@@ -100,7 +102,7 @@ impl NetworkHandle {
         let network_message = NetworkMessage::SendBroadcast { topic, message };
         self.tx
             .send(network_message)
-            .map_err(|e| NetworkError::SendError(e))
+            .map_err(NetworkError::SendError)
     }
 
     pub fn send_private_request(
@@ -111,7 +113,7 @@ impl NetworkHandle {
         let network_message = NetworkMessage::SendPrivateRequest(peer_id, request);
         self.tx
             .send(network_message)
-            .map_err(|e| NetworkError::SendError(e))
+            .map_err(NetworkError::SendError)
     }
 
     pub fn send_private_response(
@@ -122,21 +124,31 @@ impl NetworkHandle {
         let network_message = NetworkMessage::SendPrivateResponse(channel, response);
         self.tx
             .send(network_message)
-            .map_err(|e| NetworkError::SendError(e))
+            .map_err(NetworkError::SendError)
     }
 
-    pub async fn send_self_request(
+    pub fn send_self_request(&self, request: PrivateRequest) -> Result<(), NetworkError> {
+        let network_message = NetworkMessage::SendSelfRequest { request };
+
+        self.tx
+            .send(network_message)
+            .map_err(NetworkError::SendError)?;
+
+        Ok(())
+    }
+
+    pub async fn send_self_request_sync(
         &self,
         request: PrivateRequest,
     ) -> Result<PrivateResponse, NetworkError> {
         let (tx, mut rx) = unbounded_channel::<PrivateResponse>();
-        let network_message = NetworkMessage::SendSelfRequest {
+        let network_message = NetworkMessage::SendSelfRequestSync {
             request,
             response_channel: tx,
         };
         self.tx
             .send(network_message)
-            .map_err(|e| NetworkError::SendError(e))?;
+            .map_err(NetworkError::SendError)?;
 
         rx.recv().await.ok_or(NetworkError::RecvError)
     }

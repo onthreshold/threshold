@@ -38,13 +38,7 @@ impl SimpleWallet {
             utxos: vec![
                 Utxo {
                     outpoint: OutPoint {
-                        txid: match bitcoin::Txid::from_slice(&[0u8; 32]) {
-                            Ok(txid) => txid,
-                            Err(e) => {
-                                println!("❌ Failed to create UTXO: {}", e);
-                                return Self::default();
-                            }
-                        },
+                        txid: bitcoin::Txid::from_slice(&[0u8; 32]).expect("Failed to create UTXO"),
                         vout: 0,
                     },
                     value: Amount::from_sat(100_000),
@@ -52,13 +46,7 @@ impl SimpleWallet {
                 },
                 Utxo {
                     outpoint: OutPoint {
-                        txid: match bitcoin::Txid::from_slice(&[1u8; 32]) {
-                            Ok(txid) => txid,
-                            Err(e) => {
-                                println!("❌ Failed to create UTXO: {}", e);
-                                return Self::default();
-                            }
-                        },
+                        txid: bitcoin::Txid::from_slice(&[1u8; 32]).expect("Failed to create UTXO"),
                         vout: 0,
                     },
                     value: Amount::from_sat(50_000),
@@ -66,13 +54,7 @@ impl SimpleWallet {
                 },
                 Utxo {
                     outpoint: OutPoint {
-                        txid: match bitcoin::Txid::from_slice(&[2u8; 32]) {
-                            Ok(txid) => txid,
-                            Err(e) => {
-                                println!("❌ Failed to create UTXO: {}", e);
-                                return Self::default();
-                            }
-                        },
+                        txid: bitcoin::Txid::from_slice(&[2u8; 32]).expect("Failed to create UTXO"),
                         vout: 0,
                     },
                     value: Amount::from_sat(20_000),

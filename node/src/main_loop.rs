@@ -1,7 +1,6 @@
 use futures::StreamExt;
 use libp2p::mdns;
 
-use frost_secp256k1::{self as frost};
 use libp2p::gossipsub;
 use libp2p::request_response;
 use libp2p::swarm::SwarmEvent;
@@ -58,8 +57,20 @@ impl NodeState {
                             .request_response
                             .send_response(channel, response);
                     }
-                    Some(NetworkMessage::SendSelfRequest{ request, response_channel }) => {
-                        println!("Received self request {:?}", request);
+                    Some(NetworkMessage::SendSelfRequest{ request }) => {
+                        match request {
+                            PrivateRequest::InsertBlock { hash, block } => {
+                                match self.db.insert_block(hash, block) {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        return Err(NodeError::Error(format!("Failed to start signing session: {}", e)));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    Some(NetworkMessage::SendSelfRequestSync{ request, response_channel }) => {
                             match request {
                                 PrivateRequest::StartSigningSession { hex_message } => {
                                     match self.start_signing_session(&hex_message) {
@@ -105,15 +116,8 @@ impl NodeState {
                                     return Err(NodeError::Error("No source peer".to_string()));
                                 }
 
-                                let data = match frost::keys::dkg::round1::Package::deserialize(&message.data) {
-                                    Ok(data) => data,
-                                    Err(e) => {
-                                        return Err(NodeError::Error(format!("Failed to deserialize round1 package: {}", e)));
-                                    }
-                                };
-                                
                                 if let Some(source_peer) = message.source {
-                                    match self.dkg_state.handle_round1_payload(source_peer, data).await {
+                                    match self.dkg_state.handle_round1_payload(source_peer, message.data) {
                                         Ok(_) => (),
                                         Err(e) => {
                                             println!("❌ Failed to handle round1 payload: {}", e);
@@ -122,7 +126,7 @@ impl NodeState {
                                 }
                             }
                             t if t == start_dkg_topic.hash() => {
-                                match self.dkg_state.handle_dkg_start().await {
+                                match self.dkg_state.handle_dkg_start() {
                                     Ok(_) => (),
                                     Err(e) => {
                                         println!("❌ Failed to handle DKG start: {}", e);
@@ -216,7 +220,7 @@ impl NodeState {
                         if topic == start_dkg_topic.hash() {
                             self.dkg_state.dkg_listeners.insert(peer_id);
                             println!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_state.dkg_listeners.len());
-                            if let Err(e) = self.dkg_state.handle_dkg_start().await {
+                            if let Err(e) = self.dkg_state.handle_dkg_start() {
                                 println!("❌ Failed to handle DKG start: {}", e);
                             }
                         }

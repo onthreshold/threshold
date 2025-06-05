@@ -31,7 +31,7 @@ pub async fn start_dkg(
             message: "DKG process started".to_string(),
         })),
         Err(e) => {
-            return Err(Status::internal(format!("Network error: {:?}", e)));
+            Err(Status::internal(format!("Network error: {:?}", e)))
         }
     }
 }
@@ -44,7 +44,7 @@ pub async fn spend_funds(
 
     println!("Received request to spend {} satoshis", amount_sat);
     let response = network
-        .send_self_request(PrivateRequest::Spend { amount_sat })
+        .send_self_request_sync(PrivateRequest::Spend { amount_sat })
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
@@ -69,11 +69,16 @@ pub async fn start_signing(
         hex_message: hex_msg.clone(),
     };
 
-    let response = network.send_self_request(network_request).await
+    let response = network
+        .send_self_request_sync(network_request)
+        .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
     let PrivateResponse::StartSigningSession { sign_id } = response else {
-        return Err(Status::internal(format!("Invalid response from node {:?}", response)));
+        return Err(Status::internal(format!(
+            "Invalid response from node {:?}",
+            response
+        )));
     };
 
     Ok(Response::new(StartSigningResponse {
@@ -108,8 +113,6 @@ pub async fn send_direct_message(
         })),
         Err(e) => Err(Status::internal(format!("Network error: {:?}", e))),
     }
-
-
 }
 
 pub async fn create_deposit_intent(
@@ -134,12 +137,14 @@ pub async fn create_deposit_intent(
     let deposit_tracking_id = Uuid::new_v4().to_string();
 
     let frost_pubkey_hex = network
-        .send_self_request(PrivateRequest::GetFrostPublicKey)
+        .send_self_request_sync(PrivateRequest::GetFrostPublicKey)
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
     let PrivateResponse::GetFrostPublicKey { public_key } = frost_pubkey_hex else {
-        return Err(Status::internal("Invalid response from node. No public key found."));
+        return Err(Status::internal(
+            "Invalid response from node. No public key found.",
+        ));
     };
 
     let public_key = PublicKey::from_str(&public_key)
@@ -157,13 +162,13 @@ pub async fn create_deposit_intent(
         user_id,
         amount_sat,
         deposit_tracking_id.clone(),
-        deposit_address.to_string()
+        deposit_address
     );
 
     Ok(Response::new(CreateDepositIntentResponse {
         success: true,
         message: format!("Deposit intent created for user {}", user_id),
-        deposit_tracking_id: deposit_tracking_id,
+        deposit_tracking_id,
         deposit_address: deposit_address.to_string(),
     }))
 }

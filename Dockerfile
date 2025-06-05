@@ -1,7 +1,7 @@
 FROM rust:1.87-slim-bookworm AS chef
 # We only pay the installation cost once, 
 # it will be cached from the second build onwards
-RUN apt-get update -y && apt-get -y install pkg-config libssl-dev libpq-dev g++ curl protobuf-compiler
+RUN apt-get update -y && apt-get -y install pkg-config libssl-dev libpq-dev g++ curl protobuf-compiler libclang-dev clang
 RUN cargo install cargo-chef 
 WORKDIR /app
 

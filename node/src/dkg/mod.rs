@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::{
+    errors::NodeError,
     peer_id_to_identifier,
     swarm_manager::{NetworkHandle, PrivateRequest, PrivateResponse},
-    errors::NodeError,
 };
 use frost_secp256k1::{
     self as frost, Identifier,
@@ -41,7 +41,7 @@ pub struct DkgState {
 }
 
 impl DkgState {
-    pub async fn handle_dkg_start(&mut self) -> Result<(), NodeError> {
+    pub fn handle_dkg_start(&mut self) -> Result<(), NodeError> {
         if self.dkg_started {
             println!("DKG already started, skipping DKG process");
             return Ok(());
@@ -92,19 +92,27 @@ impl DkgState {
         ) {
             Ok(_) => (),
             Err(e) => {
-                return Err(NodeError::Error(format!("Failed to send broadcast: {:?}", e)));
+                return Err(NodeError::Error(format!(
+                    "Failed to send broadcast: {:?}",
+                    e
+                )));
             }
         }
 
-        
-        match self.network_handle.send_broadcast(self.round1_topic.clone(), round1_package_bytes) {
+        match self
+            .network_handle
+            .send_broadcast(self.round1_topic.clone(), round1_package_bytes)
+        {
             Ok(_) => (),
             Err(e) => {
-                return Err(NodeError::Error(format!("Failed to send broadcast: {:?}", e)));
+                return Err(NodeError::Error(format!(
+                    "Failed to send broadcast: {:?}",
+                    e
+                )));
             }
         }
 
-        match self.try_enter_round2().await {
+        match self.try_enter_round2() {
             Ok(_) => {
                 println!(
                     "Generated and published round1 package in response to DKG start signal from {}",
@@ -113,17 +121,26 @@ impl DkgState {
                 Ok(())
             }
             Err(e) => {
-                return Err(NodeError::Error(format!("Failed to enter round2: {}", e)));
+                Err(NodeError::Error(format!("Failed to enter round2: {}", e)))
             }
         }
     }
 
-    pub async fn handle_round1_payload(
+    pub fn handle_round1_payload(
         &mut self,
         sender_peer_id: PeerId,
-        package: round1::Package,
+        package: Vec<u8>,
     ) -> Result<(), NodeError> {
         let identifier = peer_id_to_identifier(&sender_peer_id);
+        let package = match frost::keys::dkg::round1::Package::deserialize(&package) {
+            Ok(package) => package,
+            Err(e) => {
+                return Err(NodeError::Error(format!(
+                    "Failed to deserialize round1 package: {}",
+                    e
+                )));
+            }
+        };
         // Add package to peer packages
         self.round1_peer_packages.insert(identifier, package);
 
@@ -134,15 +151,12 @@ impl DkgState {
             self.max_signers - 1
         );
 
-        match self.try_enter_round2().await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                return Err(NodeError::Error(format!("Failed to enter round2: {}", e)));
-            }
-        }
+        self.try_enter_round2()?;
+
+        Ok(())
     }
 
-    pub async fn try_enter_round2(&mut self) -> Result<(), NodeError> {
+    pub fn try_enter_round2(&mut self) -> Result<(), NodeError> {
         if let Some(r1_secret_package) = self.r1_secret_package.as_ref() {
             if self.round1_peer_packages.len() + 1 == self.max_signers as usize {
                 println!("Received all round1 packages, entering part2");
@@ -160,16 +174,25 @@ impl DkgState {
                             let package_to_send = match round2_packages.get(&identifier) {
                                 Some(package) => package,
                                 None => {
-                                    return Err(NodeError::Error(format!("Round2 package not found for {}", peer_to_send_to)));
+                                    return Err(NodeError::Error(format!(
+                                        "Round2 package not found for {}",
+                                        peer_to_send_to
+                                    )));
                                 }
                             };
 
                             let request = PrivateRequest::Round2Package(package_to_send.clone());
 
-                            match self.network_handle.send_private_request(*peer_to_send_to, request) {
+                            match self
+                                .network_handle
+                                .send_private_request(*peer_to_send_to, request)
+                            {
                                 Ok(_) => (),
                                 Err(e) => {
-                                    return Err(NodeError::Error(format!("Failed to send private request: {:?}", e)));
+                                    return Err(NodeError::Error(format!(
+                                        "Failed to send private request: {:?}",
+                                        e
+                                    )));
                                 }
                             }
 
@@ -200,10 +223,16 @@ impl DkgState {
                 "Duplicate round2 package from {} – already recorded",
                 sender_peer_id
             );
-            match self.network_handle.send_private_response(response_channel, PrivateResponse::Pong) {
+            match self
+                .network_handle
+                .send_private_response(response_channel, PrivateResponse::Pong)
+            {
                 Ok(_) => (),
                 Err(e) => {
-                    return Err(NodeError::Error(format!("Failed to send private response: {:?}", e)));
+                    return Err(NodeError::Error(format!(
+                        "Failed to send private response: {:?}",
+                        e
+                    )));
                 }
             }
 
@@ -221,10 +250,16 @@ impl DkgState {
         );
 
         // Ack the received package
-        match self.network_handle.send_private_response(response_channel, PrivateResponse::Pong) {
+        match self
+            .network_handle
+            .send_private_response(response_channel, PrivateResponse::Pong)
+        {
             Ok(_) => (),
             Err(e) => {
-                return Err(NodeError::Error(format!("Failed to send private response: {:?}", e)));
+                return Err(NodeError::Error(format!(
+                    "Failed to send private response: {:?}",
+                    e
+                )));
             }
         }
 

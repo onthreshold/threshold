@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use swarm_manager::{NetworkHandle, SwarmManager};
 
-use crate::{dkg::DkgState, errors::NodeError, swarm_manager::build_swarm};
+use crate::{db::Db, dkg::DkgState, errors::NodeError, swarm_manager::build_swarm};
 
+pub mod block;
+pub mod db;
 pub mod dkg;
 pub mod grpc_handler;
 pub mod grpc_operator;
@@ -56,6 +58,7 @@ pub struct NodeState {
 
     // DKG
     pub dkg_state: DkgState,
+    pub db: Db,
 
     pub peer_id: PeerId,
     pub peers: HashSet<PeerId>,
@@ -97,13 +100,20 @@ impl NodeState {
 
         let allowed_peers: Vec<PeerId> = peer_data
             .iter()
-            .map(|peer| peer.public_key.parse().map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e))))
+            .map(|peer| {
+                peer.public_key
+                    .parse()
+                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))
+            })
             .collect::<Result<Vec<PeerId>, NodeError>>()?;
 
         let peers_to_names: BTreeMap<PeerId, String> = peer_data
             .iter()
             .map(|peer| {
-                let peer_id = peer.public_key.parse().map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))?;
+                let peer_id = peer
+                    .public_key
+                    .parse()
+                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))?;
                 Ok((peer_id, peer.name.clone()))
             })
             .collect::<Result<BTreeMap<PeerId, String>, NodeError>>()?;
@@ -116,6 +126,7 @@ impl NodeState {
             swarm,
             min_signers,
             max_signers,
+            db: Db::new("node_db.db"),
             dkg_state: match DkgState::new(
                 network_handle.clone(),
                 min_signers,
@@ -126,7 +137,10 @@ impl NodeState {
             ) {
                 Ok(dkg_state) => dkg_state,
                 Err(e) => {
-                    return Err(NodeError::Error(format!("Failed to create DKG state: {}", e)));
+                    return Err(NodeError::Error(format!(
+                        "Failed to create DKG state: {}",
+                        e
+                    )));
                 }
             },
             peers: HashSet::new(),
@@ -153,7 +167,10 @@ impl NodeState {
             "node_config.json".to_string(),
         ) {
             Ok(node_state) => Ok(node_state),
-            Err(e) => Err(NodeError::Error(format!("Failed to create node state: {}", e))),
+            Err(e) => Err(NodeError::Error(format!(
+                "Failed to create node state: {}",
+                e
+            ))),
         }
     }
 }

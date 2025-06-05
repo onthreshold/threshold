@@ -11,8 +11,10 @@ use frost_secp256k1::{self as frost};
 use libp2p::{PeerId, gossipsub};
 
 use crate::{
-    Config, DkgKeys, EncryptionParams, KeyData, NodeError, PeerData, dkg::DkgState,
-    swarm_manager::NetworkHandle,
+    Config, DkgKeys, EncryptionParams, KeyData, NodeError, PeerData,
+    block::{Block, GenesisBlock},
+    dkg::DkgState,
+    swarm_manager::{NetworkHandle, PrivateRequest},
 };
 
 fn derive_key_from_password(
@@ -139,11 +141,13 @@ impl DkgState {
         Ok(dkg_state)
     }
 
-    pub fn save_dkg_keys(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_dkg_keys(&self) -> Result<(), NodeError> {
         // Load existing config or create new one
         let mut config = if Path::new(&self.config_file).exists() {
-            let config_str = fs::read_to_string(&self.config_file)?;
-            serde_json::from_str::<Config>(&config_str)?
+            let config_str = fs::read_to_string(&self.config_file)
+                .map_err(|e| NodeError::Error(format!("Failed to read config: {}", e)))?;
+            serde_json::from_str::<Config>(&config_str)
+                .map_err(|e| NodeError::Error(format!("Failed to deserialize config: {}", e)))?
         } else {
             // For new configs, we need to create a dummy key_data
             // This is not ideal but maintains compatibility with the structure
@@ -172,10 +176,13 @@ impl DkgState {
         // Update DKG keys if they exist
         if let (Some(private_key), Some(pubkey)) = (&self.private_key_package, &self.pubkey_package)
         {
-            let password = get_password_for_dkg()?;
+            let password = get_password_for_dkg()
+                .map_err(|e| NodeError::Error(format!("Failed to get password for DKG: {}", e)))?;
 
             // Serialize private key to bytes
-            let private_key_bytes = private_key.serialize()?;
+            let private_key_bytes = private_key
+                .serialize()
+                .map_err(|e| NodeError::Error(format!("Failed to serialize private key: {}", e)))?;
 
             // Use existing salt from key_data, or generate a new one if empty
             let salt_b64 = if config.key_data.encryption_params.salt_b64.is_empty() {
@@ -190,10 +197,14 @@ impl DkgState {
 
             // Encrypt the private key package
             let (encrypted_private_key_b64, iv_b64) =
-                encrypt_dkg_private_key(&private_key_bytes, &password, &salt_b64)?;
+                encrypt_dkg_private_key(&private_key_bytes, &password, &salt_b64).map_err(|e| {
+                    NodeError::Error(format!("Failed to encrypt private key: {}", e))
+                })?;
 
             // Serialize and base64 encode the public key package
-            let pubkey_bytes = pubkey.serialize()?;
+            let pubkey_bytes = pubkey
+                .serialize()
+                .map_err(|e| NodeError::Error(format!("Failed to serialize public key: {}", e)))?;
             let pubkey_package_b64 = BASE64.encode(pubkey_bytes);
 
             config.dkg_keys = Some(DkgKeys {
@@ -205,12 +216,23 @@ impl DkgState {
                 },
                 pubkey_package_b64,
             });
+            let genesis_block =
+                GenesisBlock::new(pubkey.serialize().map_err(|e| {
+                    NodeError::Error(format!("Failed to serialize public key: {}", e))
+                })?);
+            self.network_handle
+                .send_self_request(PrivateRequest::InsertBlock {
+                    hash: genesis_block.get_hash(),
+                    block: genesis_block.serialize(),
+                })
+                .map_err(|e| NodeError::Error(format!("Failed to send genesis block: {:?}", e)))?;
         }
 
         // Save config
-        let config_str = serde_json::to_string_pretty(&config)?;
-        fs::write(&self.config_file, config_str)?;
-
+        let config_str = serde_json::to_string_pretty(&config)
+            .map_err(|e| NodeError::Error(format!("Failed to serialize config: {}", e)))?;
+        fs::write(&self.config_file, config_str)
+            .map_err(|e| NodeError::Error(format!("Failed to write config: {}", e)))?;
         Ok(())
     }
 
