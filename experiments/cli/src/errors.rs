@@ -17,20 +17,8 @@ pub enum KeygenError {
     #[display("Failed to encrypt key.")]
     Encryption(String),
 
-    #[display("Failed to decode key.")]
-    KeyDecoding(String),
-
-    #[display("Failed to decrypt key.")]
-    Decryption(String),
-
     #[display("Failed to create directory.")]
     KeyFileNotFound(String),
-
-    #[display("Failed to Serialize config. {}", _0)]
-    JsonError(serde_json::Error),
-
-    #[display("Failed to reconstruct keypair from protobuf.")]
-    IdentityError(String),
 }
 
 #[derive(Debug)]

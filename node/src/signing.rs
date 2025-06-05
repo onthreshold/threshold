@@ -5,6 +5,7 @@ use frost_secp256k1::rand_core::RngCore;
 use frost_secp256k1::{self as frost};
 use hex;
 use libp2p::{PeerId, request_response};
+use tracing::{debug, error, info, warn};
 
 use crate::errors::NodeError;
 use crate::swarm_manager::{PrivateRequest, PrivateResponse};
@@ -15,16 +16,16 @@ impl NodeState {
     /// `message_hex` must be hex-encoded 32-byte sighash.
     pub fn start_signing_session(&mut self, message_hex: &str) -> Result<Option<u64>, NodeError> {
         if self.dkg_state.get_private_key().is_none() || self.dkg_state.get_public_key().is_none() {
-            println!("❌ DKG not completed – cannot start signing");
+            error!("❌ DKG not completed – cannot start signing");
             return Err(NodeError::Error("DKG not completed".to_string()));
         }
 
         let Ok(message) = hex::decode(message_hex.trim()) else {
-            println!("❌ Invalid hex message");
+            error!("❌ Invalid hex message");
             return Err(NodeError::Error("Invalid hex message".to_string()));
         };
         if message.len() != 32 {
-            println!(
+            error!(
                 "❌ Message must be 32-byte (sighash) – got {} bytes",
                 message.len()
             );
@@ -33,8 +34,10 @@ impl NodeState {
             ));
         }
 
+        info!("Starting signing session for message: {}", message_hex);
+
         if self.active_signing.is_some() {
-            println!("❌ A signing session is already active");
+            error!("❌ A signing session is already active");
             return Err(NodeError::Error(
                 "A signing session is already active".to_string(),
             ));
@@ -46,7 +49,7 @@ impl NodeState {
         // Select participants: self + first (min_signers -1) peers
         let required = (self.min_signers - 1) as usize;
         if self.peers.len() < required {
-            println!("❌ Not enough peers – need at least {} others", required);
+            error!("❌ Not enough peers – need at least {} others", required);
             return Err(NodeError::Error("Not enough peers".to_string()));
         }
         // Randomly shuffle peers and pick required number
@@ -153,7 +156,7 @@ impl NodeState {
         };
         let _ = self.network_handle.send_private_response(channel, resp);
 
-        println!(
+        debug!(
             "🔐 Provided commitments for sign_id {} to {}",
             sign_id, peer
         );
@@ -177,14 +180,14 @@ impl NodeState {
 
         let Ok(commitments) = frost::round1::SigningCommitments::deserialize(&commitments_bytes)
         else {
-            println!("Failed to deserialize commitments from {}", peer);
+            warn!("Failed to deserialize commitments from {}", peer);
             return Err(NodeError::Error(
                 "Failed to deserialize commitments".to_string(),
             ));
         };
         let identifier = peer_id_to_identifier(&peer);
         active.commitments.insert(identifier, commitments);
-        println!(
+        debug!(
             "📩 Received commitments from {} (total {}/{})",
             peer,
             active.commitments.len(),
@@ -197,7 +200,7 @@ impl NodeState {
                 frost::SigningPackage::new(active.commitments.clone(), &active.message);
             active.signing_package = Some(signing_package.clone());
             let Ok(pkg_bytes) = signing_package.serialize() else {
-                println!("Failed to serialize signing package");
+                warn!("Failed to serialize signing package");
                 return Err(NodeError::Error(
                     "Failed to serialize signing package".to_string(),
                 ));
@@ -234,7 +237,7 @@ impl NodeState {
                 }
             }
 
-            println!("📦 Distributed signing package for session {}", sign_id);
+            debug!("📦 Distributed signing package for session {}", sign_id);
         }
 
         Ok(())
@@ -249,16 +252,16 @@ impl NodeState {
         channel: request_response::ResponseChannel<PrivateResponse>,
     ) -> Result<(), NodeError> {
         let Some(active) = self.active_signing.as_ref() else {
-            println!("No active session to sign");
+            warn!("No active session to sign");
             return Err(NodeError::Error("No active session".to_string()));
         };
         if active.sign_id != sign_id {
-            println!("Session id mismatch");
+            warn!("Session id mismatch");
             return Err(NodeError::Error("Session id mismatch".to_string()));
         }
 
         let Ok(signing_package) = frost::SigningPackage::deserialize(&package_bytes) else {
-            println!("Failed to deserialize signing package");
+            warn!("Failed to deserialize signing package");
             return Err(NodeError::Error(
                 "Failed to deserialize signing package".to_string(),
             ));
@@ -288,7 +291,7 @@ impl NodeState {
             }
         }
 
-        println!(
+        debug!(
             "✍️  Sent signature share for session {} to {}",
             sign_id, peer
         );
@@ -311,14 +314,14 @@ impl NodeState {
         }
 
         let Ok(sig_share) = frost::round2::SignatureShare::deserialize(&sig_bytes) else {
-            println!("Failed to deserialize signature share from {}", peer);
+            warn!("Failed to deserialize signature share from {}", peer);
             return Err(NodeError::Error(
                 "Failed to deserialize signature share".to_string(),
             ));
         };
         let identifier = peer_id_to_identifier(&peer);
         active.signature_shares.insert(identifier, sig_share);
-        println!(
+        debug!(
             "✅ Received signature share from {} (total {}/{})",
             peer,
             active.signature_shares.len(),
@@ -344,7 +347,7 @@ impl NodeState {
             )
             .expect("Aggregate");
             let sig_hex = hex::encode(group_sig.serialize().expect("serialize group sig"));
-            println!(
+            debug!(
                 "🎉 Final FROST signature for session {}: {}",
                 sign_id, sig_hex
             );
@@ -360,9 +363,9 @@ impl NodeState {
                             input.witness = witness;
                         }
                         let raw_tx = bitcoin::consensus::encode::serialize(&tx);
-                        println!("📤 Signed transaction (hex): {}", hex::encode(raw_tx));
+                        debug!("📤 Signed transaction (hex): {}", hex::encode(raw_tx));
                     }
-                    Err(e) => println!("❌ Failed to convert signature: {}", e),
+                    Err(e) => debug!("❌ Failed to convert signature: {}", e),
                 }
             }
             // Reset

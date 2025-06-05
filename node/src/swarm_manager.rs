@@ -6,6 +6,7 @@ use std::{
     pin::Pin,
     time::Duration,
 };
+use tracing::info;
 
 use frost_secp256k1::keys::dkg::round2;
 use libp2p::{
@@ -248,7 +249,7 @@ impl SwarmManager {
     }
 
     pub async fn start(&mut self) {
-        println!("Starting swarm manager");
+        info!("Starting swarm manager");
         loop {
             tokio::select! {
                 send_message = self.network_manager_rx.recv() => match send_message {
@@ -281,7 +282,7 @@ impl SwarmManager {
                         SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                             for (peer_id, _multiaddr) in list {
                                 if self.allowed_peers.contains(peer_id) {
-                                    println!("Discovered peer: {}", self.peer_name(peer_id));
+                                    info!("Discovered peer: {}", self.peer_name(peer_id));
                                     self.live_peers.insert(*peer_id);
                                     self.inner.behaviour_mut().gossipsub.add_explicit_peer(peer_id);
                                 }
@@ -291,7 +292,7 @@ impl SwarmManager {
                         SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                             for (peer_id, _multiaddr) in list {
                                 if self.allowed_peers.contains(peer_id) {
-                                    println!("Peer expired: {}", self.peer_name(peer_id));
+                                    info!("Peer expired: {}", self.peer_name(peer_id));
                                     self.live_peers.retain(|p| *p != *peer_id);
                                     self.inner.behaviour_mut().gossipsub.remove_explicit_peer(peer_id);
                                 }

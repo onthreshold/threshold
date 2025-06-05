@@ -2,9 +2,13 @@ use crate::{db::Db, dkg::DkgState, errors::NodeError};
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+};
 use swarm_manager::{NetworkEvent, NetworkHandle};
 use tokio::sync::mpsc::UnboundedReceiver;
+use tracing::error;
 
 pub mod block;
 pub mod db;
@@ -12,10 +16,12 @@ pub mod dkg;
 pub mod grpc;
 pub mod main_loop;
 pub mod signing;
+pub mod start_node;
 pub mod swarm_manager;
 pub mod wallet;
 
 pub mod errors;
+pub mod key_manager;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct PeerData {
@@ -49,6 +55,7 @@ pub struct Config {
     pub allowed_peers: Vec<PeerData>,
     pub key_data: KeyData,
     pub dkg_keys: Option<DkgKeys>,
+    pub log_file_path: Option<PathBuf>,
 }
 
 pub struct NodeState {
@@ -151,7 +158,7 @@ pub fn peer_id_to_identifier(peer_id: &PeerId) -> Identifier {
     match Identifier::derive(&bytes) {
         Ok(identifier) => identifier,
         Err(e) => {
-            println!("Failed to derive identifier: {}", e);
+            error!("Failed to derive identifier: {}", e);
             panic!("Failed to derive identifier");
         }
     }
