@@ -106,6 +106,25 @@ mod tests {
     }
 
     #[test]
+    fn test_execute_transaction_with_zero_amount() {
+        let accounts = HashMap::from([(
+            "1".to_string(),
+            Account {
+                balance: 0,
+                address: "1".to_string(),
+            },
+        )]);
+        let mut chain_state = ChainState::new_with_accounts(accounts, 0);
+        let transaction = Transaction::new(vec![Operation::OpIncrementBalance {
+            account_id: "1".to_string(),
+            amount: 0,
+        }]);
+        let result = TransactionExecutor::execute_transaction(transaction, &mut chain_state);
+        assert!(result.is_ok());
+        assert_eq!(chain_state.get_account("1").unwrap().balance, 0);
+    }
+
+    #[test]
     fn test_execute_transaction_with_invalid_account() {
         let mut chain_state = ChainState::new();
         let transaction = Transaction::new(vec![Operation::OpIncrementBalance {
