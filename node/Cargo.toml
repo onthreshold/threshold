@@ -3,6 +3,10 @@ name = "node"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "node"
+path = "src/lib.rs"
+
 [dependencies]
 libp2p = { workspace = true, features = [
     "noise",
