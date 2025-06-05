@@ -1,4 +1,4 @@
-use node::grpc_handler::node_proto::{
+use node::grpc::grpc_handler::node_proto::{
     self, node_control_client::NodeControlClient, CreateDepositIntentResponse,
     SendDirectMessageResponse, SpendFundsResponse, StartSigningResponse,
 };
@@ -39,7 +39,7 @@ pub async fn rpc_start_signing(
 
     let start_signing_response = client
         .start_signing(tonic::Request::new(node_proto::StartSigningRequest {
-            hex_message: hex_message,
+            hex_message,
         }))
         .await?;
 
@@ -60,8 +60,8 @@ pub async fn rpc_send_direct_message(
 
     let send_direct_message_response = client
         .send_direct_message(tonic::Request::new(node_proto::SendDirectMessageRequest {
-            peer_id: peer_id,
-            message: message,
+            peer_id,
+            message,
         }))
         .await?;
 

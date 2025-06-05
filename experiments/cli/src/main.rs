@@ -25,13 +25,8 @@ use std::{fs, path::PathBuf};
 use tonic::transport::Server;
 
 use node::{
-    grpc_handler::NodeControlService,
-    swarm_manager::build_swarm,
-    Config,
-    EncryptionParams,
-    KeyData,
-    NodeState,
-    PeerData,
+    grpc::grpc_handler::NodeControlService, swarm_manager::build_swarm, Config, EncryptionParams,
+    KeyData, NodeState, PeerData,
 };
 
 use crate::errors::{CliError, KeygenError};
