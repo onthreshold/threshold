@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use libp2p::{request_response::ResponseChannel, swarm::SwarmEvent, Multiaddr, PeerId};
+use libp2p::{Multiaddr, PeerId, request_response::ResponseChannel, swarm::SwarmEvent};
 use std::{
     collections::{BTreeMap, HashSet, hash_map::DefaultHasher},
     fmt::Debug,
