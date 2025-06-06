@@ -7,7 +7,7 @@ use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut, hashes::sha256};
 use hex;
 use tracing::{error, info};
 
-use crate::NodeState;
+use crate::{NodeState, Network};
 use frost_secp256k1::{self as frost};
 
 /// Very simple demonstration UTXO representation (key-path Taproot assumed)
@@ -115,7 +115,7 @@ pub struct PendingSpend {
     pub tx: Transaction,
 }
 
-impl NodeState {
+impl<N: Network> NodeState<N> {
     pub fn get_frost_public_key(&self) -> Option<String> {
         self.dkg_state.pubkey_package.as_ref().map(|p| {
             format!("{:?}", p.verifying_key())

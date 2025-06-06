@@ -6,6 +6,7 @@ use std::{
     hash::{Hash, Hasher},
     pin::Pin,
     time::Duration,
+    fmt::Debug,
 };
 use tracing::info;
 
@@ -95,12 +96,20 @@ pub struct NetworkHandle {
     tx: mpsc::UnboundedSender<NetworkMessage>,
 }
 
-impl NetworkHandle {
-    pub fn peer_id(&self) -> PeerId {
+pub trait Network: Clone + Debug {
+    fn peer_id(&self) -> PeerId;
+    fn send_broadcast(&self, topic: gossipsub::IdentTopic, message: Vec<u8>) -> Result<(), NetworkError>;
+    fn send_private_request(&self, peer_id: PeerId, request: PrivateRequest) -> Result<(), NetworkError>;
+    fn send_private_response(&self, channel: ResponseChannel<PrivateResponse>, response: PrivateResponse) -> Result<(), NetworkError>;
+    fn send_self_request(&self, request: PrivateRequest, sync: bool) -> Result<Option<NetworkResponseFuture>, NetworkError>;
+}
+
+impl Network for NetworkHandle {
+    fn peer_id(&self) -> PeerId {
         self.peer_id
     }
 
-    pub fn send_broadcast(
+    fn send_broadcast(
         &self,
         topic: gossipsub::IdentTopic,
         message: Vec<u8>,
@@ -111,7 +120,7 @@ impl NetworkHandle {
             .map_err(|e| NetworkError::SendError(e.to_string()))
     }
 
-    pub fn send_private_request(
+    fn send_private_request(
         &self,
         peer_id: PeerId,
         request: PrivateRequest,
@@ -122,7 +131,7 @@ impl NetworkHandle {
             .map_err(|e| NetworkError::SendError(e.to_string()))
     }
 
-    pub fn send_private_response(
+    fn send_private_response(
         &self,
         channel: ResponseChannel<PrivateResponse>,
         response: PrivateResponse,
@@ -133,7 +142,7 @@ impl NetworkHandle {
             .map_err(|e| NetworkError::SendError(e.to_string()))
     }
 
-    pub fn send_self_request(
+    fn send_self_request(
         &self,
         request: PrivateRequest,
         sync: bool,

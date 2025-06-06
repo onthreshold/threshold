@@ -4,7 +4,7 @@ use tracing::{debug, error, info, warn};
 use crate::{
     errors::NodeError,
     peer_id_to_identifier,
-    swarm_manager::{NetworkHandle, PrivateRequest, PrivateResponse},
+    swarm_manager::{Network, PrivateRequest, PrivateResponse},
 };
 use frost_secp256k1::{
     self as frost, Identifier,
@@ -16,7 +16,6 @@ pub mod utils;
 
 pub struct DkgState {
     pub dkg_started: bool,
-    pub network_handle: NetworkHandle,
     pub min_signers: u16,
     pub max_signers: u16,
     pub rng: frost::rand_core::OsRng,
@@ -42,7 +41,7 @@ pub struct DkgState {
 }
 
 impl DkgState {
-    pub fn handle_dkg_start(&mut self) -> Result<(), NodeError> {
+    pub fn handle_dkg_start(&mut self, network_handle: &impl Network) -> Result<(), NodeError> {
         if self.dkg_started {
             debug!("DKG already started, skipping DKG process");
             return Ok(());
@@ -87,7 +86,7 @@ impl DkgState {
         // Broadcast START_DKG message to the network,
         let start_message = format!("START_DKG:{}", self.peer_id);
 
-        match self.network_handle.send_broadcast(
+        match network_handle.send_broadcast(
             self.start_dkg_topic.clone(),
             start_message.as_bytes().to_vec(),
         ) {
@@ -100,8 +99,7 @@ impl DkgState {
             }
         }
 
-        match self
-            .network_handle
+        match network_handle
             .send_broadcast(self.round1_topic.clone(), round1_package_bytes)
         {
             Ok(_) => (),
@@ -113,7 +111,7 @@ impl DkgState {
             }
         }
 
-        match self.try_enter_round2() {
+        match self.try_enter_round2(network_handle) {
             Ok(_) => {
                 info!(
                     "Generated and published round1 package in response to DKG start signal from {}",
@@ -127,6 +125,7 @@ impl DkgState {
 
     pub fn handle_round1_payload(
         &mut self,
+        network_handle: &impl Network,
         sender_peer_id: PeerId,
         package: Vec<u8>,
     ) -> Result<(), NodeError> {
@@ -150,12 +149,12 @@ impl DkgState {
             self.max_signers - 1
         );
 
-        self.try_enter_round2()?;
+        self.try_enter_round2(network_handle)?;
 
         Ok(())
     }
 
-    pub fn try_enter_round2(&mut self) -> Result<(), NodeError> {
+    pub fn try_enter_round2(&mut self, network_handle: &impl Network) -> Result<(), NodeError> {
         if let Some(r1_secret_package) = self.r1_secret_package.as_ref() {
             if self.round1_peer_packages.len() + 1 == self.max_signers as usize {
                 info!("Received all round1 packages, entering part2");
@@ -183,8 +182,7 @@ impl DkgState {
 
                             let request = PrivateRequest::Round2Package(package_to_send.clone());
 
-                            match self
-                                .network_handle
+                            match network_handle
                                 .send_private_request(*peer_to_send_to, request)
                             {
                                 Ok(_) => (),
@@ -212,14 +210,14 @@ impl DkgState {
 
     pub fn handle_round2_payload(
         &mut self,
+        network_handle: &impl Network,
         sender_peer_id: PeerId,
         package: round2::Package,
         response_channel: libp2p::request_response::ResponseChannel<PrivateResponse>,
     ) -> Result<(), NodeError> {
         let identifier = peer_id_to_identifier(&sender_peer_id);
 
-        match self
-            .network_handle
+        match network_handle
             .send_private_response(response_channel, PrivateResponse::Pong)
         {
             Ok(_) => (),
@@ -260,7 +258,7 @@ impl DkgState {
                         self.private_key_package = Some(private_key_package);
                         self.pubkey_package = Some(pubkey_package);
 
-                        if let Err(e) = self.save_dkg_keys() {
+                        if let Err(e) = self.save_dkg_keys(network_handle) {
                             error!("Failed to save DKG keys: {}", e);
                         } else {
                             info!("DKG keys saved to config file");
