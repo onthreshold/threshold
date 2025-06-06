@@ -1,9 +1,11 @@
 [workspace]
 members = [
-    "node",
-
     "bin/cli",
-    "bin/esplora-client", "crates/protocol", "crates/tests", "crates/types",
+    "bin/esplora-client",
+    "tests",
+    "crates/node",
+    "crates/protocol",
+    "crates/types",
 ]
 resolver = "2"
 
@@ -30,9 +32,11 @@ libp2p = { version = "0.54", features = [
 ] }
 hex = "0.4"
 rand = "0.9.1"
-esplora-client = { version = "*", default-features = false, features = ["async-https", "tokio"] }
+esplora-client = { version = "*", default-features = false, features = [
+    "async-https",
+    "tokio",
+] }
 bincode = { version = "2.0.1", features = ["serde"] }
 sha2 = "0.10.9"
 rocksdb = "0.23.0"
 async-trait = "0.1.88"
-
