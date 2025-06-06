@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use bitcoin::Txid;
-use node::{errors::NodeError, validators::Oracle};
+use protocol::oracle::Oracle;
+use types::errors::NodeError;
 
 pub struct MockOracle {
     // Map of tx_hash -> (address, amount, is_valid)

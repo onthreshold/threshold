@@ -22,9 +22,9 @@ use rpc_client::{
 use std::{fs, path::PathBuf};
 
 use node::{
-    errors::NodeError, key_manager::get_config, start_node::start_node, EncryptionParams, KeyData,
-    NodeConfig,
+    key_manager::get_config, start_node::start_node, EncryptionParams, KeyData, NodeConfig,
 };
+use types::errors::NodeError;
 
 use crate::errors::{CliError, KeygenError};
 

@@ -7,9 +7,9 @@ use hex;
 use libp2p::{PeerId, request_response};
 use tracing::{debug, error, info, warn};
 
-use crate::errors::NodeError;
 use crate::swarm_manager::{Network, PrivateRequest, PrivateResponse};
 use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
+use types::errors::NodeError;
 
 impl<N: Network> NodeState<N> {
     /// Coordinator entrypoint. Start a threshold signing session across the network.

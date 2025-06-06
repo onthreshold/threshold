@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 tokio = { workspace = true, features = ["full", "macros", "rt-multi-thread"] }
 node = { path = "../../node" }
+types = { path = "../../crates/types" }
 libp2p = { workspace = true, features = ["ed25519"] }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

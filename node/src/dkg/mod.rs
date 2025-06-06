@@ -2,9 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    NodeConfig,
-    errors::NodeError,
-    peer_id_to_identifier,
+    NodeConfig, peer_id_to_identifier,
     swarm_manager::{Network, PrivateRequest, PrivateResponse},
 };
 use frost_secp256k1::{
@@ -12,6 +10,7 @@ use frost_secp256k1::{
     keys::dkg::{round1, round2},
 };
 use libp2p::PeerId;
+use types::errors::NodeError;
 
 pub mod utils;
 

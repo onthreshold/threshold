@@ -21,11 +21,9 @@ use tokio::{
     sync::mpsc::{self, UnboundedReceiver, unbounded_channel},
 };
 
-use crate::{
-    PeerData,
-    errors::{NetworkError, NodeError},
-    protocol::block::Block,
-};
+use crate::PeerData;
+use protocol::block::Block;
+use types::errors::{NetworkError, NodeError};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PingBody {

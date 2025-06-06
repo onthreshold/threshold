@@ -3,9 +3,9 @@ use libp2p::request_response;
 use tokio::select;
 use tracing::{debug, error, info};
 
-use crate::errors::NodeError;
 use crate::swarm_manager::{NetworkEvent, PrivateRequest, PrivateResponse};
 use crate::{Network, NodeState};
+use types::errors::NodeError;
 
 impl<N: Network> NodeState<N> {
     pub async fn start(&mut self) -> Result<(), NodeError> {

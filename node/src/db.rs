@@ -1,12 +1,10 @@
 use rocksdb::DB;
 
-use crate::{
-    errors::NodeError,
-    protocol::{
-        block::{Block, BlockHash},
-        chain_state::ChainState,
-    },
+use protocol::{
+    block::{Block, BlockHash},
+    chain_state::ChainState,
 };
+use types::errors::NodeError;
 
 pub struct Db {
     pub db: DB,
