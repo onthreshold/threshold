@@ -256,7 +256,7 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
             VaultConfigPath {
                 key_file_path: path.join(format!(
                     "{}.json",
-                    file_name.clone().unwrap_or("config".to_string())
+                    file_name.clone().unwrap_or("key".to_string())
                 )),
                 config_file_path: path.join(format!(
                     "{}.yaml",
