@@ -71,6 +71,12 @@ pub struct BlockBody {
     pub transactions: Vec<Transaction>,
 }
 
+impl BlockBody {
+    pub fn new(transactions: Vec<Transaction>) -> Self {
+        Self { transactions }
+    }
+}
+
 impl BlockHeader {
     pub fn calculate_hash(&self) -> BlockHash {
         let mut hasher = Sha256::new();

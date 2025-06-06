@@ -1,5 +1,5 @@
 use bitcoin::Txid;
-use esplora_client::AsyncClient;
+use esplora_client::{AsyncClient, Builder};
 use types::errors::NodeError;
 
 #[async_trait::async_trait]
@@ -16,9 +16,21 @@ pub struct BitcoinOracle {
     pub esplora_client: AsyncClient,
 }
 
+impl Default for BitcoinOracle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BitcoinOracle {
-    pub fn new(esplora_client: AsyncClient) -> Self {
-        Self { esplora_client }
+    pub fn new() -> Self {
+        const BLOCKSTREAM_API_URL: &str = "https://blockstream.info/api";
+        let builder = Builder::new(BLOCKSTREAM_API_URL);
+        let async_client = builder.build_async().unwrap();
+
+        Self {
+            esplora_client: async_client,
+        }
     }
 }
 
