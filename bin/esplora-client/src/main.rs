@@ -208,7 +208,7 @@ mod tests {
             .await
             .unwrap();
 
-        let correct_txs = vec![
+        let correct_txs = [
             "99c024e891c3110297513a1bc8c6f36948b36461096e664be72c3ac96e958c5c",
             "1d0249929acaf31c2c6b6e6f9c72f44bd663a426cb146afe0b7bbaa66e0bc0df",
             "fdcd9cf8d660e359a6ab2993d649276fca60be01c2b4327f95ad2527cbe3db08",
