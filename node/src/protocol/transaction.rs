@@ -19,8 +19,29 @@ pub enum TransactionType {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq)]
 pub enum Operation {
-    OpPushAddress { address: String },
-    OpPushAmount { amount: u64 },
+    /// Push a value to the stack in bytes
+    /// Data types:
+    ///    - Numbers: u64
+    ///    - Strings: utf-8 encoded string
+    ///    - Booleans: u8 (0 or 1)
+    ///    - Tx Hash: [u8; 32]
+    OpPush { value: Vec<u8> },
+    /// Check if the transaction is on the Bitcoin network. Modifies allowance list to allow the address to spend the amount.
+    /// Pops from the stack:
+    ///   - 0: The tx hash
+    ///   - 1: The address
+    ///   - 2: The amount
+    ///
+    /// Pushes to the stack:
+    ///   - 0: The result (0 or 1)
+    OpCheckOracle,
+    /// Increment the balance of the address on the stack. Checks the allowance list to see if the address is allowed to spend the amount.
+    /// Pops from the stack:
+    ///   - 0: The address
+    ///   - 1: The amount
+    ///
+    /// Pushes to the stack:
+    ///   - 0: The result (0 or 1)
     OpIncrementBalance,
 }
 

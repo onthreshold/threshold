@@ -44,8 +44,9 @@ uuid = { version = "1.17.0", features = ["v4"] }
 rocksdb = "0.23.0"
 sha2 = "0.10.9"
 bincode = { version = "2.0.1", features = ["serde"] }
-esplora-client = { version = "*", default-features = false, features = ["async", "tokio"] }
+esplora-client = { workspace = true }
 directories = "6.0.0"
+async-trait = "0.1.88"
 
 
 [dev-dependencies]

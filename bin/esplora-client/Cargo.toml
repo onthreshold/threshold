@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 bitcoin = { workspace = true }
-esplora-client = { version = "*", default-features = false, features = ["async-https"] }
 tokio = { workspace = true, features = ["full"] }
+esplora-client = { workspace = true }
 node = { path = "../../node" }
 async-trait = "0.1.88"
