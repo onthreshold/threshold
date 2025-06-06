@@ -172,7 +172,10 @@ async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Setup { output_dir, file_name } => {
+        Commands::Setup {
+            output_dir,
+            file_name,
+        } => {
             setup_config(output_dir, file_name).map_err(|e| {
                 println!("Keygen Error: {}", e);
                 CliError::KeygenError(e)
@@ -251,11 +254,20 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
         let path = PathBuf::from(output);
         if path.is_dir() {
             VaultConfigPath {
-                key_file_path: path.join(format!("{}.json", file_name.clone().unwrap_or("config".to_string()))),
-                config_file_path: path.join(format!("{}.yaml", file_name.clone().unwrap_or("config".to_string()))),
+                key_file_path: path.join(format!(
+                    "{}.json",
+                    file_name.clone().unwrap_or("config".to_string())
+                )),
+                config_file_path: path.join(format!(
+                    "{}.yaml",
+                    file_name.clone().unwrap_or("config".to_string())
+                )),
             }
         } else {
-            return Err(KeygenError::KeyFileNotFound(format!("Output path is a file, not a directory. Please provide a directory path.")));
+            return Err(KeygenError::KeyFileNotFound(
+                "Output path is a file, not a directory. Please provide a directory path."
+                    .to_string(),
+            ));
         }
     } else {
         get_key_file_path()?
@@ -269,7 +281,9 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
 
     config.set_key_data(key_data);
 
-    config.save_to_file().map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
+    config
+        .save_to_file()
+        .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
     println!(
         "Key data has been saved to {} with the peer id {}. To modify the allowed peers and other configurations, edit the config file here: {}",

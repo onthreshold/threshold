@@ -116,8 +116,8 @@ pub fn get_config(
         dkg_keys: key_store.dkg_keys,
         allowed_peers: config_store.allowed_peers,
         log_file_path: config_store.log_file_path,
-        key_file_path: config_store.key_file_path,
-        config_file_path: config_file_path,
+        key_file_path,
+        config_file_path,
     };
 
     debug!("Read config file");
