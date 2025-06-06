@@ -46,8 +46,8 @@ bincode = { workspace = true }
 esplora-client = { workspace = true }
 directories = "6.0.0"
 async-trait = { workspace = true }
-protocol = { path = "../crates/protocol" }
-types = { path = "../crates/types" }
+protocol = { path = "../protocol" }
+types = { path = "../types" }
 
 [dev-dependencies]
 tempfile = "3.8"
