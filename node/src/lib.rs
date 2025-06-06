@@ -99,9 +99,6 @@ impl NodeConfig {
 }
 
 pub struct NodeState<N: Network> {
-    pub allowed_peers: Vec<PeerId>,
-    pub peers_to_names: BTreeMap<PeerId, String>,
-
     // DKG
     pub dkg_state: DkgState,
     pub db: Db,
@@ -126,60 +123,28 @@ pub struct NodeState<N: Network> {
 }
 
 impl<N: Network> NodeState<N> {
-    pub fn peer_name(&self, peer_id: &PeerId) -> String {
-        self.peers_to_names
-            .get(peer_id)
-            .unwrap_or(&peer_id.to_string())
-            .clone()
-    }
-
     pub fn new_from_config(
         network_handle: N,
-        peer_data: Vec<PeerData>,
         min_signers: u16,
         max_signers: u16,
         config: NodeConfig,
+        storage_db: Db,
         network_events_emitter: UnboundedReceiver<NetworkEvent>,
     ) -> Result<Self, NodeError> {
-        let allowed_peers: Vec<PeerId> = peer_data
-            .iter()
-            .filter_map(|peer| {
-                peer.public_key
-                    .parse()
-                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))
-                    .ok()
-            })
-            .collect::<Vec<PeerId>>();
-
-        let peers_to_names: BTreeMap<PeerId, String> = peer_data
-            .iter()
-            .filter_map(|peer| {
-                let peer_id = peer
-                    .public_key
-                    .parse()
-                    .map_err(|e| NodeError::Error(format!("Failed to parse peer data: {}", e)))
-                    .ok()?;
-                Some((peer_id, peer.name.clone()))
-            })
-            .collect::<BTreeMap<PeerId, String>>();
-
         let dkg_state = DkgState::new(
             min_signers,
             max_signers,
             network_handle.peer_id(),
-            peers_to_names.clone(),
             config.clone(),
         )?;
 
         Ok(NodeState {
             network_handle: network_handle.clone(),
-            allowed_peers: allowed_peers.clone(),
             network_events_stream: network_events_emitter,
-            peers_to_names: peers_to_names.clone(),
             peer_id: network_handle.peer_id(),
             min_signers,
             max_signers,
-            db: Db::new("node_db.db"),
+            db: storage_db,
             dkg_state,
             peers: HashSet::new(),
             rng: frost::rand_core::OsRng,

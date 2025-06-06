@@ -72,7 +72,7 @@ impl<N: Network> NodeState<N> {
                         match message.topic {
                             t if t == round1_topic.hash() => {
                                 if let Some(source_peer) = message.source {
-                                    info!("Received round1 payload from {}", self.peer_name(&source_peer));
+                                    // info!("Received round1 payload from {}", self.peer_name(&source_peer));
                                     match self.dkg_state.handle_round1_payload(&self.network_handle, source_peer, message.data) {
                                         Ok(_) => (),
                                         Err(e) => {

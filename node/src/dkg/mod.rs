@@ -22,7 +22,6 @@ pub struct DkgState {
     pub peer_id: PeerId,
     pub peers: HashSet<PeerId>,
 
-    pub peers_to_names: BTreeMap<PeerId, String>,
     pub dkg_listeners: HashSet<PeerId>,
 
     pub start_dkg_topic: libp2p::gossipsub::IdentTopic,

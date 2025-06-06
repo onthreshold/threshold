@@ -102,7 +102,6 @@ impl DkgState {
         min_signers: u16,
         max_signers: u16,
         peer_id: PeerId,
-        peers_to_names: BTreeMap<PeerId, String>,
         config: NodeConfig,
     ) -> Result<Self, NodeError> {
         let mut dkg_state = DkgState {
@@ -110,7 +109,6 @@ impl DkgState {
             max_signers,
             rng: frost::rand_core::OsRng,
             peer_id,
-            peers_to_names,
             dkg_listeners: HashSet::new(),
             config: config.clone(),
             start_dkg_topic: gossipsub::IdentTopic::new("start-dkg"),

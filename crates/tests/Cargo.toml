@@ -8,5 +8,7 @@ bitcoin = { workspace = true }
 protocol = { path = "../protocol" }
 node = { path = "../../node" }
 types = { path = "../types" }
+libp2p = { workspace = true }
 async-trait = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+futures = { workspace = true }
