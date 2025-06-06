@@ -6,7 +6,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     path::PathBuf,
 };
-use swarm_manager::{NetworkEvent, NetworkHandle};
+use swarm_manager::{Network, NetworkEvent};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tracing::error;
 
@@ -58,7 +58,7 @@ pub struct Config {
     pub log_file_path: Option<PathBuf>,
 }
 
-pub struct NodeState {
+pub struct NodeState<N: Network> {
     pub allowed_peers: Vec<PeerId>,
     pub peers_to_names: BTreeMap<PeerId, String>,
 
@@ -81,12 +81,12 @@ pub struct NodeState {
     // Config management
     pub config_file: String,
 
-    pub network_handle: NetworkHandle,
+    pub network_handle: N,
 
     pub network_events_stream: UnboundedReceiver<NetworkEvent>,
 }
 
-impl NodeState {
+impl<N: Network> NodeState<N> {
     pub fn peer_name(&self, peer_id: &PeerId) -> String {
         self.peers_to_names
             .get(peer_id)
@@ -95,7 +95,7 @@ impl NodeState {
     }
 
     pub fn new_from_config(
-        network_handle: NetworkHandle,
+        network_handle: N,
         peer_data: Vec<PeerData>,
         min_signers: u16,
         max_signers: u16,
@@ -125,7 +125,6 @@ impl NodeState {
             .collect::<BTreeMap<PeerId, String>>();
 
         let dkg_state = DkgState::new(
-            network_handle.clone(),
             min_signers,
             max_signers,
             network_handle.peer_id(),

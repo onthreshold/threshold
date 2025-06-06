@@ -3,15 +3,12 @@ use crate::grpc::grpc_handler::node_proto::{
     SendDirectMessageResponse, SpendFundsRequest, SpendFundsResponse, StartDkgRequest,
     StartDkgResponse, StartSigningRequest, StartSigningResponse,
 };
-use crate::swarm_manager::{NetworkHandle, PingBody, PrivateRequest, PrivateResponse};
+use crate::swarm_manager::{Network, NetworkHandle, PingBody, PrivateRequest, PrivateResponse};
 use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use tonic::{Request, Response, Status};
 use tracing::{debug, info};
 
-use bitcoin::Address;
-use bitcoin::Network;
-use bitcoin::PublicKey;
 use bitcoin::script::Builder;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -152,7 +149,7 @@ pub async fn create_deposit_intent(
         ));
     };
 
-    let public_key = PublicKey::from_str(&public_key)
+    let public_key = bitcoin::PublicKey::from_str(&public_key)
         .map_err(|e| Status::internal(format!("Failed to parse public key: {}", e)))?;
 
     let witness_script = Builder::new()
@@ -160,7 +157,7 @@ pub async fn create_deposit_intent(
         .push_opcode(bitcoin::opcodes::all::OP_CHECKSIG)
         .into_script();
 
-    let deposit_address = Address::p2wsh(&witness_script, Network::Testnet);
+    let deposit_address = bitcoin::Address::p2wsh(&witness_script, bitcoin::Network::Testnet);
 
     info!(
         "Received request to create deposit intent for user {} with amount {}. Tracking ID: {}. Deposit Address: {}",

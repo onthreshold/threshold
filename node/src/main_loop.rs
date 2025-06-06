@@ -6,13 +6,13 @@ use libp2p::swarm::SwarmEvent;
 use tokio::select;
 use tracing::{debug, error, info};
 
-use crate::NodeState;
 use crate::errors::NodeError;
 use crate::swarm_manager::{
     MyBehaviourEvent, NetworkEvent, NetworkMessage, PrivateRequest, PrivateResponse,
 };
+use crate::{Network, NodeState};
 
-impl NodeState {
+impl<N: Network> NodeState<N> {
     pub async fn start(&mut self) -> Result<(), NodeError> {
         info!("Local peer id: {}", self.peer_id);
 
@@ -80,7 +80,7 @@ impl NodeState {
                                 }
 
                                 if let Some(source_peer) = message.source {
-                                    match self.dkg_state.handle_round1_payload(source_peer, message.data) {
+                                    match self.dkg_state.handle_round1_payload(&self.network_handle, source_peer, message.data) {
                                         Ok(_) => (),
                                         Err(e) => {
                                             error!("❌ Failed to handle round1 payload: {}", e);
@@ -89,7 +89,7 @@ impl NodeState {
                                 }
                             }
                             t if t == start_dkg_topic.hash() => {
-                                match self.dkg_state.handle_dkg_start() {
+                                match self.dkg_state.handle_dkg_start(&self.network_handle) {
                                     Ok(_) => (),
                                     Err(e) => {
                                         error!("❌ Failed to handle DKG start: {}", e);
@@ -108,7 +108,7 @@ impl NodeState {
                             message: request_response::Message::Request { request: PrivateRequest::Round2Package(package), channel, .. }
                         }
                     )))) => {
-                        match self.dkg_state.handle_round2_payload(peer, package, channel) {
+                        match self.dkg_state.handle_round2_payload(&self.network_handle, peer, package, channel) {
                             Ok(_) => (),
                             Err(e) => {
                                 error!("❌ Failed to handle round2 payload: {}", e);
@@ -150,7 +150,7 @@ impl NodeState {
                         if topic == start_dkg_topic.hash() {
                             self.dkg_state.dkg_listeners.insert(peer_id);
                             info!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_state.dkg_listeners.len());
-                            if let Err(e) = self.dkg_state.handle_dkg_start() {
+                            if let Err(e) = self.dkg_state.handle_dkg_start(&self.network_handle) {
                                 error!("❌ Failed to handle DKG start: {}", e);
                             }
                         }

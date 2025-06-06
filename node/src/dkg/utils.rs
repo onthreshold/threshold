@@ -14,7 +14,7 @@ use crate::{
     Config, DkgKeys, EncryptionParams, KeyData, NodeError, PeerData,
     dkg::DkgState,
     protocol::block::{ChainConfig, GenesisBlock, ValidatorInfo},
-    swarm_manager::{NetworkHandle, PrivateRequest},
+    swarm_manager::{Network, PrivateRequest},
 };
 
 fn derive_key_from_password(
@@ -102,7 +102,6 @@ impl DkgState {
 
 impl DkgState {
     pub fn new(
-        network_handle: NetworkHandle,
         min_signers: u16,
         max_signers: u16,
         peer_id: PeerId,
@@ -110,7 +109,6 @@ impl DkgState {
         config_file: String,
     ) -> Result<Self, NodeError> {
         let mut dkg_state = DkgState {
-            network_handle,
             min_signers,
             max_signers,
             rng: frost::rand_core::OsRng,
@@ -141,7 +139,7 @@ impl DkgState {
         Ok(dkg_state)
     }
 
-    pub fn save_dkg_keys(&self) -> Result<(), NodeError> {
+    pub fn save_dkg_keys(&self, network_handle: &impl Network) -> Result<(), NodeError> {
         // Load existing config or create new one
         let mut config = if Path::new(&self.config_file).exists() {
             let config_str = fs::read_to_string(&self.config_file)
@@ -241,7 +239,7 @@ impl DkgState {
                     NodeError::Error(format!("Failed to serialize public key: {}", e))
                 })?,
             );
-            self.network_handle
+            network_handle
                 .send_self_request(
                     PrivateRequest::InsertBlock {
                         block: genesis_block.to_block(),
