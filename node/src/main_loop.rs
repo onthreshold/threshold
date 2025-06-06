@@ -60,6 +60,12 @@ impl<N: Network> NodeState<N> {
                         for (peer_id, _multiaddr) in list {
                             self.peers.insert(peer_id);
                             self.dkg_state.peers.insert(peer_id);
+                            match self.dkg_state.handle_dkg_start(&self.network_handle){
+                                Ok(_) => (),
+                                Err(e) => {
+                                    error!("❌ Failed to handle DKG start: {}", e);
+                                }
+                            };
                         }
                     },
                     Some(NetworkEvent::GossipsubMessage(message)) => {

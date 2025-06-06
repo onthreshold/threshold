@@ -21,7 +21,10 @@ use rpc_client::{
 };
 use std::{fs, path::PathBuf};
 
-use node::{start_node::start_node, Config, EncryptionParams, KeyData, PeerData};
+use node::{
+    errors::NodeError, key_manager::get_config, start_node::start_node, EncryptionParams, KeyData,
+    NodeConfig,
+};
 
 use crate::errors::{CliError, KeygenError};
 
@@ -114,8 +117,6 @@ enum Commands {
     Setup {
         #[arg(short, long)]
         output: Option<String>,
-        #[arg(short, long)]
-        allowed_peers: Option<Vec<String>>,
     },
     /// Run the node and connect to the network
     Run {
@@ -160,11 +161,8 @@ async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Setup {
-            output,
-            allowed_peers,
-        } => {
-            setup_config(output, allowed_peers).map_err(|e| {
+        Commands::Setup { output } => {
+            setup_config(output).map_err(|e| {
                 println!("Keygen Error: {}", e);
                 CliError::KeygenError(e)
             })?;
@@ -178,7 +176,7 @@ async fn main() -> Result<(), CliError> {
         } => {
             start_node_cli(config, grpc_port, log_file, max_signers, min_signers)
                 .await
-                .map_err(|_| CliError::NodeError)?;
+                .map_err(|e| CliError::NodeError(e.to_string()))?;
         }
         Commands::Spend { amount, endpoint } => {
             rpc_spend(endpoint, amount)
@@ -216,10 +214,7 @@ async fn main() -> Result<(), CliError> {
     Ok(())
 }
 
-fn setup_config(
-    output: Option<String>,
-    allowed_peers: Option<Vec<String>>,
-) -> Result<(), KeygenError> {
+fn setup_config(output_dir: Option<String>) -> Result<(), KeygenError> {
     let keypair = Keypair::generate_ed25519();
     let public_key_b58 = keypair.public().to_peer_id().to_base58();
 
@@ -233,27 +228,7 @@ fn setup_config(
         encryption_params,
     };
 
-    let allowed_peer_ids = allowed_peers.unwrap_or_default();
-
-    let allowed_peer_data = allowed_peer_ids
-        .iter()
-        .map(|peer_id| PeerData {
-            public_key: peer_id.to_string(),
-            name: peer_id.to_string(),
-        })
-        .collect();
-
-    let config = Config {
-        allowed_peers: allowed_peer_data,
-        key_data,
-        dkg_keys: None,
-        log_file_path: Some(get_log_file_path()?),
-    };
-
-    let json = serde_json::to_string_pretty(&config)
-        .map_err(|e| KeygenError::Io(std::io::Error::other(e)))?;
-
-    let key_file_path = if let Some(output) = output {
+    let key_file_path = if let Some(output) = output_dir {
         let path = PathBuf::from(output);
         if path.is_dir() {
             return Err(KeygenError::KeyFileNotFound(format!(
@@ -267,7 +242,11 @@ fn setup_config(
         get_key_file_path()?
     };
 
-    fs::write(&key_file_path, json).map_err(KeygenError::Io)?;
+    let mut config = NodeConfig::new(key_file_path.clone(), get_log_file_path().ok());
+    config.set_key_data(key_data);
+    config
+        .save_to_file()
+        .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
     println!(
         "Key data has been saved to {} with the peer id {}. To modify the allowed peers, edit the config file.",
@@ -284,11 +263,18 @@ async fn start_node_cli(
     log_file: Option<String>,
     max_signers: Option<u16>,
     min_signers: Option<u16>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), NodeError> {
+    let config = match get_config(config_filepath.clone()) {
+        Ok(config) => config,
+        Err(e) => {
+            return Err(NodeError::Error(format!("Failed to get config: {}", e)));
+        }
+    };
+
     start_node(
         max_signers,
         min_signers,
-        config_filepath,
+        config,
         grpc_port,
         log_file.map(PathBuf::from),
     )

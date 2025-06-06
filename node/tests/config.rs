@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod config_test {
-    use node::Config;
+    use node::NodeConfig;
 
     #[test]
     fn test_config_deserialization() {
@@ -22,7 +22,7 @@ mod config_test {
             }
         }"#;
 
-        let config: Config = serde_json::from_str(json_str).expect("Failed to deserialize");
+        let config: NodeConfig = serde_json::from_str(json_str).expect("Failed to deserialize");
         assert_eq!(config.allowed_peers.len(), 1);
         assert_eq!(
             config.key_data.public_key_b58,

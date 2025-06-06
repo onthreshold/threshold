@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use crate::{Config, EncryptionParams, errors::NodeError};
+use crate::{EncryptionParams, NodeConfig, errors::NodeError};
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{Argon2, password_hash::SaltString};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -80,7 +80,7 @@ fn get_password_from_prompt() -> Result<String, NodeError> {
         .map_err(|e| NodeError::Error(e.to_string()))
 }
 
-pub fn get_config(config_filepath: Option<String>) -> Result<Config, NodeError> {
+pub fn get_config(config_filepath: Option<String>) -> Result<NodeConfig, NodeError> {
     let key_file_path = if let Some(config_path) = config_filepath {
         PathBuf::from(config_path)
     } else {
@@ -94,7 +94,7 @@ pub fn get_config(config_filepath: Option<String>) -> Result<Config, NodeError> 
 
     debug!("Read config file");
 
-    let config = serde_json::from_str::<Config>(&config_contents)
+    let config = serde_json::from_str::<NodeConfig>(&config_contents)
         .map_err(|e| NodeError::Error(format!("Failed to deserialize config file: {}", e)))?;
 
     debug!("Deserialized config file");
@@ -102,7 +102,7 @@ pub fn get_config(config_filepath: Option<String>) -> Result<Config, NodeError> 
     Ok(config)
 }
 
-pub fn load_and_decrypt_keypair(config_data: &Config) -> Result<Keypair, NodeError> {
+pub fn load_and_decrypt_keypair(config_data: &NodeConfig) -> Result<Keypair, NodeError> {
     let password = match std::env::var("KEY_PASSWORD") {
         Ok(pw) => pw,
         Err(_) => get_password_from_prompt()?,
