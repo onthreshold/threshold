@@ -4,9 +4,7 @@ use tokio::select;
 use tracing::{debug, error, info};
 
 use crate::errors::NodeError;
-use crate::swarm_manager::{
-     NetworkEvent, PrivateRequest, PrivateResponse,
-};
+use crate::swarm_manager::{NetworkEvent, PrivateRequest, PrivateResponse};
 use crate::{Network, NodeState};
 
 impl<N: Network> NodeState<N> {
@@ -64,18 +62,6 @@ impl<N: Network> NodeState<N> {
                             self.dkg_state.peers.insert(peer_id);
                         }
                     },
-                    // Some(NetworkEvent::SwarmEvent(SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
-                    //     peer_id,
-                    //     topic,
-                    // })))) => {
-                    //     if topic == start_dkg_topic.hash() {
-                    //         self.dkg_state.dkg_listeners.insert(peer_id);
-                    //         info!("Peer {} subscribed to topic {topic}. Listeners: {}", self.peer_name(&peer_id), self.dkg_state.dkg_listeners.len());
-                    //         if let Err(e) = self.dkg_state.handle_dkg_start(&self.network_handle) {
-                    //             error!("❌ Failed to handle DKG start: {}", e);
-                    //         }
-                    //     }
-                    // },
                     Some(NetworkEvent::GossipsubMessage(message)) => {
                         match message.topic {
                             t if t == round1_topic.hash() => {
