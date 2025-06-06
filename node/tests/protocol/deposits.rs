@@ -3,12 +3,12 @@ mod deposit_test {
     use bitcoin::{Txid, hashes::Hash};
     use std::collections::HashMap;
 
+    use crate::mocks::oracle::MockOracle;
     use node::protocol::{
         chain_state::{Account, ChainState},
         executor::TransactionExecutor,
         transaction::{Operation, Transaction, TransactionType},
     };
-    use node::validators::mock::MockOracle;
 
     fn get_test_chain_state() -> ChainState {
         let accounts = HashMap::from([
@@ -41,6 +41,14 @@ mod deposit_test {
         Txid::from_slice(&[1u8; 32]).unwrap()
     }
 
+    fn create_mock_oracle(transactions: Vec<(Txid, String, u64, bool)>) -> MockOracle {
+        let mut mock_oracle = MockOracle::new();
+        for (tx_hash, address, amount, is_valid) in transactions {
+            mock_oracle.add_transaction(tx_hash, address, amount, is_valid);
+        }
+        mock_oracle
+    }
+
     #[tokio::test]
     async fn test_execute_deposit_transaction() {
         let accounts = HashMap::from([(
@@ -53,14 +61,15 @@ mod deposit_test {
         let chain_state = ChainState::new_with_accounts(accounts, 0);
 
         // Setup mock oracle
-        let mut mock_oracle = MockOracle::new();
         let tx_hash = create_test_tx_hash();
-        mock_oracle.add_transaction(tx_hash, "1".to_string(), 100, true);
+        let mock_oracle = create_mock_oracle(vec![(tx_hash, "1".to_string(), 100, true)]);
 
         let transaction = Transaction::new(
             TransactionType::Deposit,
             vec![
                 // First, validate the transaction with oracle
+                // OpCheckOracle pops: tx_hash, address, amount
+                // So we push in reverse: amount, address, tx_hash
                 Operation::OpPush {
                     value: 100u64.to_be_bytes().to_vec(),
                 },
@@ -72,6 +81,8 @@ mod deposit_test {
                 },
                 Operation::OpCheckOracle,
                 // Then increment the balance
+                // OpIncrementBalance pops: address, amount
+                // So we push in reverse: amount, address
                 Operation::OpPush {
                     value: 100u64.to_be_bytes().to_vec(),
                 },
@@ -95,16 +106,17 @@ mod deposit_test {
         let chain_state = get_test_chain_state();
 
         // Setup mock oracle with multiple transactions
-        let mut mock_oracle = MockOracle::new();
         let tx_hash1 = Txid::from_slice(&[1u8; 32]).unwrap();
         let tx_hash2 = Txid::from_slice(&[2u8; 32]).unwrap();
         let tx_hash3 = Txid::from_slice(&[3u8; 32]).unwrap();
         let tx_hash4 = Txid::from_slice(&[4u8; 32]).unwrap();
 
-        mock_oracle.add_transaction(tx_hash1, "1".to_string(), 100, true);
-        mock_oracle.add_transaction(tx_hash2, "2".to_string(), 200, true);
-        mock_oracle.add_transaction(tx_hash3, "1".to_string(), 100, true);
-        mock_oracle.add_transaction(tx_hash4, "3".to_string(), 300, true);
+        let mock_oracle = create_mock_oracle(vec![
+            (tx_hash1, "1".to_string(), 100, true),
+            (tx_hash2, "2".to_string(), 200, true),
+            (tx_hash3, "1".to_string(), 100, true),
+            (tx_hash4, "3".to_string(), 300, true),
+        ]);
 
         let transaction = Transaction::new(
             TransactionType::Deposit,
@@ -198,9 +210,8 @@ mod deposit_test {
     async fn test_execute_deposit_transaction_with_zero_amount() {
         let chain_state = get_test_chain_state();
 
-        let mut mock_oracle = MockOracle::new();
         let tx_hash = create_test_tx_hash();
-        mock_oracle.add_transaction(tx_hash, "1".to_string(), 0, true);
+        let mock_oracle = create_mock_oracle(vec![(tx_hash, "1".to_string(), 0, true)]);
 
         let transaction = Transaction::new(
             TransactionType::Deposit,
@@ -236,9 +247,8 @@ mod deposit_test {
     async fn test_execute_deposit_transaction_with_invalid_account() {
         let chain_state = ChainState::new();
 
-        let mut mock_oracle = MockOracle::new();
         let tx_hash = create_test_tx_hash();
-        mock_oracle.add_transaction(tx_hash, "1".to_string(), 100, true);
+        let mock_oracle = create_mock_oracle(vec![(tx_hash, "1".to_string(), 100, true)]);
 
         let transaction = Transaction::new(
             TransactionType::Deposit,
@@ -274,10 +284,9 @@ mod deposit_test {
     async fn test_execute_deposit_transaction_oracle_validation_fails() {
         let chain_state = get_test_chain_state();
 
-        let mut mock_oracle = MockOracle::new();
         let tx_hash = create_test_tx_hash();
         // Set validation to fail
-        mock_oracle.add_transaction(tx_hash, "1".to_string(), 100, false);
+        let mock_oracle = create_mock_oracle(vec![(tx_hash, "1".to_string(), 100, false)]);
 
         let transaction = Transaction::new(
             TransactionType::Deposit,
@@ -312,10 +321,9 @@ mod deposit_test {
     async fn test_execute_deposit_transaction_wrong_amount_in_oracle() {
         let chain_state = get_test_chain_state();
 
-        let mut mock_oracle = MockOracle::new();
         let tx_hash = create_test_tx_hash();
         // Oracle expects 200 but we'll try to validate 100
-        mock_oracle.add_transaction(tx_hash, "1".to_string(), 200, true);
+        let mock_oracle = create_mock_oracle(vec![(tx_hash, "1".to_string(), 200, true)]);
 
         let transaction = Transaction::new(
             TransactionType::Deposit,
@@ -342,7 +350,8 @@ mod deposit_test {
     async fn test_execute_deposit_transaction_without_oracle_check() {
         let chain_state = get_test_chain_state();
 
-        let mock_oracle = MockOracle::new();
+        // Empty oracle since we're not checking any transactions
+        let mock_oracle = create_mock_oracle(vec![]);
 
         // Try to increment balance without checking oracle first
         let transaction = Transaction::new(
@@ -368,10 +377,9 @@ mod deposit_test {
     async fn test_partial_allowance_spending() {
         let chain_state = get_test_chain_state();
 
-        let mut mock_oracle = MockOracle::new();
         let tx_hash = create_test_tx_hash();
         // Oracle validates 100
-        mock_oracle.add_transaction(tx_hash, "1".to_string(), 100, true);
+        let mock_oracle = create_mock_oracle(vec![(tx_hash, "1".to_string(), 100, true)]);
 
         let transaction = Transaction::new(
             TransactionType::Deposit,
@@ -416,12 +424,13 @@ mod deposit_test {
     async fn test_multiple_oracle_validations_same_account() {
         let chain_state = get_test_chain_state();
 
-        let mut mock_oracle = MockOracle::new();
         let tx_hash1 = Txid::from_slice(&[1u8; 32]).unwrap();
         let tx_hash2 = Txid::from_slice(&[2u8; 32]).unwrap();
 
-        mock_oracle.add_transaction(tx_hash1, "1".to_string(), 100, true);
-        mock_oracle.add_transaction(tx_hash2, "1".to_string(), 50, true);
+        let mock_oracle = create_mock_oracle(vec![
+            (tx_hash1, "1".to_string(), 100, true),
+            (tx_hash2, "1".to_string(), 50, true),
+        ]);
 
         let transaction = Transaction::new(
             TransactionType::Deposit,
