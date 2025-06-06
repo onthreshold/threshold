@@ -123,7 +123,9 @@ enum Commands {
     /// Generate a new keypair and save it to a file set by the --output flag
     Setup {
         #[arg(short, long)]
-        output: Option<String>,
+        output_dir: Option<String>,
+        #[arg(short, long)]
+        file_name: Option<String>,
     },
     /// Run the node and connect to the network
     Run {
@@ -170,8 +172,8 @@ async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Setup { output } => {
-            setup_config(output).map_err(|e| {
+        Commands::Setup { output_dir, file_name } => {
+            setup_config(output_dir, file_name).map_err(|e| {
                 println!("Keygen Error: {}", e);
                 CliError::KeygenError(e)
             })?;
@@ -231,7 +233,7 @@ async fn main() -> Result<(), CliError> {
     Ok(())
 }
 
-fn setup_config(output_dir: Option<String>) -> Result<(), KeygenError> {
+fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result<(), KeygenError> {
     let keypair = Keypair::generate_ed25519();
     let public_key_b58 = keypair.public().to_peer_id().to_base58();
 
@@ -245,39 +247,35 @@ fn setup_config(output_dir: Option<String>) -> Result<(), KeygenError> {
         encryption_params,
     };
 
-    let key_file_path = if let Some(output) = output_dir {
+    let paths = if let Some(output) = output_dir {
         let path = PathBuf::from(output);
         if path.is_dir() {
-            return Err(KeygenError::KeyFileNotFound(format!(
-                "The path {} is a directory",
-                path.display()
-            )));
+            VaultConfigPath {
+                key_file_path: path.join(format!("{}.json", file_name.clone().unwrap_or("config".to_string()))),
+                config_file_path: path.join(format!("{}.yaml", file_name.clone().unwrap_or("config".to_string()))),
+            }
         } else {
-            path
+            return Err(KeygenError::KeyFileNotFound(format!("Output path is a file, not a directory. Please provide a directory path.")));
         }
     } else {
-        get_key_file_path()?.key_file_path
+        get_key_file_path()?
     };
 
-    let config_file_path = get_key_file_path()?.config_file_path;
-
     let mut config = NodeConfig::new(
-        key_file_path.clone(),
-        config_file_path.clone(),
+        paths.key_file_path.clone(),
+        paths.config_file_path.clone(),
         get_log_file_path().ok(),
     );
 
     config.set_key_data(key_data);
 
-    config
-        .save_to_file()
-        .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
+    config.save_to_file().map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
     println!(
-        "Key data has been saved to {} with the peer id {}. To modify the allowed peers and other configurations, edit the config file here: {}.",
-        key_file_path.display(),
+        "Key data has been saved to {} with the peer id {}. To modify the allowed peers and other configurations, edit the config file here: {}",
+        paths.key_file_path.display(),
         public_key_b58,
-        config_file_path.display()
+        paths.config_file_path.display()
     );
 
     Ok(())

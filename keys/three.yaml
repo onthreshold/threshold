@@ -1,0 +1,11 @@
+allowed_peers:
+  - name: "node_1"
+    public_key: "12D3KooWQ4YDGRZZ8JCRyTdRnqS2agTEMpViXk9xXiVBAtdFGCQ7"
+  - name: "node_2"
+    public_key: "12D3KooWQ4YDGRZZ8JCRyTdRnqS2agTEMpViXk9xXiVBAtdFGCQ7"
+  - name: "node_4"
+    public_key: "12D3KooWB7QvMmYTnrFdxrq2Un7gJT4zNgzQY14BU9gsu2UNcBLD"
+  - name: "node_5"
+    public_key: "12D3KooWSrmxv2o9abButFRPYnidATKyYF5unJPHC9ZgQYedViZp"
+log_file_path: /home/vidyootsenthil/.config/thevault/node.log
+key_file_path: ./keys/three.json
