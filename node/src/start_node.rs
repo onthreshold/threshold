@@ -1,9 +1,6 @@
 use crate::{
-    NodeState,
-    errors::NodeError,
-    grpc::grpc_handler::NodeControlService,
-    key_manager::{get_config, get_key_file_path, load_and_decrypt_keypair},
-    swarm_manager::build_swarm,
+    NodeConfig, NodeState, errors::NodeError, grpc::grpc_handler::NodeControlService,
+    key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm,
 };
 use std::path::{Path, PathBuf};
 use tonic::transport::Server;
@@ -14,7 +11,7 @@ use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 pub async fn start_node(
     max_signers: Option<u16>,
     min_signers: Option<u16>,
-    config_filepath: Option<String>,
+    config: NodeConfig,
     grpc_port: Option<u16>,
     log_file: Option<PathBuf>,
 ) -> Result<(), NodeError> {
@@ -22,14 +19,6 @@ pub async fn start_node(
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     let registry = tracing_subscriber::registry().with(env_filter);
-
-    let config = match get_config(config_filepath.clone()) {
-        Ok(config) => config,
-        Err(e) => {
-            error!("Failed to get config: {}", e);
-            return Err(e);
-        }
-    };
 
     if let Some(log_path) = config.log_file_path.clone().or(log_file) {
         // File logging
@@ -77,18 +66,6 @@ pub async fn start_node(
         info!("Logging initialized with console output only");
     }
 
-    let config_file_path = if let Some(path) = config_filepath.clone() {
-        path
-    } else {
-        match get_key_file_path() {
-            Ok(path) => path.to_string_lossy().to_string(),
-            Err(e) => {
-                error!("Failed to get config file path: {}", e);
-                std::process::exit(1);
-            }
-        }
-    };
-
     let keypair = match load_and_decrypt_keypair(&config) {
         Ok(kp) => kp,
         Err(e) => {
@@ -100,7 +77,7 @@ pub async fn start_node(
     let max_signers = max_signers.unwrap_or(5);
     let min_signers = min_signers.unwrap_or(3);
 
-    let allowed_peers = config.allowed_peers;
+    let allowed_peers = config.allowed_peers.clone();
 
     let (network_handle, mut swarm, network_events_stream) =
         build_swarm(keypair.clone(), allowed_peers.clone()).expect("Failed to build swarm");
@@ -110,7 +87,7 @@ pub async fn start_node(
         allowed_peers,
         min_signers,
         max_signers,
-        config_file_path,
+        config,
         network_events_stream,
     )
     .expect("Failed to create node");

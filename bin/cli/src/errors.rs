@@ -26,7 +26,7 @@ pub enum KeygenError {
 pub enum CliError {
     KeygenError(KeygenError),
     RpcError(tonic::Status),
-    NodeError,
+    NodeError(String),
 }
 
 impl From<KeygenError> for CliError {
