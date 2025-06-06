@@ -1,7 +1,6 @@
-name: Code Coverage
+name: Code Coverage Push
 
 on:
-  pull_request:
   push:
     branches:
       - main
@@ -45,11 +44,3 @@ jobs:
           publish_branch: gh-pages
           publish_dir: ./badges_output
           keep_files: true
-      - name: Post Coverage Comment on PR
-        if: github.event_name == 'pull_request'
-        uses: 5monkeys/cobertura-action@v14
-        with:
-          path: cobertura.xml
-          minimum_coverage: 0
-          show_branch: true
-          show_line: true
