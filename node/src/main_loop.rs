@@ -3,11 +3,12 @@ use libp2p::request_response;
 use tokio::select;
 use tracing::{debug, error, info};
 
+use crate::db::Db;
 use crate::swarm_manager::{NetworkEvent, PrivateRequest, PrivateResponse};
 use crate::{Network, NodeState};
 use types::errors::NodeError;
 
-impl<N: Network> NodeState<N> {
+impl<N: Network, D: Db> NodeState<N, D> {
     pub async fn start(&mut self) -> Result<(), NodeError> {
         info!("Local peer id: {}", self.peer_id);
 

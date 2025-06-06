@@ -10,16 +10,16 @@ use crate::{
     transaction::{Operation, Transaction},
 };
 
-pub struct TransactionExecutor {
-    pub oracle: Box<dyn Oracle>,
+pub struct TransactionExecutor<O: Oracle> {
+    pub oracle: O,
     pub allowance_list: HashMap<String, u64>,
     pub stack: Vec<Vec<u8>>,
     pub error: Option<NodeError>,
     pub new_chain_state: ChainState,
 }
 
-impl TransactionExecutor {
-    pub fn new(oracle: Box<dyn Oracle>) -> Self {
+impl<O: Oracle> TransactionExecutor<O> {
+    pub fn new(oracle: O) -> Self {
         Self {
             oracle,
             allowance_list: HashMap::new(),

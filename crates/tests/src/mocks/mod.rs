@@ -1,2 +1,3 @@
-pub mod dkg;
+pub mod db;
+pub mod network;
 pub mod oracle;

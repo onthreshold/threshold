@@ -1,7 +1,7 @@
 use types::errors::NodeError;
 
 use crate::{
-    NodeConfig, NodeState, db::Db, grpc::grpc_handler::NodeControlService,
+    NodeConfig, NodeState, db::RocksDb, grpc::grpc_handler::NodeControlService,
     key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm,
 };
 use std::path::{Path, PathBuf};
@@ -89,7 +89,7 @@ pub async fn start_node(
         min_signers,
         max_signers,
         config,
-        Db::new("nodedb.db"),
+        RocksDb::new("nodedb.db"),
         network_events_stream,
     )
     .expect("Failed to create node");
