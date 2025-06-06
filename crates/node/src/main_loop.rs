@@ -40,6 +40,18 @@ impl<N: Network, D: Db> NodeState<N, D> {
                                     NodeError::Error(format!("Failed to send response: {}", e))
                                 })?;
                         }
+                        PrivateRequest::GetFrostPublicKey => {
+                            let response = self.get_frost_public_key();
+                            if let Some(response_channel) = response_channel {
+                                match response_channel.send(PrivateResponse::GetFrostPublicKey { public_key: response.unwrap_or("No public key".to_string()) }) {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        return Err(NodeError::Error(format!("Failed to send response: {}", e)));
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                     SelfRequest::GetFrostPublicKey => {
                         let response = self.get_frost_public_key();
