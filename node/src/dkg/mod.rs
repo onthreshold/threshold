@@ -99,9 +99,7 @@ impl DkgState {
             }
         }
 
-        match network_handle
-            .send_broadcast(self.round1_topic.clone(), round1_package_bytes)
-        {
+        match network_handle.send_broadcast(self.round1_topic.clone(), round1_package_bytes) {
             Ok(_) => (),
             Err(e) => {
                 return Err(NodeError::Error(format!(
@@ -182,9 +180,7 @@ impl DkgState {
 
                             let request = PrivateRequest::Round2Package(package_to_send.clone());
 
-                            match network_handle
-                                .send_private_request(*peer_to_send_to, request)
-                            {
+                            match network_handle.send_private_request(*peer_to_send_to, request) {
                                 Ok(_) => (),
                                 Err(e) => {
                                     error!("Round2 package not found for {}", peer_to_send_to);
@@ -217,9 +213,7 @@ impl DkgState {
     ) -> Result<(), NodeError> {
         let identifier = peer_id_to_identifier(&sender_peer_id);
 
-        match network_handle
-            .send_private_response(response_channel, PrivateResponse::Pong)
-        {
+        match network_handle.send_private_response(response_channel, PrivateResponse::Pong) {
             Ok(_) => (),
             Err(e) => {
                 return Err(NodeError::Error(format!(

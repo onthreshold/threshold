@@ -1,12 +1,12 @@
 use futures::StreamExt;
-use libp2p::{PeerId, request_response::ResponseChannel, swarm::SwarmEvent};
+use libp2p::{request_response::ResponseChannel, swarm::SwarmEvent, Multiaddr, PeerId};
 use std::{
     collections::{BTreeMap, HashSet, hash_map::DefaultHasher},
+    fmt::Debug,
     future::Future,
     hash::{Hash, Hasher},
     pin::Pin,
     time::Duration,
-    fmt::Debug,
 };
 use tracing::info;
 
@@ -27,12 +27,12 @@ use crate::{
     protocol::block::Block,
 };
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PingBody {
     pub message: String,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum PrivateRequest {
     Ping(PingBody),
     Round2Package(round2::Package),
@@ -44,7 +44,7 @@ pub enum PrivateRequest {
     GetFrostPublicKey,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum PrivateResponse {
     Pong,
     Commitments {
@@ -98,10 +98,26 @@ pub struct NetworkHandle {
 
 pub trait Network: Clone + Debug {
     fn peer_id(&self) -> PeerId;
-    fn send_broadcast(&self, topic: gossipsub::IdentTopic, message: Vec<u8>) -> Result<(), NetworkError>;
-    fn send_private_request(&self, peer_id: PeerId, request: PrivateRequest) -> Result<(), NetworkError>;
-    fn send_private_response(&self, channel: ResponseChannel<PrivateResponse>, response: PrivateResponse) -> Result<(), NetworkError>;
-    fn send_self_request(&self, request: PrivateRequest, sync: bool) -> Result<Option<NetworkResponseFuture>, NetworkError>;
+    fn send_broadcast(
+        &self,
+        topic: gossipsub::IdentTopic,
+        message: Vec<u8>,
+    ) -> Result<(), NetworkError>;
+    fn send_private_request(
+        &self,
+        peer_id: PeerId,
+        request: PrivateRequest,
+    ) -> Result<(), NetworkError>;
+    fn send_private_response(
+        &self,
+        channel: ResponseChannel<PrivateResponse>,
+        response: PrivateResponse,
+    ) -> Result<(), NetworkError>;
+    fn send_self_request(
+        &self,
+        request: PrivateRequest,
+        sync: bool,
+    ) -> Result<Option<NetworkResponseFuture>, NetworkError>;
 }
 
 impl Network for NetworkHandle {
@@ -178,8 +194,18 @@ impl Network for NetworkHandle {
 }
 
 pub enum NetworkEvent {
-    SwarmEvent(SwarmEvent<MyBehaviourEvent>),
-    NetworkMessage(NetworkMessage),
+    // SwarmEvent(SwarmEvent<MyBehaviourEvent>),
+    // NetworkMessage(NetworkMessage),
+    SelfRequest {
+        request: PrivateRequest,
+        response_channel: Option<mpsc::UnboundedSender<PrivateResponse>>,
+    },
+
+    GossipsubMessage(gossipsub::Message),
+    MessageEvent(request_response::Event<PrivateRequest, PrivateResponse>),
+
+    PeersConnected(Vec<(PeerId, Multiaddr)>),
+    PeersDisconnected(Vec<(PeerId, Multiaddr)>),
 }
 
 pub struct SwarmManager {
@@ -282,36 +308,47 @@ impl SwarmManager {
                             .request_response
                             .send_response(channel, response);
                     }
-                    Some(message) => {
-                        self.network_events.send(NetworkEvent::NetworkMessage(message)).unwrap();
+                    Some(NetworkMessage::SendSelfRequest { request, response_channel }) => {
+                        self.network_events.send(NetworkEvent::SelfRequest { request, response_channel } ).unwrap();
                     }
                     _ => {
                     }
                 },
                 event = self.inner.select_next_some() => {
-                    match &event {
+                    match event {
                         SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                            for (peer_id, _multiaddr) in list {
-                                if self.allowed_peers.contains(peer_id) {
-                                    info!("Discovered peer: {}", self.peer_name(peer_id));
-                                    self.live_peers.insert(*peer_id);
-                                    self.inner.behaviour_mut().gossipsub.add_explicit_peer(peer_id);
+                            let mut peers_connected = vec![];
+                            for (peer_id, multiaddr) in list {
+                                if self.allowed_peers.contains(&peer_id) {
+                                    info!("Discovered peer: {}", self.peer_name(&peer_id));
+                                    peers_connected.push((peer_id, multiaddr));
+                                    self.live_peers.insert(peer_id);
+                                    self.inner.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                                 }
                             }
-                            self.network_events.send(NetworkEvent::SwarmEvent(event)).unwrap();
+                            self.network_events.send(NetworkEvent::PeersConnected(peers_connected)).unwrap();
                         },
                         SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                            for (peer_id, _multiaddr) in list {
-                                if self.allowed_peers.contains(peer_id) {
-                                    info!("Peer expired: {}", self.peer_name(peer_id));
-                                    self.live_peers.retain(|p| *p != *peer_id);
-                                    self.inner.behaviour_mut().gossipsub.remove_explicit_peer(peer_id);
+                            for (peer_id, _multiaddr) in list.clone() {
+                                if self.allowed_peers.contains(&peer_id) {
+                                    info!("Peer expired: {}", self.peer_name(&peer_id));
+                                    self.live_peers.retain(|p| p != &peer_id);
+                                    self.inner.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                                 }
                             }
-                            self.network_events.send(NetworkEvent::SwarmEvent(event)).unwrap();
+                            self.network_events.send(NetworkEvent::PeersDisconnected(list)).unwrap();
+                        },
+                        SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                            message,
+                            ..
+                        })) => {
+                            self.network_events.send(NetworkEvent::GossipsubMessage(message.clone())).unwrap();
+                        },
+                        SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(message) ) => {
+                            self.network_events.send(NetworkEvent::MessageEvent(message)).unwrap();
                         },
                         _ => {
-                            self.network_events.send(NetworkEvent::SwarmEvent(event)).unwrap();
+                            // self.network_events.send(NetworkEvent::SwarmEvent(event)).unwrap();
                         }
                     }
                 }
