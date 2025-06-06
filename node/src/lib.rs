@@ -1,4 +1,4 @@
-use crate::{db::Db, dkg::DkgState, errors::NodeError};
+use crate::{db::Db, dkg::DkgState};
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
@@ -10,20 +10,17 @@ use std::{
 use swarm_manager::{Network, NetworkEvent};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tracing::error;
+use types::errors::NodeError;
 
 pub mod db;
 pub mod dkg;
 pub mod grpc;
+pub mod key_manager;
 pub mod main_loop;
-pub mod protocol;
 pub mod signing;
 pub mod start_node;
 pub mod swarm_manager;
-pub mod validators;
 pub mod wallet;
-
-pub mod errors;
-pub mod key_manager;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct PeerData {

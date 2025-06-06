@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
-
-use crate::errors::NodeError;
+use types::errors::NodeError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct Account {

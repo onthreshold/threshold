@@ -2,13 +2,12 @@ use std::collections::HashMap;
 
 use bitcoin::{Txid, hashes::Hash};
 
+use types::errors::NodeError;
+
 use crate::{
-    errors::NodeError,
-    protocol::{
-        chain_state::{Account, ChainState},
-        transaction::{Operation, Transaction},
-    },
-    validators::Oracle,
+    chain_state::{Account, ChainState},
+    oracle::Oracle,
+    transaction::{Operation, Transaction},
 };
 
 pub struct TransactionExecutor {

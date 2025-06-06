@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod block_test {
-    use node::protocol::block::Block;
+    use protocol::block::Block;
 
     #[test]
     fn test_block_creation_and_hashing() {

@@ -1,12 +1,13 @@
 use std::{fs, path::PathBuf};
 
-use crate::{EncryptionParams, NodeConfig, errors::NodeError};
+use crate::{EncryptionParams, NodeConfig};
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{Argon2, password_hash::SaltString};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use directories::ProjectDirs;
 use libp2p::identity::Keypair;
 use tracing::debug;
+use types::errors::NodeError;
 
 pub fn get_key_file_path() -> Result<PathBuf, NodeError> {
     let proj_dirs = ProjectDirs::from("", "", "TheVault")

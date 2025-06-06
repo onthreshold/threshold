@@ -4,7 +4,7 @@ mod deposit_test {
     use std::collections::HashMap;
 
     use crate::mocks::oracle::MockOracle;
-    use node::protocol::{
+    use protocol::{
         chain_state::{Account, ChainState},
         executor::TransactionExecutor,
         transaction::{Operation, Transaction, TransactionType},

@@ -1,7 +1,6 @@
 use bitcoin::Txid;
 use esplora_client::AsyncClient;
-
-use crate::errors::NodeError;
+use types::errors::NodeError;
 
 #[async_trait::async_trait]
 pub trait Oracle {

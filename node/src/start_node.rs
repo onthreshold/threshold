@@ -1,5 +1,7 @@
+use types::errors::NodeError;
+
 use crate::{
-    NodeConfig, NodeState, errors::NodeError, grpc::grpc_handler::NodeControlService,
+    NodeConfig, NodeState, grpc::grpc_handler::NodeControlService,
     key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm,
 };
 use std::path::{Path, PathBuf};

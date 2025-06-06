@@ -7,11 +7,12 @@ use frost_secp256k1::{self as frost};
 use libp2p::{PeerId, gossipsub};
 
 use crate::{
-    DkgKeys, EncryptionParams, NodeConfig, NodeError,
+    DkgKeys, EncryptionParams, NodeConfig,
     dkg::DkgState,
-    protocol::block::{ChainConfig, GenesisBlock, ValidatorInfo},
     swarm_manager::{Network, PrivateRequest},
 };
+use protocol::block::{ChainConfig, GenesisBlock, ValidatorInfo};
+use types::errors::NodeError;
 
 fn derive_key_from_password(
     password: &str,

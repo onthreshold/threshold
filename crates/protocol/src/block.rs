@@ -3,8 +3,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use types::errors::NodeError;
 
-use crate::{errors::NodeError, protocol::transaction::Transaction};
+use crate::transaction::Transaction;
 
 pub type BlockHash = [u8; 32];
 pub type StateRoot = [u8; 32];

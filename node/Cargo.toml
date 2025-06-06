@@ -35,19 +35,19 @@ hex = { workspace = true }
 bitcoin = { workspace = true }
 tonic = "0.13"
 prost = "0.13"
-derive_more = { version = "2.0.1", features = ["full"] }
 aes-gcm = "0.10"
 argon2 = "0.5"
 base64 = "0.22"
 rpassword = "7.3"
 uuid = { version = "1.17.0", features = ["v4"] }
-rocksdb = "0.23.0"
-sha2 = "0.10.9"
-bincode = { version = "2.0.1", features = ["serde"] }
+rocksdb = { workspace = true }
+sha2 = { workspace = true }
+bincode = { workspace = true }
 esplora-client = { workspace = true }
 directories = "6.0.0"
-async-trait = "0.1.88"
-
+async-trait = { workspace = true }
+protocol = { path = "../crates/protocol" }
+types = { path = "../crates/types" }
 
 [dev-dependencies]
 tempfile = "3.8"
