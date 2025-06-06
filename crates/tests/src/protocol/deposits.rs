@@ -93,7 +93,7 @@ mod deposit_test {
             ],
         );
 
-        let mut executor = TransactionExecutor::new(Box::new(mock_oracle));
+        let mut executor = TransactionExecutor::new(mock_oracle);
         let result_state = executor
             .execute_transaction(transaction, chain_state)
             .await
@@ -196,7 +196,7 @@ mod deposit_test {
             ],
         );
 
-        let mut executor = TransactionExecutor::new(Box::new(mock_oracle));
+        let mut executor = TransactionExecutor::new(mock_oracle);
         let result_state = executor
             .execute_transaction(transaction, chain_state)
             .await
@@ -236,7 +236,7 @@ mod deposit_test {
             ],
         );
 
-        let mut executor = TransactionExecutor::new(Box::new(mock_oracle));
+        let mut executor = TransactionExecutor::new(mock_oracle);
         let result = executor.execute_transaction(transaction, chain_state).await;
         assert!(result.is_ok());
         let result_state = result.unwrap();
@@ -273,7 +273,7 @@ mod deposit_test {
             ],
         );
 
-        let mut executor = TransactionExecutor::new(Box::new(mock_oracle));
+        let mut executor = TransactionExecutor::new(mock_oracle);
         let result = executor.execute_transaction(transaction, chain_state).await;
         // Should succeed - account will be created if it doesn't exist
         assert!(result.is_ok());
@@ -311,7 +311,7 @@ mod deposit_test {
             ],
         );
 
-        let mut executor = TransactionExecutor::new(Box::new(mock_oracle));
+        let mut executor = TransactionExecutor::new(mock_oracle);
         let result = executor.execute_transaction(transaction, chain_state).await;
         // Should fail because allowance won't be granted
         assert!(result.is_err());
@@ -341,7 +341,7 @@ mod deposit_test {
             ],
         );
 
-        let mut executor = TransactionExecutor::new(Box::new(mock_oracle));
+        let mut executor = TransactionExecutor::new(mock_oracle);
         let result = executor.execute_transaction(transaction, chain_state).await;
         assert!(result.is_err());
     }
@@ -367,7 +367,7 @@ mod deposit_test {
             ],
         );
 
-        let mut executor = TransactionExecutor::new(Box::new(mock_oracle));
+        let mut executor = TransactionExecutor::new(mock_oracle);
         let result = executor.execute_transaction(transaction, chain_state).await;
         // Should fail due to insufficient allowance
         assert!(result.is_err());
@@ -414,7 +414,7 @@ mod deposit_test {
             ],
         );
 
-        let mut executor = TransactionExecutor::new(Box::new(mock_oracle));
+        let mut executor = TransactionExecutor::new(mock_oracle);
         let result = executor.execute_transaction(transaction, chain_state).await;
         // Should fail on the second increment
         assert!(result.is_err());
@@ -468,7 +468,7 @@ mod deposit_test {
             ],
         );
 
-        let mut executor = TransactionExecutor::new(Box::new(mock_oracle));
+        let mut executor = TransactionExecutor::new(mock_oracle);
         let result_state = executor
             .execute_transaction(transaction, chain_state)
             .await

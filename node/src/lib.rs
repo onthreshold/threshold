@@ -98,10 +98,10 @@ impl NodeConfig {
     }
 }
 
-pub struct NodeState<N: Network> {
+pub struct NodeState<N: Network, D: Db> {
     // DKG
     pub dkg_state: DkgState,
-    pub db: Db,
+    pub db: D,
 
     pub peer_id: PeerId,
     pub peers: HashSet<PeerId>,
@@ -122,13 +122,13 @@ pub struct NodeState<N: Network> {
     pub network_events_stream: UnboundedReceiver<NetworkEvent>,
 }
 
-impl<N: Network> NodeState<N> {
+impl<N: Network, D: Db> NodeState<N, D> {
     pub fn new_from_config(
         network_handle: N,
         min_signers: u16,
         max_signers: u16,
         config: NodeConfig,
-        storage_db: Db,
+        storage_db: D,
         network_events_emitter: UnboundedReceiver<NetworkEvent>,
     ) -> Result<Self, NodeError> {
         let dkg_state = DkgState::new(

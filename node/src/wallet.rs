@@ -7,6 +7,7 @@ use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut, hashes::sha256};
 use hex;
 use tracing::{error, info};
 
+use crate::db::Db;
 use crate::{Network, NodeState};
 use frost_secp256k1::{self as frost};
 
@@ -115,7 +116,7 @@ pub struct PendingSpend {
     pub tx: Transaction,
 }
 
-impl<N: Network> NodeState<N> {
+impl<N: Network, D: Db> NodeState<N, D> {
     pub fn get_frost_public_key(&self) -> Option<String> {
         self.dkg_state.pubkey_package.as_ref().map(|p| {
             format!("{:?}", p.verifying_key())

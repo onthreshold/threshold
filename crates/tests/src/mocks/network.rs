@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use node::{
     NodeState,
-    db::Db,
+    db::{Db, RocksDb},
     swarm_manager::{Network, NetworkEvent, NetworkResponseFuture},
 };
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
@@ -87,7 +87,7 @@ impl MockNodeCluster {
                 node_config.clone(),
                 min_signers,
                 max_signers,
-                format!("node-{}", i).as_str(),
+                RocksDb::new(format!("node-{}", i).as_str()),
             ) else {
                 panic!("Failed to create node network");
             };
@@ -109,13 +109,13 @@ impl MockNodeCluster {
     }
 }
 
-pub fn create_node_network(
+pub fn create_node_network<D: Db>(
     peer_id: libp2p::PeerId,
     node_config: node::NodeConfig,
     min_signers: u16,
     max_signers: u16,
-    database_name: &str,
-) -> Result<(NodeState<MockNetwork>, MockNetwork), errors::NodeError> {
+    db: D,
+) -> Result<(NodeState<MockNetwork, D>, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, events_emitter_rx) = unbounded_channel::<NetworkEvent>();
     let network = MockNetwork {
         events_emitter_tx,
@@ -127,7 +127,7 @@ pub fn create_node_network(
         min_signers,
         max_signers,
         node_config,
-        Db::new(database_name),
+        db,
         events_emitter_rx,
     )?;
 
