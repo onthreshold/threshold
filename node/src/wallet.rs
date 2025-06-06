@@ -7,7 +7,7 @@ use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut, hashes::sha256};
 use hex;
 use tracing::{error, info};
 
-use crate::{NodeState, Network};
+use crate::{Network, NodeState};
 use frost_secp256k1::{self as frost};
 
 /// Very simple demonstration UTXO representation (key-path Taproot assumed)
