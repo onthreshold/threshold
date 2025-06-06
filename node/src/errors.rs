@@ -5,7 +5,7 @@ use tokio::sync::mpsc::error::SendError;
 
 use crate::swarm_manager::NetworkMessage;
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum NodeError {
     Error(String),
 }

@@ -44,8 +44,8 @@ impl ChainState {
         self.accounts.get(address)
     }
 
-    pub fn get_account_mut(&mut self, address: &str) -> Option<&mut Account> {
-        self.accounts.get_mut(address)
+    pub fn upsert_account(&mut self, address: &str, account: Account) {
+        self.accounts.insert(address.to_string(), account);
     }
 
     pub fn get_block_height(&self) -> u64 {

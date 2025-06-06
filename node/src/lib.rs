@@ -19,6 +19,7 @@ pub mod signing;
 pub mod start_node;
 pub mod swarm_manager;
 pub mod wallet;
+pub mod validators;
 
 pub mod errors;
 pub mod key_manager;

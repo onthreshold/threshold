@@ -30,3 +30,4 @@ libp2p = { version = "0.54", features = [
 ] }
 hex = "0.4"
 rand = "0.9.1"
+esplora-client = { version = "*", default-features = false, features = ["async-https", "tokio"] }
