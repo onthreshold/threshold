@@ -21,14 +21,18 @@ use rpc_client::{
 };
 use std::{fs, path::PathBuf};
 
+use crate::errors::{CliError, KeygenError};
 use node::{
     key_manager::get_config, start_node::start_node, EncryptionParams, KeyData, NodeConfig,
 };
 use types::errors::NodeError;
 
-use crate::errors::{CliError, KeygenError};
+struct VaultConfigPath {
+    key_file_path: PathBuf,
+    config_file_path: PathBuf,
+}
 
-fn get_key_file_path() -> Result<PathBuf, KeygenError> {
+fn get_key_file_path() -> Result<VaultConfigPath, KeygenError> {
     let proj_dirs = ProjectDirs::from("", "", "TheVault").ok_or_else(|| {
         KeygenError::DirectoryCreation("Failed to determine project directory".into())
     })?;
@@ -36,7 +40,10 @@ fn get_key_file_path() -> Result<PathBuf, KeygenError> {
     let config_dir = proj_dirs.config_dir();
     fs::create_dir_all(config_dir).map_err(|e| KeygenError::DirectoryCreation(e.to_string()))?;
 
-    Ok(config_dir.join("config.json"))
+    Ok(VaultConfigPath {
+        key_file_path: config_dir.join("config.json"),
+        config_file_path: config_dir.join("config.yaml"),
+    })
 }
 
 fn get_log_file_path() -> Result<PathBuf, KeygenError> {
@@ -121,7 +128,9 @@ enum Commands {
     /// Run the node and connect to the network
     Run {
         #[arg(short, long)]
-        config: Option<String>,
+        key_file_path: Option<String>,
+        #[arg(short, long)]
+        config_file_path: Option<String>,
         #[arg(short, long)]
         grpc_port: Option<u16>,
         #[arg(short, long)]
@@ -168,15 +177,23 @@ async fn main() -> Result<(), CliError> {
             })?;
         }
         Commands::Run {
-            config,
+            key_file_path,
+            config_file_path,
             grpc_port,
             log_file,
             max_signers,
             min_signers,
         } => {
-            start_node_cli(config, grpc_port, log_file, max_signers, min_signers)
-                .await
-                .map_err(|e| CliError::NodeError(e.to_string()))?;
+            start_node_cli(
+                key_file_path,
+                config_file_path,
+                grpc_port,
+                log_file,
+                max_signers,
+                min_signers,
+            )
+            .await
+            .map_err(|e| CliError::NodeError(e.to_string()))?;
         }
         Commands::Spend { amount, endpoint } => {
             rpc_spend(endpoint, amount)
@@ -209,7 +226,7 @@ async fn main() -> Result<(), CliError> {
                 .await
                 .map_err(CliError::RpcError)?;
         }
-    };
+    }
 
     Ok(())
 }
@@ -239,32 +256,42 @@ fn setup_config(output_dir: Option<String>) -> Result<(), KeygenError> {
             path
         }
     } else {
-        get_key_file_path()?
+        get_key_file_path()?.key_file_path
     };
 
-    let mut config = NodeConfig::new(key_file_path.clone(), get_log_file_path().ok());
+    let config_file_path = get_key_file_path()?.config_file_path;
+
+    let mut config = NodeConfig::new(
+        key_file_path.clone(),
+        config_file_path.clone(),
+        get_log_file_path().ok(),
+    );
+
     config.set_key_data(key_data);
+
     config
         .save_to_file()
         .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
     println!(
-        "Key data has been saved to {} with the peer id {}. To modify the allowed peers, edit the config file.",
+        "Key data has been saved to {} with the peer id {}. To modify the allowed peers and other configurations, edit the config file here: {}.",
         key_file_path.display(),
-        public_key_b58
+        public_key_b58,
+        config_file_path.display()
     );
 
     Ok(())
 }
 
 async fn start_node_cli(
-    config_filepath: Option<String>,
+    key_file_path: Option<String>,
+    config_file_path: Option<String>,
     grpc_port: Option<u16>,
     log_file: Option<String>,
     max_signers: Option<u16>,
     min_signers: Option<u16>,
 ) -> Result<(), NodeError> {
-    let config = match get_config(config_filepath.clone()) {
+    let config = match get_config(key_file_path.clone(), config_file_path.clone()) {
         Ok(config) => config,
         Err(e) => {
             return Err(NodeError::Error(format!("Failed to get config: {}", e)));

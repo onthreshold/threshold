@@ -56,11 +56,30 @@ pub struct NodeConfig {
     pub dkg_keys: Option<DkgKeys>,
     pub log_file_path: Option<PathBuf>,
     #[serde(skip)]
+    key_file_path: PathBuf,
+    #[serde(skip)]
     config_file_path: PathBuf,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct KeyStore {
+    key_data: KeyData,
+    dkg_keys: Option<DkgKeys>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ConfigStore {
+    allowed_peers: Vec<PeerData>,
+    log_file_path: Option<PathBuf>,
+    key_file_path: PathBuf,
+}
+
 impl NodeConfig {
-    pub fn new(config_file_path: PathBuf, log_file_path: Option<PathBuf>) -> Self {
+    pub fn new(
+        key_file_path: PathBuf,
+        config_file_path: PathBuf,
+        log_file_path: Option<PathBuf>,
+    ) -> Self {
         NodeConfig {
             allowed_peers: Vec::new(),
             key_data: KeyData {
@@ -74,14 +93,30 @@ impl NodeConfig {
             },
             dkg_keys: None,
             log_file_path,
+            key_file_path,
             config_file_path,
         }
     }
 
     pub fn save_to_file(&self) -> Result<(), NodeError> {
-        // Save config
-        let config_str = serde_json::to_string_pretty(&self)
-            .map_err(|e| NodeError::Error(format!("Failed to serialize config: {}", e)))?;
+        let key_store = KeyStore {
+            key_data: self.key_data.clone(),
+            dkg_keys: self.dkg_keys.clone(),
+        };
+
+        let key_info_str = serde_json::to_string_pretty(&key_store)
+            .map_err(|e| NodeError::Error(format!("Failed to serialize key data: {}", e)))?;
+
+        fs::write(&self.key_file_path, key_info_str)
+            .map_err(|e| NodeError::Error(format!("Failed to write key data: {}", e)))?;
+
+        let config_store = ConfigStore {
+            allowed_peers: self.allowed_peers.clone(),
+            log_file_path: self.log_file_path.clone(),
+            key_file_path: self.key_file_path.clone(),
+        };
+
+        let config_str: String = serde_yaml::to_string(&config_store).unwrap();
 
         fs::write(&self.config_file_path, config_str)
             .map_err(|e| NodeError::Error(format!("Failed to write config: {}", e)))?;

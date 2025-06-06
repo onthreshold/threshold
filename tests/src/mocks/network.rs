@@ -74,7 +74,10 @@ impl MockNodeCluster {
         let mut path = PathBuf::new();
         path.push("config.json");
 
-        let node_config = node::NodeConfig::new(path, None);
+        let mut config_path = PathBuf::new();
+        config_path.push("config.toml");
+
+        let node_config = node::NodeConfig::new(path.clone(), config_path, None);
 
         let mut networks = BTreeMap::new();
         let mut nodes = BTreeMap::new();
