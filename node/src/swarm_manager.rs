@@ -87,7 +87,7 @@ pub enum NetworkMessage {
     },
 }
 
-type NetworkResponseFuture =
+pub type NetworkResponseFuture =
     Pin<Box<dyn Future<Output = Result<PrivateResponse, NetworkError>> + Send>>;
 
 #[derive(Debug, Clone)]

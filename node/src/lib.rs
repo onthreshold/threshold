@@ -4,6 +4,7 @@ use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashSet},
+    fs,
     path::PathBuf,
 };
 use swarm_manager::{Network, NetworkEvent};
@@ -30,33 +31,74 @@ pub struct PeerData {
     pub public_key: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct DkgKeys {
     pub encrypted_private_key_package_b64: String,
     pub dkg_encryption_params: EncryptionParams,
     pub pubkey_package_b64: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct EncryptionParams {
     pub kdf: String,
     pub salt_b64: String,
     pub iv_b64: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct KeyData {
     pub public_key_b58: String,
     pub encrypted_private_key_b64: String,
     pub encryption_params: EncryptionParams,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Config {
+#[derive(Clone, Serialize, Deserialize)]
+pub struct NodeConfig {
     pub allowed_peers: Vec<PeerData>,
     pub key_data: KeyData,
     pub dkg_keys: Option<DkgKeys>,
     pub log_file_path: Option<PathBuf>,
+    #[serde(skip)]
+    config_file_path: PathBuf,
+}
+
+impl NodeConfig {
+    pub fn new(config_file_path: PathBuf, log_file_path: Option<PathBuf>) -> Self {
+        NodeConfig {
+            allowed_peers: Vec::new(),
+            key_data: KeyData {
+                public_key_b58: String::new(),
+                encrypted_private_key_b64: String::new(),
+                encryption_params: EncryptionParams {
+                    kdf: String::new(),
+                    salt_b64: String::new(),
+                    iv_b64: String::new(),
+                },
+            },
+            dkg_keys: None,
+            log_file_path,
+            config_file_path,
+        }
+    }
+
+    pub fn save_to_file(&self) -> Result<(), NodeError> {
+        // Save config
+        let config_str = serde_json::to_string_pretty(&self)
+            .map_err(|e| NodeError::Error(format!("Failed to serialize config: {}", e)))?;
+
+        fs::write(&self.config_file_path, config_str)
+            .map_err(|e| NodeError::Error(format!("Failed to write config: {}", e)))?;
+
+        Ok(())
+    }
+
+    pub fn set_dkg_keys(&mut self, dkg_keys: DkgKeys) {
+        self.dkg_keys = Some(dkg_keys);
+    }
+
+    pub fn set_key_data(&mut self, key_data: KeyData) {
+        self.key_data = key_data;
+    }
 }
 
 pub struct NodeState<N: Network> {
@@ -79,8 +121,7 @@ pub struct NodeState<N: Network> {
     pub wallet: crate::wallet::SimpleWallet,
     pub pending_spends: std::collections::BTreeMap<u64, crate::wallet::PendingSpend>,
 
-    // Config management
-    pub config_file: String,
+    pub config: NodeConfig,
 
     pub network_handle: N,
 
@@ -100,7 +141,7 @@ impl<N: Network> NodeState<N> {
         peer_data: Vec<PeerData>,
         min_signers: u16,
         max_signers: u16,
-        config_file: String,
+        config: NodeConfig,
         network_events_emitter: UnboundedReceiver<NetworkEvent>,
     ) -> Result<Self, NodeError> {
         let allowed_peers: Vec<PeerId> = peer_data
@@ -130,7 +171,7 @@ impl<N: Network> NodeState<N> {
             max_signers,
             network_handle.peer_id(),
             peers_to_names.clone(),
-            config_file.clone(),
+            config.clone(),
         )?;
 
         Ok(NodeState {
@@ -148,7 +189,7 @@ impl<N: Network> NodeState<N> {
             active_signing: None,
             wallet: crate::wallet::SimpleWallet::new(),
             pending_spends: BTreeMap::new(),
-            config_file: config_file.clone(),
+            config,
         })
     }
 }

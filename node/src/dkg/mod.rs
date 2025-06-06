@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 use tracing::{debug, error, info, warn};
 
 use crate::{
+    NodeConfig,
     errors::NodeError,
     peer_id_to_identifier,
     swarm_manager::{Network, PrivateRequest, PrivateResponse},
@@ -25,8 +26,6 @@ pub struct DkgState {
     pub peers_to_names: BTreeMap<PeerId, String>,
     pub dkg_listeners: HashSet<PeerId>,
 
-    pub config_file: String,
-
     pub start_dkg_topic: libp2p::gossipsub::IdentTopic,
     pub round1_topic: libp2p::gossipsub::IdentTopic,
 
@@ -38,6 +37,8 @@ pub struct DkgState {
 
     pub pubkey_package: Option<frost::keys::PublicKeyPackage>,
     pub private_key_package: Option<frost::keys::KeyPackage>,
+
+    pub config: NodeConfig,
 }
 
 impl DkgState {
@@ -46,6 +47,7 @@ impl DkgState {
             debug!("DKG already started, skipping DKG process");
             return Ok(());
         }
+        debug!("Starting DKG process");
 
         // Check if DKG keys already exist
         if self.private_key_package.is_some() && self.pubkey_package.is_some() {
