@@ -53,7 +53,7 @@ fn generate_test_keypair(output_path: Option<PathBuf>, password: &str) -> Result
             path
         }
     } else {
-        get_key_file_path()?
+        get_key_file_path()?.key_file_path
     };
 
     fs::write(&key_file_path, json).map_err(KeygenError::Io)?;

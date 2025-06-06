@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use crate::{EncryptionParams, NodeConfig};
+use crate::{ConfigStore, EncryptionParams, KeyStore, NodeConfig};
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{Argon2, password_hash::SaltString};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -26,15 +26,15 @@ pub fn get_config_file_path(file_path_option: Option<String>) -> Result<PathBuf,
     if let Some(file_path_str) = file_path_option {
         let mut path = PathBuf::from(file_path_str);
         if path.is_dir() {
-            path.push("config.json");
+            path.push("config.yaml");
         }
-        println!("Using key file path: {}", path.display());
+        println!("Using config file path: {}", path.display());
         Ok(path)
     } else {
         let proj_dirs = ProjectDirs::from("", "", "TheVault")
             .ok_or_else(|| NodeError::Error("Failed to determine project directory".into()))?;
         let config_dir = proj_dirs.config_dir();
-        Ok(config_dir.join("config.json"))
+        Ok(config_dir.join("config.yaml"))
     }
 }
 
@@ -81,26 +81,48 @@ fn get_password_from_prompt() -> Result<String, NodeError> {
         .map_err(|e| NodeError::Error(e.to_string()))
 }
 
-pub fn get_config(config_filepath: Option<String>) -> Result<NodeConfig, NodeError> {
-    let key_file_path = if let Some(config_path) = config_filepath {
-        PathBuf::from(config_path)
+pub fn get_config(
+    key_file_path: Option<String>,
+    config_file_path: Option<String>,
+) -> Result<NodeConfig, NodeError> {
+    let key_file_path = if let Some(key_path) = key_file_path {
+        PathBuf::from(key_path)
     } else {
         get_key_file_path()?
     };
 
+    let config_file_path = if let Some(config_path) = config_file_path {
+        PathBuf::from(config_path)
+    } else {
+        get_config_file_path(None)?
+    };
+
     debug!("Using key file path: {}", key_file_path.display());
 
-    let config_contents = fs::read_to_string(&key_file_path)
+    let key_contents = fs::read_to_string(&key_file_path)
         .map_err(|e| NodeError::Error(format!("Failed to read config file: {}", e)))?;
+
+    let key_store = serde_json::from_str::<KeyStore>(&key_contents)
+        .map_err(|e| NodeError::Error(format!("Failed to deserialize key file: {}", e)))?;
+
+    let config_contents = fs::read_to_string(&config_file_path)
+        .map_err(|e| NodeError::Error(format!("Failed to read config file: {}", e)))?;
+
+    let config_store = serde_yaml::from_str::<ConfigStore>(&config_contents)
+        .map_err(|e| NodeError::Error(format!("Failed to deserialize config file: {}", e)))?;
+
+    let node_config = NodeConfig {
+        key_data: key_store.key_data,
+        dkg_keys: key_store.dkg_keys,
+        allowed_peers: config_store.allowed_peers,
+        log_file_path: config_store.log_file_path,
+        key_file_path: config_store.key_file_path,
+        config_file_path: config_file_path,
+    };
 
     debug!("Read config file");
 
-    let config = serde_json::from_str::<NodeConfig>(&config_contents)
-        .map_err(|e| NodeError::Error(format!("Failed to deserialize config file: {}", e)))?;
-
-    debug!("Deserialized config file");
-
-    Ok(config)
+    Ok(node_config)
 }
 
 pub fn load_and_decrypt_keypair(config_data: &NodeConfig) -> Result<Keypair, NodeError> {
