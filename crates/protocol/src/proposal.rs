@@ -3,7 +3,7 @@ use types::errors::NodeError;
 use crate::{block::BlockBody, transaction::Transaction};
 
 pub struct ProposedBlock {
-    pub block_body: BlockBody,
+    block_body: BlockBody,
 }
 
 impl Default for ProposedBlock {
