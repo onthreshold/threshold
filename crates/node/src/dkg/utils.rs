@@ -1,7 +1,5 @@
 use std::collections::{BTreeMap, HashSet};
 
-use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
-use argon2::{Argon2, password_hash::SaltString};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use frost_secp256k1::{self as frost};
 use libp2p::{PeerId, gossipsub};
@@ -9,83 +7,11 @@ use libp2p::{PeerId, gossipsub};
 use crate::{
     DkgKeys, EncryptionParams, NodeConfig,
     dkg::DkgState,
+    key_manager::{decrypt_private_key, encrypt_private_key, get_password_from_prompt},
     swarm_manager::{Network, PrivateRequest},
 };
 use protocol::block::{ChainConfig, GenesisBlock, ValidatorInfo};
 use types::errors::NodeError;
-
-fn derive_key_from_password(
-    password: &str,
-    salt_str: &str,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let argon2 = Argon2::default();
-    let password_bytes = password.as_bytes();
-    let salt =
-        SaltString::from_b64(salt_str).map_err(|e| format!("Salt decoding failed: {}", e))?;
-
-    let mut key = vec![0u8; 32];
-    argon2
-        .hash_password_into(password_bytes, salt.as_str().as_bytes(), &mut key)
-        .map_err(|e| format!("Argon2 key derivation failed: {}", e))?;
-    Ok(key)
-}
-
-fn encrypt_dkg_private_key(
-    private_key_data: &[u8],
-    password: &str,
-    salt_b64: &str,
-) -> Result<(String, String), Box<dyn std::error::Error>> {
-    let key_bytes = derive_key_from_password(password, salt_b64)?;
-
-    // Generate random IV
-    let mut iv = [0u8; 12];
-    use frost::rand_core::RngCore;
-    frost::rand_core::OsRng.fill_bytes(&mut iv);
-    let nonce = Nonce::from_slice(&iv);
-
-    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key_bytes));
-    let ciphertext = cipher
-        .encrypt(nonce, private_key_data)
-        .map_err(|e| format!("AES encryption failed: {}", e))?;
-
-    let encrypted_b64 = BASE64.encode(ciphertext);
-    let iv_b64 = BASE64.encode(iv);
-
-    Ok((encrypted_b64, iv_b64))
-}
-
-fn decrypt_dkg_private_key(
-    encrypted_private_key_b64: &str,
-    password: &str,
-    params: &EncryptionParams,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let key_bytes = derive_key_from_password(password, &params.salt_b64)?;
-
-    let iv_bytes = BASE64.decode(&params.iv_b64)?;
-    let nonce = Nonce::from_slice(&iv_bytes);
-
-    let ciphertext = BASE64.decode(encrypted_private_key_b64)?;
-
-    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key_bytes));
-    let decrypted_private_key = cipher
-        .decrypt(nonce, ciphertext.as_ref())
-        .map_err(|e| format!("AES decryption failed: {}", e))?;
-
-    Ok(decrypted_private_key)
-}
-
-fn get_password_for_dkg() -> Result<String, Box<dyn std::error::Error>> {
-    match std::env::var("KEY_PASSWORD") {
-        Ok(pw) => Ok(pw),
-        Err(_) => {
-            use std::io::{self, Write};
-            print!("Enter password to encrypt/decrypt DKG keys: ");
-            io::stdout().flush()?;
-            let password = rpassword::read_password()?;
-            Ok(password)
-        }
-    }
-}
 
 impl DkgState {
     pub fn get_public_key(&self) -> Option<frost::keys::PublicKeyPackage> {
@@ -135,11 +61,9 @@ impl DkgState {
     }
 
     pub fn save_dkg_keys(&mut self, network_handle: &impl Network) -> Result<(), NodeError> {
-        // Load existing config or create new one
-        // Update DKG keys if they exist
         if let (Some(private_key), Some(pubkey)) = (&self.private_key_package, &self.pubkey_package)
         {
-            let password = get_password_for_dkg()
+            let password = get_password_from_prompt()
                 .map_err(|e| NodeError::Error(format!("Failed to get password for DKG: {}", e)))?;
 
             // Serialize private key to bytes
@@ -160,9 +84,7 @@ impl DkgState {
 
             // Encrypt the private key package
             let (encrypted_private_key_b64, iv_b64) =
-                encrypt_dkg_private_key(&private_key_bytes, &password, &salt_b64).map_err(|e| {
-                    NodeError::Error(format!("Failed to encrypt private key: {}", e))
-                })?;
+                encrypt_private_key(&private_key_bytes, &password, &salt_b64)?;
 
             // Serialize and base64 encode the public key package
             let pubkey_bytes = pubkey
@@ -225,10 +147,10 @@ impl DkgState {
         Box<dyn std::error::Error>,
     > {
         if let Some(dkg_keys) = config.dkg_keys {
-            let password = get_password_for_dkg()?;
+            let password = get_password_from_prompt()?;
 
             // Decrypt the private key package
-            let private_key_bytes = decrypt_dkg_private_key(
+            let private_key_bytes = decrypt_private_key(
                 &dkg_keys.encrypted_private_key_package_b64,
                 &password,
                 &dkg_keys.dkg_encryption_params,
