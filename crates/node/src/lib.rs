@@ -1,6 +1,13 @@
-use crate::{db::Db, dkg::DkgState};
+use crate::{
+    db::Db,
+    dkg::DkgState,
+    handler::Handler,
+    key_manager::{encrypt_private_key, get_password_from_prompt},
+};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::PeerId;
+use protocol::block::{ChainConfig, GenesisBlock, ValidatorInfo};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -15,6 +22,7 @@ use types::errors::NodeError;
 pub mod db;
 pub mod dkg;
 pub mod grpc;
+pub mod handler;
 pub mod key_manager;
 pub mod main_loop;
 pub mod signing;
@@ -134,8 +142,7 @@ impl NodeConfig {
 }
 
 pub struct NodeState<N: Network, D: Db> {
-    // DKG
-    pub dkg_state: DkgState,
+    pub handlers: Vec<Box<dyn Handler<N>>>,
     pub db: D,
 
     pub peer_id: PeerId,
@@ -144,6 +151,8 @@ pub struct NodeState<N: Network, D: Db> {
     pub min_signers: u16,
     pub max_signers: u16,
     pub rng: frost::rand_core::OsRng,
+    pub pubkey_package: Option<frost::keys::PublicKeyPackage>,
+    pub private_key_package: Option<frost::keys::KeyPackage>,
 
     // FROST signing
     pub active_signing: Option<ActiveSigning>,
@@ -166,28 +175,135 @@ impl<N: Network, D: Db> NodeState<N, D> {
         storage_db: D,
         network_events_emitter: UnboundedReceiver<NetworkEvent>,
     ) -> Result<Self, NodeError> {
+        let keys = DkgState::load_dkg_keys(config.clone())
+            .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
         let dkg_state = DkgState::new(
             min_signers,
             max_signers,
             network_handle.peer_id(),
-            config.clone(),
+            keys.is_some(),
         )?;
 
-        Ok(NodeState {
+        let mut node_state = NodeState {
             network_handle: network_handle.clone(),
             network_events_stream: network_events_emitter,
             peer_id: network_handle.peer_id(),
             min_signers,
             max_signers,
             db: storage_db,
-            dkg_state,
             peers: HashSet::new(),
             rng: frost::rand_core::OsRng,
             active_signing: None,
             wallet: crate::wallet::SimpleWallet::new(),
             pending_spends: BTreeMap::new(),
             config,
-        })
+            handlers: vec![Box::new(dkg_state)],
+            pubkey_package: None,
+            private_key_package: None,
+        };
+
+        if let Some((private_key, pubkey)) = keys {
+            node_state.private_key_package = Some(private_key);
+            node_state.pubkey_package = Some(pubkey);
+        }
+
+        Ok(node_state)
+    }
+
+    pub fn set_frost_keys(
+        &mut self,
+        private_key: Vec<u8>,
+        public_key: Vec<u8>,
+    ) -> Result<(), NodeError> {
+        self.private_key_package =
+            Some(frost::keys::KeyPackage::deserialize(&private_key).unwrap());
+        self.pubkey_package =
+            Some(frost::keys::PublicKeyPackage::deserialize(&public_key).unwrap());
+        self.save_dkg_keys(
+            &self.private_key_package.clone().unwrap(),
+            &self.pubkey_package.clone().unwrap(),
+        )?;
+
+        Ok(())
+    }
+
+    pub fn save_dkg_keys(
+        &mut self,
+        private_key: &frost::keys::KeyPackage,
+        pubkey: &frost::keys::PublicKeyPackage,
+    ) -> Result<(), NodeError> {
+        // Load existing config or create new one
+        // Update DKG keys if they exist
+
+        let password = get_password_from_prompt()
+            .map_err(|e| NodeError::Error(format!("Failed to get password for DKG: {}", e)))?;
+
+        // Serialize private key to bytes
+        let private_key_bytes = private_key
+            .serialize()
+            .map_err(|e| NodeError::Error(format!("Failed to serialize private key: {}", e)))?;
+
+        // Use existing salt from key_data, or generate a new one if empty
+        let salt_b64 = if self.config.key_data.encryption_params.salt_b64.is_empty() {
+            // Generate a new salt
+            use frost::rand_core::RngCore;
+            let mut salt = [0u8; 16];
+            frost::rand_core::OsRng.fill_bytes(&mut salt);
+            BASE64.encode(salt)
+        } else {
+            self.config.key_data.encryption_params.salt_b64.clone()
+        };
+
+        // Encrypt the private key package
+        let (encrypted_private_key_b64, iv_b64) =
+            encrypt_private_key(&private_key_bytes, &password, &salt_b64)
+                .map_err(|e| NodeError::Error(format!("Failed to encrypt private key: {}", e)))?;
+
+        // Serialize and base64 encode the public key package
+        let pubkey_bytes = pubkey
+            .serialize()
+            .map_err(|e| NodeError::Error(format!("Failed to serialize public key: {}", e)))?;
+        let pubkey_package_b64 = BASE64.encode(pubkey_bytes);
+
+        self.config.set_dkg_keys(DkgKeys {
+            encrypted_private_key_package_b64: encrypted_private_key_b64,
+            dkg_encryption_params: EncryptionParams {
+                kdf: "argon2id".to_string(),
+                salt_b64,
+                iv_b64,
+            },
+            pubkey_package_b64,
+        });
+
+        let validators = self
+            .peers
+            .iter()
+            .map(|peer_id| ValidatorInfo {
+                pub_key: peer_id.to_bytes(),
+                stake: 100,
+            })
+            .collect();
+
+        let chain_config = ChainConfig {
+            block_time_seconds: 10,
+            min_signers: self.min_signers,
+            max_signers: self.max_signers,
+            min_stake: 100,
+            max_block_size: 1000,
+        };
+
+        let genesis_block = GenesisBlock::new(
+            validators,
+            chain_config,
+            pubkey
+                .serialize()
+                .map_err(|e| NodeError::Error(format!("Failed to serialize public key: {}", e)))?,
+        );
+
+        self.db.insert_block(genesis_block.to_block())?;
+
+        self.config.save_to_file()?;
+        Ok(())
     }
 }
 

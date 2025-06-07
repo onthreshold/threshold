@@ -38,25 +38,17 @@ impl Network for MockNetwork {
         todo!("Implement send_broadcast")
     }
 
-    fn send_private_request(
+    fn send_private_message(
         &self,
         peer_id: libp2p::PeerId,
-        request: node::swarm_manager::PrivateRequest,
+        request: node::swarm_manager::DirectMessage,
     ) -> Result<(), errors::NetworkError> {
         todo!("Implement send_private_request")
     }
 
-    fn send_private_response(
-        &self,
-        channel: libp2p::request_response::ResponseChannel<node::swarm_manager::PrivateResponse>,
-        response: node::swarm_manager::PrivateResponse,
-    ) -> Result<(), errors::NetworkError> {
-        todo!("Implement send_private_response")
-    }
-
     fn send_self_request(
         &self,
-        request: node::swarm_manager::PrivateRequest,
+        request: node::swarm_manager::SelfRequest,
         sync: bool,
     ) -> Result<Option<NetworkResponseFuture>, errors::NetworkError> {
         todo!("Implement send_self_request")

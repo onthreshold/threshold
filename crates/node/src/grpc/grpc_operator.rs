@@ -3,7 +3,9 @@ use crate::grpc::grpc_handler::node_proto::{
     SendDirectMessageResponse, SpendFundsRequest, SpendFundsResponse, StartDkgRequest,
     StartDkgResponse, StartSigningRequest, StartSigningResponse,
 };
-use crate::swarm_manager::{Network, NetworkHandle, PingBody, PrivateRequest, PrivateResponse};
+use crate::swarm_manager::{
+    DirectMessage, Network, NetworkHandle, PingBody, SelfRequest, SelfResponse,
+};
 use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use tonic::{Request, Response, Status};
@@ -40,13 +42,13 @@ pub async fn spend_funds(
 
     debug!("Received request to spend {} satoshis", amount_sat);
     let response = network
-        .send_self_request(PrivateRequest::Spend { amount_sat }, true)
+        .send_self_request(SelfRequest::Spend { amount_sat }, true)
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
         .ok_or(Status::internal("No response from node"))?
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
-    let PrivateResponse::SpendRequestSent { sighash } = response else {
+    let SelfResponse::SpendRequestSent { sighash } = response else {
         return Err(Status::internal("Invalid response from node"));
     };
 
@@ -63,7 +65,7 @@ pub async fn start_signing(
 ) -> Result<Response<StartSigningResponse>, Status> {
     let hex_msg = request.into_inner().hex_message;
 
-    let network_request = PrivateRequest::StartSigningSession {
+    let network_request = SelfRequest::StartSigningSession {
         hex_message: hex_msg.clone(),
     };
 
@@ -74,7 +76,7 @@ pub async fn start_signing(
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
-    let PrivateResponse::StartSigningSession { sign_id } = response else {
+    let SelfResponse::StartSigningSessionResponse { sign_id } = response else {
         return Err(Status::internal(format!(
             "Invalid response from node {:?}",
             response
@@ -101,9 +103,9 @@ pub async fn send_direct_message(
 
     let direct_message = format!("From: {}", req.message);
 
-    match network.send_private_request(
+    match network.send_private_message(
         target_peer_id,
-        PrivateRequest::Ping(PingBody {
+        DirectMessage::Ping(PingBody {
             message: direct_message,
         }),
     ) {
@@ -137,13 +139,16 @@ pub async fn create_deposit_intent(
     let deposit_tracking_id = Uuid::new_v4().to_string();
 
     let frost_pubkey_hex = network
-        .send_self_request(PrivateRequest::GetFrostPublicKey, true)
+        .send_self_request(SelfRequest::GetFrostPublicKey, true)
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
         .ok_or(Status::internal("No response from node"))?
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
-    let PrivateResponse::GetFrostPublicKey { public_key } = frost_pubkey_hex else {
+    let SelfResponse::GetFrostPublicKeyResponse {
+        public_key: Some(public_key),
+    } = frost_pubkey_hex
+    else {
         return Err(Status::internal(
             "Invalid response from node. No public key found.",
         ));

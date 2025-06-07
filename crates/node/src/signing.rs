@@ -4,11 +4,11 @@ use std::collections::BTreeMap;
 use frost_secp256k1::rand_core::RngCore;
 use frost_secp256k1::{self as frost};
 use hex;
-use libp2p::{PeerId, request_response};
+use libp2p::PeerId;
 use tracing::{debug, error, info, warn};
 
 use crate::db::Db;
-use crate::swarm_manager::{Network, PrivateRequest, PrivateResponse};
+use crate::swarm_manager::{DirectMessage, Network};
 use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
 use types::errors::NodeError;
 
@@ -16,7 +16,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
     /// Coordinator entrypoint. Start a threshold signing session across the network.
     /// `message_hex` must be hex-encoded 32-byte sighash.
     pub fn start_signing_session(&mut self, message_hex: &str) -> Result<Option<u64>, NodeError> {
-        if self.dkg_state.get_private_key().is_none() || self.dkg_state.get_public_key().is_none() {
+        if self.private_key_package.is_none() || self.pubkey_package.is_none() {
             error!("❌ DKG not completed – cannot start signing");
             return Err(NodeError::Error("DKG not completed".to_string()));
         }
@@ -67,7 +67,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
         }
 
         // Generate nonces & commitments for self
-        let key_pkg = match self.dkg_state.get_private_key().as_ref() {
+        let key_pkg = match self.private_key_package.as_ref() {
             Some(key_pkg) => key_pkg.clone(),
             None => {
                 return Err(NodeError::Error("No private key found".to_string()));
@@ -92,12 +92,12 @@ impl<N: Network, D: Db> NodeState<N, D> {
 
         // Broadcast SignRequest to chosen peers (skip self)
         for peer in &selected_peers {
-            let req = PrivateRequest::SignRequest {
+            let req = DirectMessage::SignRequest {
                 sign_id,
                 message: message.clone(),
             };
             self.network_handle
-                .send_private_request(*peer, req)
+                .send_private_message(*peer, req)
                 .map_err(|e| {
                     NodeError::Error(format!("Failed to send private request: {:?}", e))
                 })?;
@@ -112,12 +112,11 @@ impl<N: Network, D: Db> NodeState<N, D> {
         peer: PeerId,
         sign_id: u64,
         message: Vec<u8>,
-        channel: request_response::ResponseChannel<PrivateResponse>,
     ) -> Result<(), NodeError> {
-        if self.dkg_state.get_private_key().is_none() {
-            let _ = self.network_handle.send_private_response(
-                channel,
-                PrivateResponse::Commitments {
+        if self.private_key_package.is_none() {
+            let _ = self.network_handle.send_private_message(
+                peer,
+                DirectMessage::Commitments {
                     sign_id,
                     commitments: Vec::new(),
                 },
@@ -125,7 +124,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
             return Ok(());
         }
 
-        let key_pkg = match self.dkg_state.get_private_key().as_ref() {
+        let key_pkg = match self.private_key_package.as_ref() {
             Some(key_pkg) => key_pkg.clone(),
             None => {
                 return Err(NodeError::Error("No private key found".to_string()));
@@ -151,11 +150,11 @@ impl<N: Network, D: Db> NodeState<N, D> {
             ));
         };
 
-        let resp = PrivateResponse::Commitments {
+        let resp = DirectMessage::Commitments {
             sign_id,
             commitments: commit_bytes,
         };
-        let _ = self.network_handle.send_private_response(channel, resp);
+        let _ = self.network_handle.send_private_message(peer, resp);
 
         debug!(
             "🔐 Provided commitments for sign_id {} to {}",
@@ -209,18 +208,18 @@ impl<N: Network, D: Db> NodeState<N, D> {
 
             // Send package to participants (excluding self)
             for peer in &active.selected_peers {
-                let req = PrivateRequest::SignPackage {
+                let req = DirectMessage::SignPackage {
                     sign_id,
                     package: pkg_bytes.clone(),
                 };
-                let _ = self.network_handle.send_private_request(*peer, req);
+                let _ = self.network_handle.send_private_message(*peer, req);
             }
 
             // Generate our signature share
             let sig_share = frost::round2::sign(
                 &signing_package,
                 &active.nonces,
-                match self.dkg_state.get_private_key().as_ref() {
+                match self.private_key_package.as_ref() {
                     Some(key_pkg) => key_pkg,
                     None => {
                         return Err(NodeError::Error("No private key found".to_string()));
@@ -250,7 +249,6 @@ impl<N: Network, D: Db> NodeState<N, D> {
         peer: PeerId,
         sign_id: u64,
         package_bytes: Vec<u8>,
-        channel: request_response::ResponseChannel<PrivateResponse>,
     ) -> Result<(), NodeError> {
         let Some(active) = self.active_signing.as_ref() else {
             warn!("No active session to sign");
@@ -271,7 +269,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
         let sig_share = frost::round2::sign(
             &signing_package,
             &active.nonces,
-            match self.dkg_state.get_private_key().as_ref() {
+            match self.private_key_package.as_ref() {
                 Some(key_pkg) => key_pkg,
                 None => {
                     return Err(NodeError::Error("No private key found".to_string()));
@@ -281,11 +279,11 @@ impl<N: Network, D: Db> NodeState<N, D> {
         match sig_share {
             Ok(sig_share) => {
                 let sig_bytes = sig_share.serialize();
-                let resp = PrivateResponse::SignatureShare {
+                let resp = DirectMessage::SignatureShare {
                     sign_id,
                     signature_share: sig_bytes,
                 };
-                let _ = self.network_handle.send_private_response(channel, resp);
+                let _ = self.network_handle.send_private_message(peer, resp);
             }
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to sign: {}", e)));
@@ -339,7 +337,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
             let group_sig = frost::aggregate(
                 &signing_package,
                 &active.signature_shares,
-                match self.dkg_state.get_public_key().as_ref() {
+                match self.pubkey_package.as_ref() {
                     Some(public_key) => public_key,
                     None => {
                         return Err(NodeError::Error("No public key found".to_string()));
