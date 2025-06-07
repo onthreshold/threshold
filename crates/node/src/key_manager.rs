@@ -5,6 +5,7 @@ use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{Argon2, password_hash::SaltString};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use directories::ProjectDirs;
+use frost_secp256k1 as frost;
 use libp2p::identity::Keypair;
 use tracing::debug;
 use types::errors::NodeError;
@@ -38,7 +39,7 @@ pub fn get_config_file_path(file_path_option: Option<String>) -> Result<PathBuf,
     }
 }
 
-fn derive_key_from_password(password: &str, salt_str: &str) -> Result<Vec<u8>, NodeError> {
+pub fn derive_key_from_password(password: &str, salt_str: &str) -> Result<Vec<u8>, NodeError> {
     let argon2 = Argon2::default();
     let password_bytes = password.as_bytes();
     let salt = SaltString::from_b64(salt_str)
@@ -51,7 +52,31 @@ fn derive_key_from_password(password: &str, salt_str: &str) -> Result<Vec<u8>, N
     Ok(key)
 }
 
-fn decrypt_private_key(
+pub fn encrypt_private_key(
+    private_key_data: &[u8],
+    password: &str,
+    salt_b64: &str,
+) -> Result<(String, String), NodeError> {
+    let key_bytes = derive_key_from_password(password, salt_b64)?;
+
+    // Generate random IV
+    let mut iv = [0u8; 12];
+    use frost::rand_core::RngCore;
+    frost::rand_core::OsRng.fill_bytes(&mut iv);
+    let nonce = Nonce::from_slice(&iv);
+
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key_bytes));
+    let ciphertext = cipher
+        .encrypt(nonce, private_key_data)
+        .map_err(|e| NodeError::Error(format!("AES encryption failed: {}", e)))?;
+
+    let encrypted_b64 = BASE64.encode(ciphertext);
+    let iv_b64 = BASE64.encode(iv);
+
+    Ok((encrypted_b64, iv_b64))
+}
+
+pub fn decrypt_private_key(
     encrypted_private_key_b64: &str,
     password: &str,
     params: &EncryptionParams,
@@ -76,7 +101,7 @@ fn decrypt_private_key(
     Ok(decrypted_private_key)
 }
 
-fn get_password_from_prompt() -> Result<String, NodeError> {
+pub fn get_password_from_prompt() -> Result<String, NodeError> {
     rpassword::prompt_password("Enter password to decrypt identity key: ")
         .map_err(|e| NodeError::Error(e.to_string()))
 }
