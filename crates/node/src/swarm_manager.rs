@@ -192,6 +192,7 @@ impl Network for NetworkHandle {
     }
 }
 
+#[derive(Debug)]
 pub enum NetworkEvent {
     // SwarmEvent(SwarmEvent<MyBehaviourEvent>),
     // NetworkMessage(NetworkMessage),

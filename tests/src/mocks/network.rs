@@ -6,7 +6,32 @@ use node::{
     swarm_manager::{Network, NetworkEvent, NetworkResponseFuture},
 };
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
-use types::errors::{self, NodeError};
+use types::errors;
+
+#[derive(Debug)]
+struct SenderToNode {
+    pending_events: Vec<NetworkEvent>,
+    events_emitter_tx: UnboundedSender<NetworkEvent>,
+}
+
+impl SenderToNode {
+    fn new(events_emitter_tx: UnboundedSender<NetworkEvent>) -> Self {
+        Self {
+            pending_events: Vec::new(),
+            events_emitter_tx,
+        }
+    }
+
+    fn queue(&mut self, event: NetworkEvent) {
+        self.pending_events.push(event);
+    }
+
+    fn flush(&mut self) {
+        for event in self.pending_events.drain(..) {
+            self.events_emitter_tx.send(event).unwrap();
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -24,7 +49,6 @@ impl MockNetwork {
     }
 }
 
-#[allow(dead_code, unused_variables)]
 impl Network for MockNetwork {
     fn peer_id(&self) -> libp2p::PeerId {
         self.peer
@@ -55,10 +79,9 @@ impl Network for MockNetwork {
     }
 }
 
-#[allow(dead_code)]
 pub struct MockNodeCluster {
-    node_handles: BTreeMap<libp2p::PeerId, tokio::task::JoinHandle<Result<(), NodeError>>>,
-    networks: BTreeMap<libp2p::PeerId, MockNetwork>,
+    nodes: BTreeMap<libp2p::PeerId, NodeState<MockNetwork, RocksDb>>,
+    senders: BTreeMap<libp2p::PeerId, SenderToNode>,
 }
 
 impl MockNodeCluster {
@@ -71,9 +94,8 @@ impl MockNodeCluster {
 
         let node_config = node::NodeConfig::new(path.clone(), config_path, None);
 
-        let mut networks = BTreeMap::new();
         let mut nodes = BTreeMap::new();
-        let mut node_handles = BTreeMap::new();
+        let mut senders = BTreeMap::new();
 
         for i in 0..peers {
             let peer_id = libp2p::PeerId::random();
@@ -87,19 +109,56 @@ impl MockNodeCluster {
                 panic!("Failed to create node network");
             };
 
-            networks.insert(peer_id, network);
             nodes.insert(peer_id, node);
+            senders.insert(
+                peer_id,
+                SenderToNode::new(network.events_emitter_tx.clone()),
+            );
         }
 
-        for (peer_id, mut node) in nodes {
-            let handle = tokio::spawn(async move { node.start().await });
+        Self { nodes, senders }
+    }
 
-            node_handles.insert(peer_id, handle);
+    pub async fn setup(&mut self) {
+        let peers: Vec<libp2p::PeerId> = self.nodes.keys().cloned().collect();
+        for (receipient_peer, sender) in self.senders.iter_mut() {
+            sender.queue(NetworkEvent::PeersConnected(
+                peers
+                    .iter()
+                    .filter(|peer_id| *peer_id != receipient_peer)
+                    .map(|peer_id| (*peer_id, libp2p::Multiaddr::empty()))
+                    .collect(),
+            ));
+
+            sender.flush();
         }
+    }
 
-        Self {
-            node_handles,
-            networks,
+    pub async fn tear_down(&mut self) {
+        let peers: Vec<libp2p::PeerId> = self.nodes.keys().cloned().collect();
+        for (_, sender) in self.senders.iter_mut() {
+            sender.queue(NetworkEvent::PeersDisconnected(
+                peers
+                    .iter()
+                    .map(|peer_id| (*peer_id, libp2p::Multiaddr::empty()))
+                    .collect(),
+            ));
+        }
+    }
+
+    pub async fn run_n_iterations(&mut self, iterations: u32) {
+        for _ in 0..iterations {
+            // Flush all messages
+            for (_, sender) in self.senders.iter_mut() {
+                sender.flush();
+            }
+
+            // Poll Nodes
+            for (_, node) in self.nodes.iter_mut() {
+                node.poll().await.unwrap();
+            }
+
+
         }
     }
 }
@@ -134,8 +193,18 @@ mod node_tests {
     use super::*;
 
     #[tokio::test]
-    async fn create_nodes_with_mock_network() {
-        MockNodeCluster::new(2, 2, 2).await;
-        println!("Able to create mock node");
+    async fn peers_can_connect() {
+        let mut cluster = MockNodeCluster::new(2, 2, 2).await;
+        cluster.setup().await;
+        println!("Ran setup");
+        cluster.run_n_iterations(1).await;
+        println!("Ran 1 iterations");
+
+        for (_, node) in cluster.nodes.iter() {
+            assert_eq!(node.peers.len(), 1);
+        }
+
+        cluster.tear_down().await;
+        println!("Ran teardown");
     }
 }
