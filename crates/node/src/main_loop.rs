@@ -1,10 +1,8 @@
-use libp2p::gossipsub;
 use libp2p::request_response;
-use tokio::select;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use crate::db::Db;
-use crate::swarm_manager::{NetworkEvent, PrivateRequest, PrivateResponse};
+use crate::swarm_manager::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
 use crate::{Network, NodeState};
 use types::errors::NodeError;
 
@@ -12,152 +10,126 @@ impl<N: Network, D: Db> NodeState<N, D> {
     pub async fn start(&mut self) -> Result<(), NodeError> {
         info!("Local peer id: {}", self.peer_id);
 
-        let round1_topic = gossipsub::IdentTopic::new("round1_topic");
-        let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
         loop {
-            select! {
-                send_message = self.network_events_stream.recv() => match send_message {
-                    Some(NetworkEvent::SelfRequest { request, response_channel }) => {
-                        match request {
-                            PrivateRequest::StartSigningSession { hex_message } => {
-                                match self.start_signing_session(&hex_message) {
-                                    Ok(_) => (),
-                                    Err(e) => {
-                                        return Err(NodeError::Error(format!("Failed to start signing session: {}", e)));
-                                    }
-                                }
-                            },
-                            PrivateRequest::InsertBlock { block } => {
-                                if let Err(e) = self.db.insert_block(block) {
-                                    return Err(NodeError::Error(format!("Failed to handle genesis block: {}", e)));
-                                }
-                            }
-                            PrivateRequest::Spend { amount_sat } => {
-                                let response = self.start_spend_request(amount_sat);
-                                if let Some(response_channel) = response_channel {
-                                    match response_channel.send(PrivateResponse::SpendRequestSent { sighash: response.unwrap_or("No sighash".to_string()) }) {
-                                        Ok(_) => (),
-                                        Err(e) => {
-                                            return Err(NodeError::Error(format!("Failed to send response: {}", e)));
-                                        }
-                                    }
-                                }
-                            }
-                            PrivateRequest::GetFrostPublicKey => {
-                                let response = self.get_frost_public_key();
-                                if let Some(response_channel) = response_channel {
-                                    match response_channel.send(PrivateResponse::GetFrostPublicKey { public_key: response.unwrap_or("No public key".to_string()) }) {
-                                        Ok(_) => (),
-                                        Err(e) => {
-                                            return Err(NodeError::Error(format!("Failed to send response: {}", e)));
-                                        }
-                                    }
-                                }
-                            }
-                            _ => {}
+            let send_message = self.network_events_stream.recv().await;
+            for handler in self.handlers.iter_mut() {
+                let handler_message = send_message.as_ref().map(|event| event.into());
+                handler
+                    .handle(handler_message, &self.network_handle)
+                    .await?;
+            }
+            match send_message {
+                Some(NetworkEvent::SelfRequest {
+                    request,
+                    response_channel,
+                }) => match request {
+                    SelfRequest::StartSigningSession { hex_message } => {
+                        self.start_signing_session(&hex_message)?;
+                    }
+                    SelfRequest::InsertBlock { block } => {
+                        self.db.insert_block(block)?;
+                    }
+                    SelfRequest::Spend { amount_sat } => {
+                        let response = self.start_spend_request(amount_sat);
+                        if let Some(response_channel) = response_channel {
+                            response_channel
+                                .send(SelfResponse::SpendRequestSent {
+                                    sighash: response.unwrap_or("No sighash".to_string()),
+                                })
+                                .map_err(|e| {
+                                    NodeError::Error(format!("Failed to send response: {}", e))
+                                })?;
                         }
                     }
-                    Some(NetworkEvent::PeersConnected(list)) => {
-                        for (peer_id, _multiaddr) in list {
-                            self.peers.insert(peer_id);
-                            self.dkg_state.peers.insert(peer_id);
-                            match self.dkg_state.handle_dkg_start(&self.network_handle){
-                                Ok(_) => (),
-                                Err(e) => {
-                                    error!("❌ Failed to handle DKG start: {}", e);
-                                }
-                            };
-                        }
-                    },
-                    Some(NetworkEvent::GossipsubMessage(message)) => {
-                        match message.topic {
-                            t if t == round1_topic.hash() => {
-                                if let Some(source_peer) = message.source {
-                                    // info!("Received round1 payload from {}", self.peer_name(&source_peer));
-                                    match self.dkg_state.handle_round1_payload(&self.network_handle, source_peer, message.data) {
-                                        Ok(_) => (),
-                                        Err(e) => {
-                                            error!("❌ Failed to handle round1 payload: {}", e);
-                                        }
-                                    }
-                                }
-                            }
-                            t if t == start_dkg_topic.hash() => {
-                                match self.dkg_state.handle_dkg_start(&self.network_handle) {
-                                    Ok(_) => (),
-                                    Err(e) => {
-                                        error!("❌ Failed to handle DKG start: {}", e);
-                                    }
-                                }
-                            }
-                            _ => {
-                                debug!("Received unhandled broadcast");
-                            }
+                    SelfRequest::GetFrostPublicKey => {
+                        let response = self.get_frost_public_key();
+                        if let Some(response_channel) = response_channel {
+                            response_channel
+                                .send(SelfResponse::GetFrostPublicKeyResponse {
+                                    public_key: response,
+                                })
+                                .map_err(|e| {
+                                    NodeError::Error(format!("Failed to send response: {}", e))
+                                })?;
                         }
                     }
-                    // Handle direct message requests (incoming)
-                    Some(NetworkEvent::MessageEvent(request_response::Event::Message {
-                        peer,
-                        message: request_response::Message::Request { request: PrivateRequest::Round2Package(package), channel, .. }
-                    })) => {
-                        match self.dkg_state.handle_round2_payload(&self.network_handle, peer, package, channel) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                error!("❌ Failed to handle round2 payload: {}", e);
-                            }
-                        }
-
+                    SelfRequest::SetFrostKeys {
+                        private_key,
+                        public_key,
+                    } => {
+                        self.set_frost_keys(private_key, public_key)?;
                     }
-                    // Handle direct message requests (incoming)
-                    Some(NetworkEvent::MessageEvent(request_response::Event::Message {
-                        peer,
-                        message: request_response::Message::Request { request: PrivateRequest::SignRequest { sign_id, message }, channel, .. }
-                    })) => {
-                        match self.handle_sign_request(peer, sign_id, message, channel) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                error!("❌ Failed to handle sign request: {}", e);
-                            }
-                        }
+                },
+                Some(NetworkEvent::PeersConnected(list)) => {
+                    for (peer_id, _multiaddr) in list {
+                        self.peers.insert(peer_id);
                     }
-                    // Handle direct message requests (incoming)
-                    Some(NetworkEvent::MessageEvent(request_response::Event::Message {
-                        peer,
-                        message: request_response::Message::Request { request: PrivateRequest::SignPackage { sign_id, package }, channel, .. }
-                    })) => {
-                        match self.handle_sign_package(peer, sign_id, package, channel) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                error!("❌ Failed to handle sign package: {}", e);
-                            }
-                        }
-                    }
-                    // Handle direct message requests (incoming)
-                    Some(NetworkEvent::MessageEvent(request_response::Event::Message {
-                        peer,
-                        message: request_response::Message::Response { response: PrivateResponse::Commitments { sign_id, commitments }, .. }
-                    })) => {
-                        match self.handle_commitments_response(peer, sign_id, commitments) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                error!("❌ Failed to handle commitments response: {}", e);
-                            }
-                        }
-                    }
-                    // Handle direct message requests (incoming)
-                    Some(NetworkEvent::MessageEvent(request_response::Event::Message {
-                        peer,
-                        message: request_response::Message::Response { response: PrivateResponse::SignatureShare { sign_id, signature_share }, .. }
-                    })) => {
-                        match self.handle_signature_share(peer, sign_id, signature_share) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                error!("❌ Failed to handle signature share: {}", e);
-                            }
-                        }
-                    }
-                    _ => {}
                 }
+                // Handle direct message requests (incoming)
+                Some(NetworkEvent::MessageEvent(request_response::Event::Message {
+                    peer,
+                    message:
+                        request_response::Message::Request {
+                            request: DirectMessage::SignRequest { sign_id, message },
+                            ..
+                        },
+                })) => match self.handle_sign_request(peer, sign_id, message) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("❌ Failed to handle sign request: {}", e);
+                    }
+                },
+                // Handle direct message requests (incoming)
+                Some(NetworkEvent::MessageEvent(request_response::Event::Message {
+                    peer,
+                    message:
+                        request_response::Message::Request {
+                            request: DirectMessage::SignPackage { sign_id, package },
+                            ..
+                        },
+                })) => match self.handle_sign_package(peer, sign_id, package) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("❌ Failed to handle sign package: {}", e);
+                    }
+                },
+                // Handle direct message requests (incoming)
+                Some(NetworkEvent::MessageEvent(request_response::Event::Message {
+                    peer,
+                    message:
+                        request_response::Message::Request {
+                            request:
+                                DirectMessage::Commitments {
+                                    sign_id,
+                                    commitments,
+                                },
+                            ..
+                        },
+                })) => match self.handle_commitments_response(peer, sign_id, commitments) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("❌ Failed to handle commitments response: {}", e);
+                    }
+                },
+                // Handle direct message requests (incoming)
+                Some(NetworkEvent::MessageEvent(request_response::Event::Message {
+                    peer,
+                    message:
+                        request_response::Message::Request {
+                            request:
+                                DirectMessage::SignatureShare {
+                                    sign_id,
+                                    signature_share,
+                                },
+                            ..
+                        },
+                })) => match self.handle_signature_share(peer, sign_id, signature_share) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("❌ Failed to handle signature share: {}", e);
+                    }
+                },
+                _ => {}
             }
         }
     }

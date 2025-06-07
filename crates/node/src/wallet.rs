@@ -118,7 +118,7 @@ pub struct PendingSpend {
 
 impl<N: Network, D: Db> NodeState<N, D> {
     pub fn get_frost_public_key(&self) -> Option<String> {
-        self.dkg_state.pubkey_package.as_ref().map(|p| {
+        self.pubkey_package.as_ref().map(|p| {
             format!("{:?}", p.verifying_key())
                 .replace("VerifyingKey(", "")
                 .replace(")", "")

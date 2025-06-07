@@ -1,5 +1,9 @@
 use futures::StreamExt;
-use libp2p::{Multiaddr, PeerId, request_response::ResponseChannel, swarm::SwarmEvent};
+use libp2p::{
+    Multiaddr, PeerId,
+    request_response::{Event, Message},
+    swarm::SwarmEvent,
+};
 use std::{
     collections::{BTreeMap, HashSet, hash_map::DefaultHasher},
     fmt::Debug,
@@ -31,19 +35,17 @@ pub struct PingBody {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum PrivateRequest {
+pub enum DirectMessage {
     Ping(PingBody),
     Round2Package(round2::Package),
-    SignRequest { sign_id: u64, message: Vec<u8> },
-    SignPackage { sign_id: u64, package: Vec<u8> },
-    InsertBlock { block: Block },
-    StartSigningSession { hex_message: String },
-    Spend { amount_sat: u64 },
-    GetFrostPublicKey,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum PrivateResponse {
+    SignRequest {
+        sign_id: u64,
+        message: Vec<u8>,
+    },
+    SignPackage {
+        sign_id: u64,
+        package: Vec<u8>,
+    },
     Pong,
     Commitments {
         sign_id: u64,
@@ -53,40 +55,55 @@ pub enum PrivateResponse {
         sign_id: u64,
         signature_share: Vec<u8>,
     },
+}
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum SelfRequest {
+    GetFrostPublicKey,
     StartSigningSession {
-        sign_id: u64,
+        hex_message: String,
     },
-    SpendRequestSent {
-        sighash: String,
+    InsertBlock {
+        block: Block,
     },
-    GetFrostPublicKey {
-        public_key: String,
+    Spend {
+        amount_sat: u64,
     },
+    SetFrostKeys {
+        private_key: Vec<u8>,
+        public_key: Vec<u8>,
+    },
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum SelfResponse {
+    GetFrostPublicKeyResponse { public_key: Option<String> },
+    StartSigningSessionResponse { sign_id: u64 },
+    SpendRequestSent { sighash: String },
 }
 
 #[derive(NetworkBehaviour)]
 pub struct MyBehaviour {
     pub gossipsub: gossipsub::Behaviour,
     pub mdns: mdns::tokio::Behaviour,
-    pub request_response: cbor::Behaviour<PrivateRequest, PrivateResponse>,
+    pub request_response: cbor::Behaviour<DirectMessage, ()>,
 }
 
+#[derive(Clone, Debug)]
 pub enum NetworkMessage {
     SendBroadcast {
         topic: gossipsub::IdentTopic,
         message: Vec<u8>,
     },
-    SendPrivateRequest(PeerId, PrivateRequest),
-    SendPrivateResponse(ResponseChannel<PrivateResponse>, PrivateResponse),
+    SendPrivateMessage(PeerId, DirectMessage),
     SendSelfRequest {
-        request: PrivateRequest,
-        response_channel: Option<mpsc::UnboundedSender<PrivateResponse>>,
+        request: SelfRequest,
+        response_channel: Option<mpsc::UnboundedSender<SelfResponse>>,
     },
 }
 
 pub type NetworkResponseFuture =
-    Pin<Box<dyn Future<Output = Result<PrivateResponse, NetworkError>> + Send>>;
+    Pin<Box<dyn Future<Output = Result<SelfResponse, NetworkError>> + Send>>;
 
 #[derive(Debug, Clone)]
 pub struct NetworkHandle {
@@ -94,26 +111,21 @@ pub struct NetworkHandle {
     tx: mpsc::UnboundedSender<NetworkMessage>,
 }
 
-pub trait Network: Clone + Debug {
+pub trait Network: Clone + Debug + Sync {
     fn peer_id(&self) -> PeerId;
     fn send_broadcast(
         &self,
         topic: gossipsub::IdentTopic,
         message: Vec<u8>,
     ) -> Result<(), NetworkError>;
-    fn send_private_request(
+    fn send_private_message(
         &self,
         peer_id: PeerId,
-        request: PrivateRequest,
-    ) -> Result<(), NetworkError>;
-    fn send_private_response(
-        &self,
-        channel: ResponseChannel<PrivateResponse>,
-        response: PrivateResponse,
+        request: DirectMessage,
     ) -> Result<(), NetworkError>;
     fn send_self_request(
         &self,
-        request: PrivateRequest,
+        request: SelfRequest,
         sync: bool,
     ) -> Result<Option<NetworkResponseFuture>, NetworkError>;
 }
@@ -134,23 +146,12 @@ impl Network for NetworkHandle {
             .map_err(|e| NetworkError::SendError(e.to_string()))
     }
 
-    fn send_private_request(
+    fn send_private_message(
         &self,
         peer_id: PeerId,
-        request: PrivateRequest,
+        request: DirectMessage,
     ) -> Result<(), NetworkError> {
-        let network_message = NetworkMessage::SendPrivateRequest(peer_id, request);
-        self.tx
-            .send(network_message)
-            .map_err(|e| NetworkError::SendError(e.to_string()))
-    }
-
-    fn send_private_response(
-        &self,
-        channel: ResponseChannel<PrivateResponse>,
-        response: PrivateResponse,
-    ) -> Result<(), NetworkError> {
-        let network_message = NetworkMessage::SendPrivateResponse(channel, response);
+        let network_message = NetworkMessage::SendPrivateMessage(peer_id, request);
         self.tx
             .send(network_message)
             .map_err(|e| NetworkError::SendError(e.to_string()))
@@ -158,11 +159,11 @@ impl Network for NetworkHandle {
 
     fn send_self_request(
         &self,
-        request: PrivateRequest,
+        request: SelfRequest,
         sync: bool,
     ) -> Result<Option<NetworkResponseFuture>, NetworkError> {
         if sync {
-            let (tx, mut rx) = unbounded_channel::<PrivateResponse>();
+            let (tx, mut rx) = unbounded_channel::<SelfResponse>();
 
             let network_message = NetworkMessage::SendSelfRequest {
                 request,
@@ -195,15 +196,92 @@ pub enum NetworkEvent {
     // SwarmEvent(SwarmEvent<MyBehaviourEvent>),
     // NetworkMessage(NetworkMessage),
     SelfRequest {
-        request: PrivateRequest,
-        response_channel: Option<mpsc::UnboundedSender<PrivateResponse>>,
+        request: SelfRequest,
+        response_channel: Option<mpsc::UnboundedSender<SelfResponse>>,
     },
-
+    Subscribed {
+        peer_id: PeerId,
+        topic: gossipsub::TopicHash,
+    },
     GossipsubMessage(gossipsub::Message),
-    MessageEvent(request_response::Event<PrivateRequest, PrivateResponse>),
+    MessageEvent(request_response::Event<DirectMessage, ()>),
 
     PeersConnected(Vec<(PeerId, Multiaddr)>),
     PeersDisconnected(Vec<(PeerId, Multiaddr)>),
+}
+
+#[derive(Debug, Clone)]
+pub enum HandlerMessage {
+    SelfRequest {
+        request: SelfRequest,
+        response_channel: Option<mpsc::UnboundedSender<SelfResponse>>,
+    },
+    Subscribed {
+        peer_id: PeerId,
+        topic: gossipsub::TopicHash,
+    },
+    GossipsubMessage(gossipsub::Message),
+    MessageEvent((PeerId, DirectMessage)),
+    PeersConnected(Vec<(PeerId, Multiaddr)>),
+    PeersDisconnected(Vec<(PeerId, Multiaddr)>),
+    Unknown,
+}
+
+impl From<&NetworkEvent> for HandlerMessage {
+    fn from(event: &NetworkEvent) -> Self {
+        match event {
+            NetworkEvent::SelfRequest {
+                request,
+                response_channel,
+            } => HandlerMessage::SelfRequest {
+                request: request.clone(),
+                response_channel: response_channel.clone(),
+            },
+            NetworkEvent::Subscribed { peer_id, topic } => HandlerMessage::Subscribed {
+                peer_id: *peer_id,
+                topic: topic.clone(),
+            },
+            NetworkEvent::GossipsubMessage(message) => {
+                HandlerMessage::GossipsubMessage(message.clone())
+            }
+            NetworkEvent::MessageEvent(Event::Message {
+                peer,
+                message: Message::Request { request, .. },
+                ..
+            }) => HandlerMessage::MessageEvent((*peer, request.clone())),
+            NetworkEvent::PeersConnected(peers) => HandlerMessage::PeersConnected(peers.clone()),
+            NetworkEvent::PeersDisconnected(peers) => {
+                HandlerMessage::PeersDisconnected(peers.clone())
+            }
+            _ => HandlerMessage::Unknown,
+        }
+    }
+}
+
+impl From<NetworkEvent> for HandlerMessage {
+    fn from(event: NetworkEvent) -> Self {
+        match event {
+            NetworkEvent::SelfRequest {
+                request,
+                response_channel,
+            } => HandlerMessage::SelfRequest {
+                request,
+                response_channel,
+            },
+            NetworkEvent::Subscribed { peer_id, topic } => {
+                HandlerMessage::Subscribed { peer_id, topic }
+            }
+            NetworkEvent::GossipsubMessage(message) => HandlerMessage::GossipsubMessage(message),
+            NetworkEvent::MessageEvent(Event::Message {
+                peer,
+                message: Message::Request { request, .. },
+                ..
+            }) => HandlerMessage::MessageEvent((peer, request)),
+            NetworkEvent::PeersConnected(peers) => HandlerMessage::PeersConnected(peers),
+            NetworkEvent::PeersDisconnected(peers) => HandlerMessage::PeersDisconnected(peers),
+            _ => HandlerMessage::Unknown,
+        }
+    }
 }
 
 pub struct SwarmManager {
@@ -294,17 +372,11 @@ impl SwarmManager {
                             .gossipsub
                             .publish(topic, message);
                     }
-                    Some(NetworkMessage::SendPrivateRequest(peer_id, request)) => {
+                    Some(NetworkMessage::SendPrivateMessage(peer_id, request)) => {
                         self.inner
                             .behaviour_mut()
                             .request_response
                             .send_request(&peer_id, request);
-                    }
-                    Some(NetworkMessage::SendPrivateResponse(channel, response)) => {
-                        let _ = self.inner
-                            .behaviour_mut()
-                            .request_response
-                            .send_response(channel, response);
                     }
                     Some(NetworkMessage::SendSelfRequest { request, response_channel }) => {
                         self.network_events.send(NetworkEvent::SelfRequest { request, response_channel } ).unwrap();
@@ -344,6 +416,9 @@ impl SwarmManager {
                         },
                         SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(message) ) => {
                             self.network_events.send(NetworkEvent::MessageEvent(message)).unwrap();
+                        },
+                        SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed { peer_id, topic })) => {
+                            self.network_events.send(NetworkEvent::Subscribed { peer_id, topic }).unwrap();
                         },
                         _ => {
                             // self.network_events.send(NetworkEvent::SwarmEvent(event)).unwrap();
