@@ -1,9 +1,9 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, path::PathBuf, sync::{Arc, Mutex}};
 
 use node::{
     NodeState,
     db::{Db, RocksDb},
-    swarm_manager::{Network, NetworkEvent, NetworkResponseFuture},
+    swarm_manager::{Network, NetworkEvent, NetworkResponseFuture, PrivateRequest},
 };
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use types::errors;
@@ -33,18 +33,33 @@ impl SenderToNode {
     }
 }
 
+#[derive(Debug)]
+pub struct PendingNetworkEvent {
+    pub from_peer: libp2p::PeerId,
+    pub event: NetworkEvent,
+    pub target_peers: Vec<libp2p::PeerId>, // Empty vec means broadcast to all
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct MockNetwork {
     peer: libp2p::PeerId,
     events_emitter_tx: UnboundedSender<NetworkEvent>,
+    cluster_senders: Arc<Mutex<BTreeMap<libp2p::PeerId, UnboundedSender<NetworkEvent>>>>,
+    pending_events: Arc<Mutex<Vec<PendingNetworkEvent>>>,
 }
 
 impl MockNetwork {
-    pub fn new(events_emitter_tx: UnboundedSender<NetworkEvent>, peer: libp2p::PeerId) -> Self {
+    pub fn new(
+        events_emitter_tx: UnboundedSender<NetworkEvent>, 
+        peer: libp2p::PeerId,
+        cluster_senders: Arc<Mutex<BTreeMap<libp2p::PeerId, UnboundedSender<NetworkEvent>>>>,
+    ) -> Self {
         Self {
             events_emitter_tx,
             peer,
+            cluster_senders,
+            pending_events: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
@@ -59,7 +74,22 @@ impl Network for MockNetwork {
         topic: libp2p::gossipsub::IdentTopic,
         message: Vec<u8>,
     ) -> Result<(), errors::NetworkError> {
-        todo!("Implement send_broadcast")
+        let gossip_message = libp2p::gossipsub::Message {
+            source: Some(self.peer),
+            data: message,
+            sequence_number: None,
+            topic: topic.hash(),
+        };
+
+        // Queue the event instead of sending immediately
+        let pending_event = PendingNetworkEvent {
+            from_peer: self.peer,
+            event: NetworkEvent::GossipsubMessage(gossip_message),
+            target_peers: Vec::new(), // Empty means broadcast to all
+        };
+
+        self.pending_events.lock().unwrap().push(pending_event);
+        Ok(())
     }
 
     fn send_private_message(
@@ -67,7 +97,18 @@ impl Network for MockNetwork {
         peer_id: libp2p::PeerId,
         request: node::swarm_manager::DirectMessage,
     ) -> Result<(), errors::NetworkError> {
-        todo!("Implement send_private_request")
+        // Queue the private request instead of sending immediately
+        let pending_event = PendingNetworkEvent {
+            from_peer: self.peer,
+            event: NetworkEvent::SelfRequest {
+                request,
+                response_channel: None,
+            },
+            target_peers: vec![peer_id],
+        };
+
+        self.pending_events.lock().unwrap().push(pending_event);
+        Ok(())
     }
 
     fn send_self_request(
@@ -75,17 +116,29 @@ impl Network for MockNetwork {
         request: node::swarm_manager::SelfRequest,
         sync: bool,
     ) -> Result<Option<NetworkResponseFuture>, errors::NetworkError> {
-        todo!("Implement send_self_request")
+        // For self requests, send immediately to own node
+        let self_request_event = NetworkEvent::SelfRequest {
+            request,
+            response_channel: None,
+        };
+        let _ = self.events_emitter_tx.send(self_request_event);
+        Ok(None)
     }
 }
 
 pub struct MockNodeCluster {
     nodes: BTreeMap<libp2p::PeerId, NodeState<MockNetwork, RocksDb>>,
     senders: BTreeMap<libp2p::PeerId, SenderToNode>,
+    cluster_senders: Arc<Mutex<BTreeMap<libp2p::PeerId, UnboundedSender<NetworkEvent>>>>,
+    networks: BTreeMap<libp2p::PeerId, MockNetwork>,
 }
 
 impl MockNodeCluster {
     pub async fn new(peers: u32, min_signers: u16, max_signers: u16) -> Self {
+        Self::new_with_db_prefix(peers, min_signers, max_signers, "node").await
+    }
+
+    pub async fn new_with_db_prefix(peers: u32, min_signers: u16, max_signers: u16, db_prefix: &str) -> Self {
         let mut path = PathBuf::new();
         path.push("config.json");
 
@@ -94,29 +147,38 @@ impl MockNodeCluster {
 
         let node_config = node::NodeConfig::new(path.clone(), config_path, None);
 
+
         let mut nodes = BTreeMap::new();
         let mut senders = BTreeMap::new();
+        let mut networks = BTreeMap::new();
+        let cluster_senders = Arc::new(Mutex::new(BTreeMap::new()));
 
         for i in 0..peers {
             let peer_id = libp2p::PeerId::random();
+            let db_name = format!("{}-{}", db_prefix, i);
             let Ok((node, network)) = create_node_network(
                 peer_id,
                 node_config.clone(),
                 min_signers,
                 max_signers,
-                RocksDb::new(format!("node-{}", i).as_str()),
+                RocksDb::new(&db_name),
+                cluster_senders.clone(),
             ) else {
                 panic!("Failed to create node network");
             };
+
+            // Add sender to cluster_senders
+            cluster_senders.lock().unwrap().insert(peer_id, network.events_emitter_tx.clone());
 
             nodes.insert(peer_id, node);
             senders.insert(
                 peer_id,
                 SenderToNode::new(network.events_emitter_tx.clone()),
             );
+            networks.insert(peer_id, network);
         }
 
-        Self { nodes, senders }
+        Self { nodes, senders, cluster_senders, networks }
     }
 
     pub async fn setup(&mut self) {
@@ -158,8 +220,145 @@ impl MockNodeCluster {
                 node.poll().await.unwrap();
             }
 
-
+            // Process any network events generated during polling
+            self.process_network_events().await;
         }
+    }
+
+    // Process network events that were generated during node polling
+    async fn process_network_events(&mut self) {
+        // Collect all pending events from all networks
+        let mut all_pending_events = Vec::new();
+        
+        for (peer_id, network) in self.networks.iter() {
+            let mut pending_events = network.pending_events.lock().unwrap();
+            all_pending_events.extend(pending_events.drain(..));
+        }
+
+        // Process each pending event
+        for pending_event in all_pending_events {
+            self.forward_event_to_peers(pending_event).await;
+        }
+    }
+
+    // Forward a single event to the appropriate target peers
+    async fn forward_event_to_peers(&mut self, pending_event: PendingNetworkEvent) {
+        if pending_event.target_peers.is_empty() {
+            // Broadcast to all peers except the sender
+            let target_peers: Vec<libp2p::PeerId> = self.senders.keys()
+                .filter(|peer_id| **peer_id != pending_event.from_peer)
+                .cloned()
+                .collect();
+            
+            for target_peer in target_peers {
+                if let Some(sender) = self.senders.get_mut(&target_peer) {
+                    // We need to recreate the event for each peer since NetworkEvent doesn't implement Clone
+                    let event = match &pending_event.event {
+                        NetworkEvent::GossipsubMessage(msg) => NetworkEvent::GossipsubMessage(libp2p::gossipsub::Message {
+                            source: msg.source,
+                            data: msg.data.clone(),
+                            sequence_number: msg.sequence_number,
+                            topic: msg.topic.clone(),
+                        }),
+                        NetworkEvent::SelfRequest { request, response_channel } => {
+                            // We'll handle private requests by recreating them as SelfRequest events
+                            NetworkEvent::SelfRequest {
+                                request: request.clone(),
+                                response_channel: None,
+                            }
+                        },
+                        other => {
+                            // For other events, we'll skip them for now
+                            continue;
+                        }
+                    };
+                    sender.queue(event);
+                }
+            }
+        } else {
+            // Send to specific target peers
+            for target_peer in pending_event.target_peers {
+                if let Some(sender) = self.senders.get_mut(&target_peer) {
+                    // Recreate the event for the target peer
+                    let event = match &pending_event.event {
+                        NetworkEvent::SelfRequest { request, response_channel } => {
+                            NetworkEvent::SelfRequest {
+                                request: request.clone(),
+                                response_channel: None,
+                            }
+                        },
+                        NetworkEvent::GossipsubMessage(msg) => NetworkEvent::GossipsubMessage(libp2p::gossipsub::Message {
+                            source: msg.source,
+                            data: msg.data.clone(),
+                            sequence_number: msg.sequence_number,
+                            topic: msg.topic.clone(),
+                        }),
+                        other => {
+                            // For other events, we'll skip them for now
+                            continue;
+                        }
+                    };
+                    sender.queue(event);
+                }
+            }
+        }
+    }
+
+    // Methods to send various types of network events for testing
+    pub fn send_broadcast_to_all(&mut self, topic: libp2p::gossipsub::IdentTopic, message: Vec<u8>) {
+        let gossip_message = libp2p::gossipsub::Message {
+            source: None, // Simulate external broadcast
+            data: message,
+            sequence_number: None,
+            topic: topic.hash(),
+        };
+
+        for (_, sender) in self.senders.iter_mut() {
+            sender.queue(NetworkEvent::GossipsubMessage(gossip_message.clone()));
+        }
+    }
+
+    pub fn send_private_request_to_peer(&mut self, _from_peer: libp2p::PeerId, to_peer: libp2p::PeerId, request: PrivateRequest) {
+        if let Some(sender) = self.senders.get_mut(&to_peer) {
+            sender.queue(NetworkEvent::SelfRequest {
+                request,
+                response_channel: None,
+            });
+        }
+    }
+
+    pub fn send_self_request_to_peer(&mut self, peer_id: libp2p::PeerId, request: PrivateRequest) {
+        if let Some(sender) = self.senders.get_mut(&peer_id) {
+            sender.queue(NetworkEvent::SelfRequest {
+                request,
+                response_channel: None,
+            });
+        }
+    }
+
+    pub fn simulate_peer_disconnect(&mut self, peer_id: libp2p::PeerId) {
+        for (recipient_peer, sender) in self.senders.iter_mut() {
+            if *recipient_peer != peer_id {
+                sender.queue(NetworkEvent::PeersDisconnected(vec![
+                    (peer_id, libp2p::Multiaddr::empty())
+                ]));
+            }
+        }
+    }
+
+    pub fn simulate_peer_reconnect(&mut self, peer_id: libp2p::PeerId) {
+        for (recipient_peer, sender) in self.senders.iter_mut() {
+            if *recipient_peer != peer_id {
+                sender.queue(NetworkEvent::PeersConnected(vec![
+                    (peer_id, libp2p::Multiaddr::empty())
+                ]));
+            }
+        }
+    }
+
+    // Helper method to get peer IDs for testing
+    pub fn get_peer_ids(&self) -> Vec<libp2p::PeerId> {
+        self.nodes.keys().cloned().collect()
     }
 }
 
@@ -169,11 +368,14 @@ pub fn create_node_network<D: Db>(
     min_signers: u16,
     max_signers: u16,
     db: D,
+    cluster_senders: Arc<Mutex<BTreeMap<libp2p::PeerId, UnboundedSender<NetworkEvent>>>>,
 ) -> Result<(NodeState<MockNetwork, D>, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, events_emitter_rx) = unbounded_channel::<NetworkEvent>();
     let network = MockNetwork {
         events_emitter_tx,
         peer: peer_id,
+        cluster_senders,
+        pending_events: Arc::new(Mutex::new(Vec::new())),
     };
 
     let nodes_state = NodeState::new_from_config(
@@ -199,6 +401,74 @@ mod node_tests {
         println!("Ran setup");
         cluster.run_n_iterations(1).await;
         println!("Ran 1 iterations");
+
+        for (_, node) in cluster.nodes.iter() {
+            assert_eq!(node.peers.len(), 1);
+        }
+
+        cluster.tear_down().await;
+        println!("Ran teardown");
+    }
+
+    #[tokio::test]
+    async fn network_events_are_processed_correctly() {
+        let test_id = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
+        let mut cluster = MockNodeCluster::new_with_db_prefix(3, 2, 3, &format!("test-events-{}", test_id)).await;
+        cluster.setup().await;
+
+        // Get peer IDs for testing
+        let peer_ids = cluster.get_peer_ids();
+        let first_peer = peer_ids[0];
+        let second_peer = peer_ids[1];
+
+        // Manually trigger some network events by calling network methods directly
+        {
+            let first_network = cluster.networks.get(&first_peer).unwrap();
+            
+            // Test broadcast
+            let topic = libp2p::gossipsub::IdentTopic::new("test-topic");
+            first_network.send_broadcast(topic, b"broadcast message".to_vec()).unwrap();
+            
+            // Test private request
+            first_network.send_private_request(second_peer, PrivateRequest::GetFrostPublicKey).unwrap();
+
+            // Check that events are queued
+            let pending_events = first_network.pending_events.lock().unwrap();
+            assert_eq!(pending_events.len(), 2, "Should have 2 pending events");
+        }
+
+        // Process the events
+        cluster.process_network_events().await;
+
+        // Check that events are cleared from the network after processing
+        {
+            let first_network = cluster.networks.get(&first_peer).unwrap();
+            let pending_events = first_network.pending_events.lock().unwrap();
+            assert_eq!(pending_events.len(), 0, "Pending events should be cleared after processing");
+        }
+
+        // Check that events were queued in the appropriate senders
+        let second_sender = cluster.senders.get(&second_peer).unwrap();
+        assert!(second_sender.pending_events.len() >= 1, "Second peer should have received events");
+
+        println!("Network event processing works correctly!");
+    }
+
+    #[tokio::test]
+    async fn peers_can_run_2_iterations() {
+        let mut cluster = MockNodeCluster::new(2, 2, 2).await;
+        cluster.setup().await;
+        println!("Ran setup");
+        
+        let timeout = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            cluster.run_n_iterations(2)
+        ).await;
+        
+        match timeout {
+            Ok(_) => println!("Ran 2 iterations successfully"),
+            Err(_) => panic!("run_n_iterations timed out after 10 seconds"),
+        }
 
         for (_, node) in cluster.nodes.iter() {
             assert_eq!(node.peers.len(), 1);
