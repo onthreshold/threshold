@@ -4,16 +4,52 @@ use tracing::{debug, error, info, warn};
 use types::errors::NodeError;
 
 use crate::{
-    dkg::DkgState,
-    peer_id_to_identifier,
-    swarm_manager::{DirectMessage, Network, SelfRequest},
+    dkg::DkgState, handler::Handler, peer_id_to_identifier, swarm_manager::{DirectMessage, HandlerMessage, Network, SelfRequest}
 };
+
+#[async_trait::async_trait]
+impl<N: Network> Handler<N> for DkgState {
+    async fn handle(
+        &mut self,
+        message: Option<HandlerMessage>,
+        network_handle: &N,
+    ) -> Result<(), types::errors::NodeError> {
+        match message {
+            Some(HandlerMessage::Subscribed { peer_id, topic }) => {
+                if topic == self.start_dkg_topic.hash() {
+                    self.dkg_listeners.insert(peer_id);
+                    println!(
+                        "Peer {} subscribed to topic {topic}. Listeners: {}",
+                        peer_id,
+                        self.dkg_listeners.len()
+                    );
+                    if let Err(e) = self.handle_dkg_start(network_handle).await {
+                        error!("❌ Failed to handle DKG start: {}", e);
+                    }
+                }
+            }
+            Some(HandlerMessage::GossipsubMessage(message)) => {
+                if message.topic == self.round1_topic.hash() {
+                    if let Some(source_peer) = message.source {
+                        self.handle_round1_payload(network_handle, source_peer, &message.data)?;
+                    }
+                }
+            }
+            Some(HandlerMessage::MessageEvent((peer, DirectMessage::Round2Package(package)))) => {
+                self.handle_round2_payload(network_handle, peer, package)?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
 
 impl DkgState {
     pub async fn handle_dkg_start(
         &mut self,
         network_handle: &impl Network,
     ) -> Result<(), NodeError> {
+        println!("handle_dkg_start");
         if self.dkg_started {
             debug!("DKG already started, skipping DKG process");
             return Ok(());
@@ -22,6 +58,7 @@ impl DkgState {
         // Check if DKG keys already exist
         if self.dkg_completed {
             info!("DKG keys already exist, skipping DKG process");
+            println!("DKG keys already exist, skipping DKG process");
             return Ok(());
         }
 
@@ -32,6 +69,7 @@ impl DkgState {
             );
             return Ok(());
         }
+        println!("Starting now");
 
         info!("Starting DKG process");
 

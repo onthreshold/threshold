@@ -6,7 +6,6 @@ use frost_secp256k1::{
 };
 use libp2p::PeerId;
 
-pub mod handler;
 pub mod key_creation;
 pub mod utils;
 
