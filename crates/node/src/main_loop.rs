@@ -5,7 +5,7 @@ use crate::swarm_manager::{NetworkEvent, SelfRequest, SelfResponse};
 use crate::{Network, NodeState};
 use types::errors::NodeError;
 
-impl<N: Network, D: Db> NodeState<N, D> {
+impl<N: Network + 'static, D: Db + 'static> NodeState<N, D> {
     pub async fn try_poll(&mut self) -> Result<bool, NodeError> {
         let send_message = self.network_events_stream.try_recv().ok();
         if let Some(event) = send_message {
