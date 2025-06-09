@@ -7,8 +7,6 @@ use crate::swarm_manager::{
     DirectMessage, Network, NetworkHandle, PingBody, SelfRequest, SelfResponse,
 };
 use bitcoin::Address;
-use clients::{EsploraApiClient, WindowedConfirmedTransactionProvider};
-use esplora_client::Builder;
 use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use serde_json;
@@ -200,18 +198,6 @@ pub async fn create_deposit_intent(
     ) {
         info!("Failed to broadcast new deposit address: {:?}", e);
     }
-
-    let deposit_address_clone = deposit_address.clone();
-
-    tokio::spawn(async move {
-        let client = EsploraApiClient::new(
-            Builder::new("https://blockstream.info/api")
-                .build_async()
-                .unwrap(),
-            100,
-        );
-        client.poll_new_transactions(deposit_address_clone).await;
-    });
 
     info!(
         "Received request to create deposit intent for user {} with amount {}. Tracking ID: {}. Deposit Address: {}",

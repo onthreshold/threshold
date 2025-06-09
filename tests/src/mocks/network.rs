@@ -447,6 +447,8 @@ pub fn create_node_network(
     max_signers: u16,
 ) -> Result<(NodeState<MockNetwork, MockDb>, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(100);
+    let (deposit_intent_tx, _) = broadcast::channel::<String>(100);
+
     let network = MockNetwork {
         events_emitter_tx: events_emitter_tx.clone(),
         peer: peer_id,
@@ -462,6 +464,7 @@ pub fn create_node_network(
         node_config,
         mock_db,
         events_emitter_tx,
+        deposit_intent_tx,
     )?;
 
     Ok((nodes_state, network))
