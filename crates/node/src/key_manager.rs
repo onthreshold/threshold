@@ -177,7 +177,10 @@ pub fn load_dkg_keys(
     Box<dyn std::error::Error>,
 > {
     if let Some(dkg_keys) = config.dkg_keys {
-        let password = get_password_from_prompt()?;
+        let password = match std::env::var("KEY_PASSWORD") {
+            Ok(pw) => pw,
+            Err(_) => get_password_from_prompt()?,
+        };
 
         let private_key_bytes = decrypt_private_key(
             &dkg_keys.encrypted_private_key_package_b64,

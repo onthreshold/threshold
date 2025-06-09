@@ -22,7 +22,10 @@ use libp2p::{
 use libp2p::{identity::Keypair, request_response::cbor};
 use tokio::{
     io,
-    sync::mpsc::{self, UnboundedReceiver, unbounded_channel},
+    sync::{
+        broadcast,
+        mpsc::{self, unbounded_channel},
+    },
 };
 
 use crate::PeerData;
@@ -201,7 +204,7 @@ pub struct SwarmManager {
     pub inner: Swarm<MyBehaviour>,
 
     pub network_manager_rx: mpsc::UnboundedReceiver<NetworkMessage>,
-    pub network_events: mpsc::UnboundedSender<NetworkEvent>,
+    pub network_events: broadcast::Sender<NetworkEvent>,
 
     pub allowed_peers: Vec<PeerId>,
     pub peers_to_names: BTreeMap<PeerId, String>,
@@ -216,10 +219,10 @@ impl SwarmManager {
     pub fn new(
         mut swarm: Swarm<MyBehaviour>,
         peer_data: Vec<PeerData>,
-    ) -> Result<(Self, NetworkHandle, UnboundedReceiver<NetworkEvent>), NodeError> {
+    ) -> Result<(Self, NetworkHandle), NodeError> {
         let (send_commands, receiving_commands) = unbounded_channel::<NetworkMessage>();
 
-        let (network_events_emitter, network_events_stream) = unbounded_channel::<NetworkEvent>();
+        let (network_events_emitter, _) = broadcast::channel::<NetworkEvent>(100);
 
         let network_handle = NetworkHandle {
             peer_id: *swarm.local_peer_id(),
@@ -263,7 +266,6 @@ impl SwarmManager {
                 peers_to_names,
             },
             network_handle,
-            network_events_stream,
         ))
     }
 
@@ -351,7 +353,7 @@ impl SwarmManager {
 pub fn build_swarm(
     keypair: Keypair,
     peer_data: Vec<PeerData>,
-) -> Result<(NetworkHandle, SwarmManager, UnboundedReceiver<NetworkEvent>), NodeError> {
+) -> Result<(NetworkHandle, SwarmManager), NodeError> {
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
         .with_tcp(
@@ -424,8 +426,8 @@ pub fn build_swarm(
         )
         .map_err(|e| NodeError::Error(format!("Failed to listen on tcp {}", e)))?;
 
-    let (swarm_manager, network, network_events_stream) = SwarmManager::new(swarm, peer_data)
+    let (swarm_manager, network) = SwarmManager::new(swarm, peer_data)
         .map_err(|e| NodeError::Error(format!("Failed to create swarm manager: {}", e)))?;
 
-    Ok((network, swarm_manager, network_events_stream))
+    Ok((network, swarm_manager))
 }

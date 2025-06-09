@@ -8,7 +8,7 @@ use node::{
     NodeState,
     swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture},
 };
-use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
+use tokio::sync::broadcast;
 use types::errors;
 
 // Import MockDb from our mocks module
@@ -17,11 +17,11 @@ use crate::mocks::db::MockDb;
 #[derive(Debug)]
 pub struct SenderToNode {
     pub pending_events: Vec<NetworkEvent>,
-    events_emitter_tx: UnboundedSender<NetworkEvent>,
+    events_emitter_tx: broadcast::Sender<NetworkEvent>,
 }
 
 impl SenderToNode {
-    fn new(events_emitter_tx: UnboundedSender<NetworkEvent>) -> Self {
+    fn new(events_emitter_tx: broadcast::Sender<NetworkEvent>) -> Self {
         Self {
             pending_events: Vec::new(),
             events_emitter_tx,
@@ -50,12 +50,12 @@ pub struct PendingNetworkEvent {
 #[allow(dead_code)]
 pub struct MockNetwork {
     pub peer: libp2p::PeerId,
-    pub events_emitter_tx: UnboundedSender<NetworkEvent>,
+    pub events_emitter_tx: broadcast::Sender<NetworkEvent>,
     pub pending_events: Arc<Mutex<Vec<PendingNetworkEvent>>>,
 }
 
 impl MockNetwork {
-    pub fn new(events_emitter_tx: UnboundedSender<NetworkEvent>, peer: libp2p::PeerId) -> Self {
+    pub fn new(events_emitter_tx: broadcast::Sender<NetworkEvent>, peer: libp2p::PeerId) -> Self {
         Self {
             events_emitter_tx,
             peer,
@@ -103,16 +103,7 @@ impl Network for MockNetwork {
         // In a real implementation, this would use proper request-response channels
         let pending_event = PendingNetworkEvent {
             from_peer: self.peer,
-            event: NetworkEvent::MessageEvent(libp2p::request_response::Event::Message {
-                peer: peer_id,
-                message: libp2p::request_response::Message::Request {
-                    #[allow(invalid_value)]
-                    request_id: unsafe { std::mem::zeroed() }, // Create dummy ID
-                    request,
-                    #[allow(invalid_value)]
-                    channel: unsafe { std::mem::zeroed() }, // Dummy channel
-                },
-            }),
+            event: NetworkEvent::MessageEvent((peer_id, request)),
             target_peers: vec![peer_id],
         };
 
@@ -283,28 +274,8 @@ impl MockNodeCluster {
                             peer_id: *peer_id,
                             topic: topic.clone(),
                         },
-                        NetworkEvent::MessageEvent(libp2p::request_response::Event::Message {
-                            peer,
-                            message,
-                        }) => {
-                            // For mock testing, recreate the MessageEvent::Message
-                            // Since we can't clone the original message, create a simple mock request
-                            let request = match message {
-                                libp2p::request_response::Message::Request { request, .. } => {
-                                    request
-                                }
-                                _ => continue,
-                            };
-                            NetworkEvent::MessageEvent(libp2p::request_response::Event::Message {
-                                peer: *peer,
-                                message: libp2p::request_response::Message::Request {
-                                    #[allow(invalid_value)]
-                                    request_id: unsafe { std::mem::zeroed() }, // Create dummy ID
-                                    request: request.clone(), // Simple dummy message
-                                    #[allow(invalid_value)]
-                                    channel: unsafe { std::mem::zeroed() }, // Dummy channel
-                                },
-                            })
+                        NetworkEvent::MessageEvent((peer, message)) => {
+                            NetworkEvent::MessageEvent((*peer, message.clone()))
                         }
                         NetworkEvent::PeersConnected(items) => {
                             NetworkEvent::PeersConnected(items.clone())
@@ -347,39 +318,10 @@ impl MockNodeCluster {
                             peer_id: *peer_id,
                             topic: topic.clone(),
                         },
-                        NetworkEvent::MessageEvent(libp2p::request_response::Event::Message {
-                            peer,
-                            message,
-                        }) => {
-                            // For mock testing, recreate the MessageEvent::Message
-                            // Since we can't clone the original message, create a simple mock request
-                            let request = match message {
-                                libp2p::request_response::Message::Request { request, .. } => {
-                                    request
-                                }
-                                _ => continue,
-                            };
-                            NetworkEvent::MessageEvent(libp2p::request_response::Event::Message {
-                                peer: *peer,
-                                message: libp2p::request_response::Message::Request {
-                                    #[allow(invalid_value)]
-                                    request_id: unsafe { std::mem::zeroed() }, // Create dummy ID
-                                    request: request.clone(),
-                                    #[allow(invalid_value)]
-                                    channel: unsafe { std::mem::zeroed() }, // Dummy channel
-                                },
-                            })
+                        NetworkEvent::MessageEvent((peer, message)) => {
+                            NetworkEvent::MessageEvent((*peer, message.clone()))
                         }
-                        NetworkEvent::MessageEvent(
-                            libp2p::request_response::Event::OutboundFailure { .. },
-                        )
-                        | NetworkEvent::MessageEvent(
-                            libp2p::request_response::Event::InboundFailure { .. },
-                        )
-                        | NetworkEvent::MessageEvent(
-                            libp2p::request_response::Event::ResponseSent { .. },
-                        ) => {
-                            // For mock testing, we wont handle these events
+                        _ => {
                             continue;
                         }
                     };
@@ -470,9 +412,9 @@ pub fn create_node_network(
     min_signers: u16,
     max_signers: u16,
 ) -> Result<(NodeState<MockNetwork, MockDb>, MockNetwork), errors::NodeError> {
-    let (events_emitter_tx, events_emitter_rx) = unbounded_channel::<NetworkEvent>();
+    let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(100);
     let network = MockNetwork {
-        events_emitter_tx,
+        events_emitter_tx: events_emitter_tx.clone(),
         peer: peer_id,
         pending_events: Arc::new(Mutex::new(Vec::new())),
     };
@@ -485,7 +427,7 @@ pub fn create_node_network(
         max_signers,
         node_config,
         mock_db,
-        events_emitter_rx,
+        events_emitter_tx,
     )?;
 
     Ok((nodes_state, network))
