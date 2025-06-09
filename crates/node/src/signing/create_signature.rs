@@ -11,7 +11,7 @@ use crate::NodeState;
 use crate::db::Db;
 use crate::handler::Handler;
 use crate::signing::ActiveSigning;
-use crate::swarm_manager::{DirectMessage, HandlerMessage, Network, SelfRequest, SelfResponse};
+use crate::swarm_manager::{DirectMessage, Network, NetworkEvent, SelfRequest, SelfResponse};
 use crate::{peer_id_to_identifier, signing::SigningState};
 use types::errors::NodeError;
 
@@ -20,16 +20,16 @@ impl<N: Network, D: Db> Handler<N, D> for SigningState {
     async fn handle(
         &mut self,
         node: &mut NodeState<N, D>,
-        message: Option<HandlerMessage>,
+        message: Option<NetworkEvent>,
     ) -> Result<(), NodeError> {
         match message {
-            Some(HandlerMessage::SelfRequest {
+            Some(NetworkEvent::SelfRequest {
                 request: SelfRequest::StartSigningSession { hex_message },
                 ..
             }) => {
                 let _ = self.start_signing_session(node, &hex_message)?;
             }
-            Some(HandlerMessage::SelfRequest {
+            Some(NetworkEvent::SelfRequest {
                 request: SelfRequest::Spend { amount_sat },
                 response_channel,
             }) => {
@@ -42,22 +42,22 @@ impl<N: Network, D: Db> Handler<N, D> for SigningState {
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
                 }
             }
-            Some(HandlerMessage::MessageEvent((
+            Some(NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::SignRequest { sign_id, message },
             ))) => self.handle_sign_request(node, peer, sign_id, message)?,
-            Some(HandlerMessage::MessageEvent((
+            Some(NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::SignPackage { sign_id, package },
             ))) => self.handle_sign_package(node, peer, sign_id, package)?,
-            Some(HandlerMessage::MessageEvent((
+            Some(NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::Commitments {
                     sign_id,
                     commitments,
                 },
             ))) => self.handle_commitments_response(node, peer, sign_id, commitments)?,
-            Some(HandlerMessage::MessageEvent((
+            Some(NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::SignatureShare {
                     sign_id,

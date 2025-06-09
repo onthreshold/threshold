@@ -9,7 +9,7 @@ use crate::{
     dkg::DkgState,
     handler::Handler,
     peer_id_to_identifier,
-    swarm_manager::{DirectMessage, HandlerMessage, Network},
+    swarm_manager::{DirectMessage, Network, NetworkEvent},
 };
 
 #[async_trait::async_trait]
@@ -17,10 +17,10 @@ impl<N: Network, D: Db> Handler<N, D> for DkgState {
     async fn handle(
         &mut self,
         node: &mut NodeState<N, D>,
-        message: Option<HandlerMessage>,
+        message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         match message {
-            Some(HandlerMessage::Subscribed { peer_id, topic }) => {
+            Some(NetworkEvent::Subscribed { peer_id, topic }) => {
                 if topic == self.start_dkg_topic.hash() {
                     self.dkg_listeners.insert(peer_id);
                     info!(
@@ -33,14 +33,14 @@ impl<N: Network, D: Db> Handler<N, D> for DkgState {
                     }
                 }
             }
-            Some(HandlerMessage::GossipsubMessage(message)) => {
+            Some(NetworkEvent::GossipsubMessage(message)) => {
                 if message.topic == self.round1_topic.hash() {
                     if let Some(source_peer) = message.source {
                         self.handle_round1_payload(node, source_peer, &message.data)?;
                     }
                 }
             }
-            Some(HandlerMessage::MessageEvent((peer, DirectMessage::Round2Package(package)))) => {
+            Some(NetworkEvent::MessageEvent((peer, DirectMessage::Round2Package(package)))) => {
                 self.handle_round2_payload(node, peer, package)?;
             }
             _ => {}
