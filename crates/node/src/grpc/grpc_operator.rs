@@ -11,6 +11,7 @@ use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use tonic::{Request, Response, Status};
 use tracing::{debug, info};
+use clients::esplora_client::EsploraApiClient;
 
 use std::str::FromStr;
 use uuid::Uuid;
@@ -181,6 +182,20 @@ pub async fn create_deposit_intent(
         .ok_or(Status::internal("No response from node"))?
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+
+    tokio::spawn(async move {
+        let client = EsploraApiClient::new(
+            Builder::new("https://blockstream.info/api")
+                .build_async()
+                .unwrap(),
+            100,
+        );
+        let response = client.poll_new_transactions(deposit_address).await;
+        
+        if let Err(e) = response {
+            error!("Failed to send transaction: {:?}", e);
+        }
+    });
 
     info!(
         "Received request to create deposit intent for user {} with amount {}. Tracking ID: {}. Deposit Address: {}",

@@ -49,6 +49,7 @@ async-trait = { workspace = true }
 protocol = { path = "../protocol" }
 types = { path = "../types" }
 serde_yaml = "0.9.34"
+clients = { path = "../clients" }
 
 [dev-dependencies]
 tempfile = "3.8"
