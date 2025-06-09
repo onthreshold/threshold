@@ -51,7 +51,18 @@ impl<N: Network, D: Db> NodeState<N, D> {
                         })
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
                 }
-            }
+            },
+            Some(NetworkEvent::SelfRequest {
+                request: SelfRequest::CreateDeposit { deposit_intent },
+                response_channel,
+            }) => {
+                let response = self.create_deposit(deposit_intent).await;
+                if let Some(response_channel) = response_channel {
+                    response_channel
+                        .send(SelfResponse::CreateDepositResponse { success: response.is_ok() })
+                        .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
+                }
+            },
             Some(NetworkEvent::PeersConnected(list)) => {
                 for (peer_id, _multiaddr) in list {
                     self.peers.insert(peer_id);

@@ -62,6 +62,7 @@ pub enum DirectMessage {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SelfRequest {
     GetFrostPublicKey,
+    CreateDeposit { deposit_intent: crate::db::DepositIntent },
     StartSigningSession { hex_message: String },
     Spend { amount_sat: u64 },
 }
@@ -69,6 +70,7 @@ pub enum SelfRequest {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SelfResponse {
     GetFrostPublicKeyResponse { public_key: Option<String> },
+    CreateDepositResponse { success: bool },
     StartSigningSessionResponse { sign_id: u64 },
     SpendRequestSent { sighash: String },
 }

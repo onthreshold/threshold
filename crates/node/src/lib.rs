@@ -240,6 +240,13 @@ impl<N: Network, D: Db> NodeState<N, D> {
 
         Ok(node_state)
     }
+
+    pub async fn create_deposit(
+        &mut self,
+        deposit_intent: crate::db::DepositIntent,
+    ) -> Result<(), NodeError> {
+        self.db.insert_deposit_intent(deposit_intent)
+    }
 }
 
 pub fn peer_id_to_identifier(peer_id: &PeerId) -> Identifier {
