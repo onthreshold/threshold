@@ -11,9 +11,6 @@ use esplora_client::Builder;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tokio::sync::Mutex as TokioMutex;
 use tokio::sync::broadcast;
 use tonic::transport::Server;
 use tracing::{error, info};
@@ -151,15 +148,11 @@ pub async fn start_node(
                 let addresses_vec: Vec<Address> = addresses
                     .iter()
                     .filter_map(|addr_str| Address::from_str(addr_str).ok())
-                    .map(|addr| addr.require_network(BitcoinNetwork::Bitcoin).ok())
-                    .filter_map(|addr| addr)
+                    .filter_map(|addr| addr.require_network(BitcoinNetwork::Bitcoin).ok())
                     .collect();
 
                 if !addresses_vec.is_empty() {
-                    info!(
-                        "Updating transaction polling with {} addresses",
-                        addresses_vec.len()
-                    );
+                    info!("Now polling {} addresses.", addresses_vec.len());
                     client.update_addresses(addresses_vec).await;
                 }
             }

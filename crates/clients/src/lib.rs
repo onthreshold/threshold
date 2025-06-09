@@ -79,6 +79,8 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
                     break;
                 }
 
+                last_seen_txid = Some(address_txs.last().unwrap().txid);
+
                 let mut found_confirmed = false;
                 let last_tx_height = address_txs.last().and_then(|tx| tx.status.block_height);
 
@@ -100,9 +102,9 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
                 if !found_confirmed && last_tx_height.is_some_and(|height| height < min_height) {
                     break;
                 }
-
-                sleep(Duration::from_secs(5)).await;
             }
+
+            sleep(Duration::from_secs(5)).await;
         }
 
         Ok(confirmed_txs)

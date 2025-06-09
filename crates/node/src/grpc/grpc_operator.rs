@@ -7,6 +7,8 @@ use crate::swarm_manager::{
     DirectMessage, Network, NetworkHandle, PingBody, SelfRequest, SelfResponse,
 };
 use bitcoin::Address;
+use bitcoin::hashes::Hash;
+use bitcoin::secp256k1::Scalar;
 use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use serde_json;
@@ -161,7 +163,16 @@ pub async fn create_deposit_intent(
 
     let internal_key = public_key.inner.x_only_public_key().0;
 
-    let deposit_address = Address::p2tr(&secp, internal_key, None, bitcoin::Network::Bitcoin);
+    let tweak_scalar = Scalar::from_be_bytes(
+        bitcoin::hashes::sha256::Hash::hash(deposit_tracking_id.as_bytes()).to_byte_array(),
+    )
+    .expect("32 bytes, should not fail");
+
+    let (tweaked_key, _) = internal_key
+        .add_tweak(&secp, &tweak_scalar)
+        .map_err(|e| Status::internal(format!("Failed to add tweak: {:?}", e)))?;
+
+    let deposit_address = Address::p2tr(&secp, tweaked_key, None, bitcoin::Network::Bitcoin);
 
     let deposit_intent = crate::db::DepositIntent {
         user_id: user_id.to_string(),
