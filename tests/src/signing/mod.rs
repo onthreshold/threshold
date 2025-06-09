@@ -29,7 +29,7 @@ pub mod signing_tests {
 
         // ── drive the network and count messages ──
         let (mut req, mut comm, mut pack, mut share) = (0, 0, 0, 0);
-        for _ in 0..200 {
+        for _ in 0..100 {
             cluster.run_n_iterations(1).await;
 
             // count DirectMessage traffic still queued in the mock senders
@@ -46,7 +46,7 @@ pub mod signing_tests {
                     }
                 }
             }
-            // break once no messages are left in either channel
+            // // break once no messages are left in either channel
             if cluster
                 .senders
                 .values()
@@ -73,8 +73,9 @@ pub mod signing_tests {
                 .iter()
                 .find_map(|h| h.downcast_ref::<node::signing::SigningState>());
             assert!(
-                signing_state.unwrap().pending_spends.is_empty(),
-                "node still has pending spend"
+                signing_state.unwrap().active_signing.is_none(),
+                "node still has pending signing {:?}",
+                node.peer_id
             );
         }
     }

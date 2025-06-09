@@ -358,6 +358,7 @@ impl SigningState {
             "✍️  Sent signature share for session {} to {}",
             sign_id, peer
         );
+        self.active_signing = None;
 
         Ok(())
     }
