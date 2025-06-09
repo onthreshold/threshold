@@ -1,11 +1,11 @@
 [workspace]
 members = [
     "bin/cli",
-    "bin/esplora-client",
     "tests",
     "crates/node",
     "crates/protocol",
     "crates/types",
+    "crates/clients",
 ]
 resolver = "2"
 

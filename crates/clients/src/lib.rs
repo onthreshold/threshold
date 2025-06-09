@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use bitcoin::{consensus, Address, Network, Transaction};
-use esplora_client::{AsyncClient, Builder};
-use std::str::FromStr;
+use bitcoin::{consensus, Address, Transaction};
+use esplora_client::AsyncClient;
 use tokio::sync::broadcast;
 use tokio::time::{sleep, Duration};
 
@@ -157,69 +156,6 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
 
                 last_confirmed_height = new_confirmed_height;
             }
-        }
-    }
-}
-
-#[tokio::main]
-async fn main() {
-    let client = EsploraApiClient::new(
-        Builder::new("https://blockstream.info/api")
-            .build_async()
-            .unwrap(),
-        100,
-    );
-
-    let address = Address::from_str("bc1qezwz3yt46nsgzcwlg0dsw680nryjpq5u8pvzts")
-        .unwrap()
-        .require_network(Network::Bitcoin)
-        .unwrap();
-
-    let transactions = client
-        .get_confirmed_transactions(address.clone(), 899900, 900000)
-        .await
-        .unwrap();
-    println!("Found {} transactions.", transactions.len());
-    for tx in transactions {
-        println!("Transaction ID: {}", tx.compute_txid());
-    }
-
-    client.poll_new_transactions(address).await;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_get_confirmed_transactions() {
-        let client = EsploraApiClient::new(
-            Builder::new("https://blockstream.info/api")
-                .build_async()
-                .unwrap(),
-            100,
-        );
-        let address = Address::from_str("bc1qezwz3yt46nsgzcwlg0dsw680nryjpq5u8pvzts")
-            .unwrap()
-            .require_network(Network::Bitcoin)
-            .unwrap();
-        let transactions = client
-            .get_confirmed_transactions(address.clone(), 899900, 899930)
-            .await
-            .unwrap();
-
-        let correct_txs = [
-            "99c024e891c3110297513a1bc8c6f36948b36461096e664be72c3ac96e958c5c",
-            "1d0249929acaf31c2c6b6e6f9c72f44bd663a426cb146afe0b7bbaa66e0bc0df",
-            "fdcd9cf8d660e359a6ab2993d649276fca60be01c2b4327f95ad2527cbe3db08",
-            "3fd280c3ccc13f0f88433f0ce95aeebacc249565c8e8b671005302de0616babe",
-            "a8705186a9d6b5063484a8029b0e2c4064e3e2723ea61ea10b6bc38d0abbc77a",
-        ];
-
-        assert_eq!(transactions.len(), correct_txs.len());
-
-        for tx in transactions {
-            assert!(correct_txs.contains(&tx.compute_txid().to_string().as_str()));
         }
     }
 }
