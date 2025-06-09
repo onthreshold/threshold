@@ -51,7 +51,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
                         })
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
                 }
-            },
+            }
             Some(NetworkEvent::SelfRequest {
                 request: SelfRequest::CreateDeposit { deposit_intent },
                 response_channel,
@@ -59,10 +59,18 @@ impl<N: Network, D: Db> NodeState<N, D> {
                 let response = self.create_deposit(deposit_intent).await;
                 if let Some(response_channel) = response_channel {
                     response_channel
-                        .send(SelfResponse::CreateDepositResponse { success: response.is_ok() })
+                        .send(SelfResponse::CreateDepositResponse {
+                            success: response.is_ok(),
+                        })
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
                 }
-            },
+            }
+            Some(NetworkEvent::DepositIntent(deposit_intent)) => {
+                info!("Deposit intent received: {:?}", deposit_intent);
+                if let Err(e) = self.create_deposit(deposit_intent).await {
+                    info!("Failed to store deposit intent: {}", e);
+                }
+            }
             Some(NetworkEvent::PeersConnected(list)) => {
                 for (peer_id, _multiaddr) in list {
                     self.peers.insert(peer_id);

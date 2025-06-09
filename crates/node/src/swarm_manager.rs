@@ -28,7 +28,7 @@ use tokio::{
     },
 };
 
-use crate::PeerData;
+use crate::{PeerData, db::DepositIntent};
 use types::errors::{NetworkError, NodeError};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -62,9 +62,15 @@ pub enum DirectMessage {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SelfRequest {
     GetFrostPublicKey,
-    CreateDeposit { deposit_intent: crate::db::DepositIntent },
-    StartSigningSession { hex_message: String },
-    Spend { amount_sat: u64 },
+    CreateDeposit {
+        deposit_intent: crate::db::DepositIntent,
+    },
+    StartSigningSession {
+        hex_message: String,
+    },
+    Spend {
+        amount_sat: u64,
+    },
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -199,6 +205,7 @@ pub enum NetworkEvent {
     MessageEvent((PeerId, DirectMessage)),
     PeersConnected(Vec<(PeerId, Multiaddr)>),
     PeersDisconnected(Vec<(PeerId, Multiaddr)>),
+    DepositIntent(DepositIntent),
     Unknown,
 }
 
@@ -215,6 +222,7 @@ pub struct SwarmManager {
 
     pub round1_topic: gossipsub::IdentTopic,
     pub start_dkg_topic: gossipsub::IdentTopic,
+    pub deposit_intents_topic: gossipsub::IdentTopic,
 }
 
 impl SwarmManager {
@@ -256,11 +264,19 @@ impl SwarmManager {
             .subscribe(&start_dkg_topic)
             .map_err(|e| NodeError::Error(e.to_string()))?;
 
+        let deposit_intents_topic = gossipsub::IdentTopic::new("deposit-intents");
+        swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&deposit_intents_topic)
+            .map_err(|e| NodeError::Error(e.to_string()))?;
+
         Ok((
             Self {
                 round1_topic,
                 live_peers: HashSet::new(),
                 start_dkg_topic,
+                deposit_intents_topic,
                 inner: swarm,
                 network_manager_rx: receiving_commands,
                 network_events: network_events_emitter,
@@ -329,6 +345,11 @@ impl SwarmManager {
                             message,
                             ..
                         })) => {
+                            if message.topic == self.deposit_intents_topic.hash() {
+                                if let Ok(deposit_intent) = serde_json::from_slice::<DepositIntent>(&message.data) {
+                                    self.network_events.send(NetworkEvent::DepositIntent(deposit_intent)).unwrap();
+                                }
+                            }
                             self.network_events.send(NetworkEvent::GossipsubMessage(message.clone())).unwrap();
                         },
                         SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(Event::Message {

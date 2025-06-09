@@ -1,6 +1,6 @@
+use bincode::{Decode, Encode};
 use rocksdb::DB;
-use serde::{Serialize, Deserialize};
-use bincode::{Encode, Decode};
+use serde::{Deserialize, Serialize};
 
 use protocol::{
     block::{Block, BlockHash},
@@ -37,10 +37,10 @@ impl RocksDb {
         let mut opts = rocksdb::Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
-        
+
         let cfs = vec!["deposit_intents"];
         let db = DB::open_cf(&opts, path, cfs).unwrap();
-        
+
         Self { db }
     }
 }
@@ -95,15 +95,18 @@ impl Db for RocksDb {
         let key = format!("di:{}", intent.deposit_tracking_id);
         let value = bincode::encode_to_vec(&intent, bincode::config::standard())
             .map_err(|e| NodeError::Error(format!("Failed to serialize deposit intent: {}", e)))?;
-        
-        self.db.put_cf(self.db.cf_handle("deposit_intents").unwrap(), key, value)?;
+
+        self.db
+            .put_cf(self.db.cf_handle("deposit_intents").unwrap(), key, value)?;
         Ok(())
     }
 
     fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError> {
         let key = format!("di:{}", tracking_id);
-        let value = self.db.get_cf(self.db.cf_handle("deposit_intents").unwrap(), key)?;
-        
+        let value = self
+            .db
+            .get_cf(self.db.cf_handle("deposit_intents").unwrap(), key)?;
+
         Ok(value.and_then(|v| {
             bincode::decode_from_slice(&v, bincode::config::standard())
                 .ok()

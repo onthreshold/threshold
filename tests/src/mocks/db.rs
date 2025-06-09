@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use node::db::Db;
+use node::db::{Db, DepositIntent};
 use protocol::{
     block::{Block, BlockHash},
     chain_state::ChainState,
@@ -12,6 +12,7 @@ pub struct MockDb {
     pub chain_state: ChainState,
     pub height_map: HashMap<u64, BlockHash>,
     pub tip_block_hash: Option<BlockHash>,
+    pub deposit_intents: HashMap<String, DepositIntent>,
 }
 
 impl Default for MockDb {
@@ -27,6 +28,7 @@ impl MockDb {
             chain_state: ChainState::new(),
             height_map: HashMap::new(),
             tip_block_hash: None,
+            deposit_intents: HashMap::new(),
         }
     }
 }
@@ -59,5 +61,15 @@ impl Db for MockDb {
         self.height_map.insert(block.header.height, block.hash());
         self.tip_block_hash = Some(block.hash());
         Ok(())
+    }
+
+    fn insert_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError> {
+        self.deposit_intents
+            .insert(intent.deposit_tracking_id.clone(), intent);
+        Ok(())
+    }
+
+    fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError> {
+        Ok(self.deposit_intents.get(tracking_id).cloned())
     }
 }

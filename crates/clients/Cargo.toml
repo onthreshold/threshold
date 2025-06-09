@@ -7,5 +7,4 @@ edition = "2021"
 bitcoin = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 esplora-client = { workspace = true }
-node = { path = "../../crates/node" }
 async-trait = "0.1.88"
