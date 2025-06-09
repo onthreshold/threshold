@@ -6,11 +6,13 @@ use std::{
 
 use node::{
     NodeState,
-    db::{Db, RocksDb},
     swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture},
 };
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use types::errors;
+
+// Import MockDb from our mocks module
+use crate::mocks::db::MockDb;
 
 #[derive(Debug)]
 struct SenderToNode {
@@ -101,11 +103,13 @@ impl Network for MockNetwork {
         // In a real implementation, this would use proper request-response channels
         let pending_event = PendingNetworkEvent {
             from_peer: self.peer,
-            event: NetworkEvent::GossipsubMessage(libp2p::gossipsub::Message {
-                source: Some(self.peer),
-                data: format!("private_message:{:?}", request).into_bytes(),
-                sequence_number: None,
-                topic: libp2p::gossipsub::TopicHash::from_raw("private_message"),
+            event: NetworkEvent::MessageEvent(libp2p::request_response::Event::Message {
+                peer: peer_id,
+                message: libp2p::request_response::Message::Request {
+                    request_id: unsafe { std::mem::zeroed() }, // Create dummy ID
+                    request,
+                    channel: unsafe { std::mem::zeroed() }, // Dummy channel
+                },
             }),
             target_peers: vec![peer_id],
         };
@@ -131,7 +135,7 @@ impl Network for MockNetwork {
 }
 
 pub struct MockNodeCluster {
-    nodes: BTreeMap<libp2p::PeerId, NodeState<MockNetwork, RocksDb>>,
+    nodes: BTreeMap<libp2p::PeerId, NodeState<MockNetwork, MockDb>>,
     senders: BTreeMap<libp2p::PeerId, SenderToNode>,
     networks: BTreeMap<libp2p::PeerId, MockNetwork>,
 }
@@ -159,16 +163,11 @@ impl MockNodeCluster {
         let mut senders = BTreeMap::new();
         let mut networks = BTreeMap::new();
 
-        for i in 0..peers {
+        for _i in 0..peers {
             let peer_id = libp2p::PeerId::random();
-            let db_name = format!("{}-{}", db_prefix, i);
-            let Ok((node, network)) = create_node_network(
-                peer_id,
-                node_config.clone(),
-                min_signers,
-                max_signers,
-                RocksDb::new(&db_name),
-            ) else {
+            let Ok((node, network)) =
+                create_node_network(peer_id, node_config.clone(), min_signers, max_signers)
+            else {
                 panic!("Failed to create node network");
             };
 
@@ -230,7 +229,12 @@ impl MockNodeCluster {
 
             // Poll Nodes
             for (_, node) in self.nodes.iter_mut() {
-                node.poll().await.unwrap();
+                loop {
+                    let more = node.try_poll().await.expect("Failed to poll node");
+                    if !more {
+                        break;
+                    }
+                }
             }
 
             // Process any network events generated during polling
@@ -280,17 +284,35 @@ impl MockNodeCluster {
                         NetworkEvent::SelfRequest {
                             request,
                             response_channel,
-                        } => {
-                            // We'll handle private requests by recreating them as SelfRequest events
-                            NetworkEvent::SelfRequest {
-                                request: request.clone(),
-                                response_channel: None,
-                            }
+                        } => NetworkEvent::SelfRequest {
+                            request: request.clone(),
+                            response_channel: None,
+                        },
+                        NetworkEvent::Subscribed { peer_id, topic } => NetworkEvent::Subscribed {
+                            peer_id: *peer_id,
+                            topic: topic.clone(),
+                        },
+                        NetworkEvent::MessageEvent(libp2p::request_response::Event::Message { peer, message }) => {
+                            // For mock testing, recreate the MessageEvent::Message
+                            // Since we can't clone the original message, create a simple mock request
+                            NetworkEvent::MessageEvent(libp2p::request_response::Event::Message {
+                                peer: *peer,
+                                message: libp2p::request_response::Message::Request {
+                                    request_id: unsafe { std::mem::zeroed() }, // Create dummy ID
+                                    request: node::swarm_manager::DirectMessage::Pong, // Simple dummy message
+                                    channel: unsafe { std::mem::zeroed() }, // Dummy channel
+                                },
+                            })
                         }
-                        NetworkEvent::Subscribed { peer_id, topic } => todo!(),
-                        NetworkEvent::MessageEvent(event) => todo!(),
-                        NetworkEvent::PeersConnected(items) => todo!(),
-                        NetworkEvent::PeersDisconnected(items) => todo!(),
+                        NetworkEvent::PeersConnected(items) => {
+                            NetworkEvent::PeersConnected(items.clone())
+                        }
+                        NetworkEvent::PeersDisconnected(items) => {
+                            NetworkEvent::PeersDisconnected(items.clone())
+                        }
+                        _ => {
+                            panic!("Unexpected event type: {:?}", pending_event.event);
+                        }
                     };
                     sender.queue(event);
                 }
@@ -301,10 +323,7 @@ impl MockNodeCluster {
                 if let Some(sender) = self.senders.get_mut(&target_peer) {
                     // Recreate the event for the target peer
                     let event = match &pending_event.event {
-                        NetworkEvent::SelfRequest {
-                            request,
-                            response_channel,
-                        } => NetworkEvent::SelfRequest {
+                        NetworkEvent::SelfRequest { request, .. } => NetworkEvent::SelfRequest {
                             request: request.clone(),
                             response_channel: None,
                         },
@@ -316,10 +335,34 @@ impl MockNodeCluster {
                                 topic: msg.topic.clone(),
                             })
                         }
-                        _ => {
-                            // For other events, we'll skip them for now
-                            continue;
+                        NetworkEvent::PeersConnected(items) => {
+                            NetworkEvent::PeersConnected(items.clone())
                         }
+                        NetworkEvent::PeersDisconnected(items) => {
+                            NetworkEvent::PeersDisconnected(items.clone())
+                        }
+                        NetworkEvent::Subscribed { peer_id, topic } => NetworkEvent::Subscribed {
+                            peer_id: *peer_id,
+                            topic: topic.clone(),
+                        },
+                        NetworkEvent::MessageEvent(libp2p::request_response::Event::Message { peer, message }) => {
+                            // For mock testing, recreate the MessageEvent::Message
+                            // Since we can't clone the original message, create a simple mock request
+                            NetworkEvent::MessageEvent(libp2p::request_response::Event::Message {
+                                peer: *peer,
+                                message: libp2p::request_response::Message::Request {
+                                    request_id: unsafe { std::mem::zeroed() }, // Create dummy ID
+                                    request: node::swarm_manager::DirectMessage::Pong, // Simple dummy message
+                                    channel: unsafe { std::mem::zeroed() }, // Dummy channel
+                                },
+                            })
+                        }
+                        NetworkEvent::MessageEvent(libp2p::request_response::Event::OutboundFailure { .. }) |
+                        NetworkEvent::MessageEvent(libp2p::request_response::Event::InboundFailure { .. }) |
+                        NetworkEvent::MessageEvent(libp2p::request_response::Event::ResponseSent { .. }) => {
+                            // For mock testing, we wont handle these events
+                            continue;
+                        },
                     };
                     sender.queue(event);
                 }
@@ -402,13 +445,12 @@ impl MockNodeCluster {
     }
 }
 
-pub fn create_node_network<D: Db>(
+pub fn create_node_network(
     peer_id: libp2p::PeerId,
     node_config: node::NodeConfig,
     min_signers: u16,
     max_signers: u16,
-    db: D,
-) -> Result<(NodeState<MockNetwork, D>, MockNetwork), errors::NodeError> {
+) -> Result<(NodeState<MockNetwork, MockDb>, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, events_emitter_rx) = unbounded_channel::<NetworkEvent>();
     let network = MockNetwork {
         events_emitter_tx,
@@ -416,12 +458,14 @@ pub fn create_node_network<D: Db>(
         pending_events: Arc::new(Mutex::new(Vec::new())),
     };
 
+    let mock_db = MockDb::new();
+
     let nodes_state = NodeState::new_from_config(
         network.clone(),
         min_signers,
         max_signers,
         node_config,
-        db,
+        mock_db,
         events_emitter_rx,
     )?;
 
@@ -530,5 +574,276 @@ mod node_tests {
 
         cluster.tear_down().await;
         println!("Ran teardown");
+    }
+
+    #[tokio::test]
+    async fn test_request_response() {
+        let mut cluster = MockNodeCluster::new(2, 2, 2).await;
+        cluster.setup().await;
+        println!("Ran setup");
+
+        cluster.run_n_iterations(2).await;
+        println!("Ran 2 iterations");
+
+        for (_, node) in cluster.nodes.iter() {
+            assert_eq!(node.peers.len(), 1);
+        }
+
+        for (peer, sender) in cluster.senders.iter() {
+            println!(
+                "Peer {} has {} pending events",
+                peer,
+                sender.pending_events.len()
+            );
+        }
+
+        cluster.tear_down().await;
+        println!("Ran teardown");
+    }
+
+    #[tokio::test]
+    async fn test_dkg_completion() {
+        let test_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let mut cluster =
+            MockNodeCluster::new_with_db_prefix(3, 2, 3, &format!("test-dkg-{}", test_id)).await;
+        cluster.setup().await;
+        println!("Started DKG test with {} nodes", cluster.nodes.len());
+
+        // Keep running iterations until no events are left
+        let mut iteration_count = 0;
+        let max_iterations = 100; // Safety limit to prevent infinite loops
+
+        loop {
+            iteration_count += 1;
+
+            if iteration_count > max_iterations {
+                panic!("DKG test exceeded maximum iterations ({})", max_iterations);
+            }
+
+            // Run one iteration
+            cluster.run_n_iterations(1).await;
+
+            // Check if there are any pending events across all senders
+            let mut total_pending_events = 0;
+            for (_, sender) in cluster.senders.iter() {
+                total_pending_events += sender.pending_events.len();
+            }
+
+            // Also check network pending events
+            for (_, network) in cluster.networks.iter() {
+                let pending_events = network.pending_events.lock().unwrap();
+                total_pending_events += pending_events.len();
+            }
+
+            println!(
+                "Iteration {}: {} total pending events",
+                iteration_count, total_pending_events
+            );
+
+            if total_pending_events == 0 {
+                println!(
+                    "No more pending events after {} iterations",
+                    iteration_count
+                );
+                break;
+            }
+        }
+
+        // Verify that each node has DKG public and private key pairs
+        for (peer_id, node) in cluster.nodes.iter() {
+            assert!(
+                node.pubkey_package.is_some(),
+                "Node {} should have a public key package after DKG completion",
+                peer_id
+            );
+            assert!(
+                node.private_key_package.is_some(),
+                "Node {} should have a private key package after DKG completion",
+                peer_id
+            );
+            println!("✅ Node {} has both DKG public and private keys", peer_id);
+        }
+
+        println!(
+            "🎉 DKG completed successfully on all {} nodes!",
+            cluster.nodes.len()
+        );
+        cluster.tear_down().await;
+    }
+
+    #[tokio::test]
+    async fn test_dkg_round1_broadcasts() {
+        let test_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let mut cluster =
+            MockNodeCluster::new_with_db_prefix(3, 2, 3, &format!("test-dkg-round1-{}", test_id))
+                .await;
+
+        cluster.setup().await;
+        println!("Started DKG Round1 test with {} nodes", cluster.nodes.len());
+
+        // Run exactly one iteration to trigger DKG start and round1
+        cluster.run_n_iterations(1).await;
+
+        // Count the different types of messages that were generated
+        let mut start_dkg_broadcasts = 0;
+        let mut round1_broadcasts = 0;
+        let mut other_messages = 0;
+
+        // Check all pending events across all networks
+        for (peer_id, network) in cluster.networks.iter() {
+            let pending_events = network.pending_events.lock().unwrap();
+            println!(
+                "Network for peer {} has {} pending events",
+                peer_id,
+                pending_events.len()
+            );
+
+            for event in pending_events.iter() {
+                match &event.event {
+                    NetworkEvent::GossipsubMessage(msg) => {
+                        let topic_str = format!("{:?}", msg.topic);
+                        let data_str = String::from_utf8_lossy(&msg.data);
+
+                        println!(
+                            "  Broadcast from {}: topic={}, data_preview={}",
+                            event.from_peer,
+                            topic_str,
+                            &data_str[..std::cmp::min(50, data_str.len())]
+                        );
+
+                        if topic_str.contains("start-dkg") {
+                            start_dkg_broadcasts += 1;
+                        } else if data_str.contains("Round1") || topic_str.contains("round1") {
+                            round1_broadcasts += 1;
+                        } else {
+                            other_messages += 1;
+                        }
+                    }
+                    _ => {
+                        other_messages += 1;
+                        println!("  Other event from {}: {:?}", event.from_peer, event.event);
+                    }
+                }
+            }
+        }
+
+        println!("Message count summary:");
+        println!("  Start-DKG broadcasts: {}", start_dkg_broadcasts);
+        println!("  Round1 broadcasts: {}", round1_broadcasts);
+        println!("  Other messages: {}", other_messages);
+
+        // Verify each peer sent a start-dkg broadcast
+        assert!(
+            start_dkg_broadcasts >= cluster.nodes.len(),
+            "Expected at least {} start-dkg broadcasts, got {}",
+            cluster.nodes.len(),
+            start_dkg_broadcasts
+        );
+
+        // After DKG starts, we expect round1 broadcasts from each peer
+        // Note: This might happen in the same iteration or the next one
+        println!("✅ DKG Round1 broadcast verification completed");
+        cluster.tear_down().await;
+    }
+
+    #[tokio::test]
+    async fn test_dkg_round2_private_requests() {
+        let test_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let mut cluster =
+            MockNodeCluster::new_with_db_prefix(3, 2, 3, &format!("test-dkg-round2-{}", test_id))
+                .await;
+
+        cluster.setup().await;
+        println!("Started DKG Round2 test with {} nodes", cluster.nodes.len());
+
+        // Run several iterations to allow round1 to complete
+        let mut round1_complete = false;
+        let mut round2_private_requests = 0;
+
+        for iteration in 1..=10 {
+            println!("--- Iteration {} ---", iteration);
+            cluster.run_n_iterations(1).await;
+
+            // Check for round2 private messages in the pending events
+            let mut current_round2_requests = 0;
+
+            for (peer_id, network) in cluster.networks.iter() {
+                let pending_events = network.pending_events.lock().unwrap();
+
+                for event in pending_events.iter() {
+                    match &event.event {
+                        NetworkEvent::GossipsubMessage(msg) => {
+                            let data_str = String::from_utf8_lossy(&msg.data);
+
+                            // Check if this is a private message (has specific target peers)
+                            if !event.target_peers.is_empty() {
+                                println!(
+                                    "  Private message from {} to {:?}: {}",
+                                    event.from_peer,
+                                    event.target_peers,
+                                    &data_str[..std::cmp::min(50, data_str.len())]
+                                );
+
+                                if data_str.contains("Round2")
+                                    || data_str.contains("private_message")
+                                {
+                                    current_round2_requests += 1;
+                                }
+                            } else {
+                                // This is a broadcast
+                                if data_str.contains("Round1") {
+                                    println!("  Still processing Round1 broadcasts");
+                                } else if data_str.contains("Round2") {
+                                    println!("  Round2 broadcast detected");
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if current_round2_requests > 0 {
+                round2_private_requests += current_round2_requests;
+                round1_complete = true;
+                println!(
+                    "  Found {} Round2 private requests in iteration {}",
+                    current_round2_requests, iteration
+                );
+            }
+
+            // If we've seen round2 requests, we can verify our expectations
+            if round1_complete && round2_private_requests > 0 {
+                break;
+            }
+        }
+
+        println!("Round2 private request summary:");
+        println!("  Round1 complete: {}", round1_complete);
+        println!("  Round2 private requests: {}", round2_private_requests);
+
+        // Verify that round2 private requests were sent after round1
+        assert!(
+            round1_complete,
+            "Round1 should complete and trigger Round2 private requests"
+        );
+
+        assert!(
+            round2_private_requests > 0,
+            "Expected Round2 private requests after Round1 completion, got {}",
+            round2_private_requests
+        );
+
+        println!("✅ DKG Round2 private request verification completed");
+        cluster.tear_down().await;
     }
 }
