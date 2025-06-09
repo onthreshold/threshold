@@ -44,9 +44,6 @@ impl<N: Network, D: Db> NodeState<N, D> {
                 request,
                 response_channel,
             }) => match request {
-                SelfRequest::InsertBlock { block } => {
-                    self.db.insert_block(block)?;
-                }
                 SelfRequest::GetFrostPublicKey => {
                     let response = self.get_frost_public_key();
                     if let Some(response_channel) = response_channel {
