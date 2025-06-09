@@ -258,7 +258,6 @@ impl DkgState {
             self.round2_peer_packages.len(),
             node.max_signers - 1
         );
-
         if let Some(r2_secret_package) = self.r2_secret_package.as_ref() {
             if self.round2_peer_packages.len() + 1 == node.max_signers as usize {
                 info!("Received all round2 packages, entering part3");
