@@ -4,7 +4,7 @@ use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::{Network, NetworkEvent};
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::broadcast;
 use tracing::error;
 use types::errors::NodeError;
 
@@ -150,7 +150,7 @@ pub struct NodeState<N: Network, D: Db> {
 
     pub network_handle: N,
 
-    pub network_events_stream: UnboundedReceiver<NetworkEvent>,
+    pub network_events_stream: broadcast::Receiver<NetworkEvent>,
 }
 
 impl<N: Network, D: Db> NodeState<N, D> {
@@ -160,7 +160,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
         max_signers: u16,
         config: NodeConfig,
         storage_db: D,
-        network_events_emitter: UnboundedReceiver<NetworkEvent>,
+        network_events_sender: broadcast::Sender<NetworkEvent>,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
@@ -169,7 +169,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
 
         let mut node_state = NodeState {
             network_handle: network_handle.clone(),
-            network_events_stream: network_events_emitter,
+            network_events_stream: network_events_sender.subscribe(),
             peer_id: network_handle.peer_id(),
             min_signers,
             max_signers,

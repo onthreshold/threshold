@@ -17,7 +17,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
     }
 
     pub async fn poll(&mut self) -> Result<(), NodeError> {
-        let send_message = self.network_events_stream.recv().await;
+        let send_message = self.network_events_stream.recv().await.ok();
         self.handle(send_message).await
     }
 

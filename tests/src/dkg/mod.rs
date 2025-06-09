@@ -93,7 +93,6 @@ mod dkg_test {
         cluster.tear_down().await;
     }
 
-    #[ignore = "This test does not work due to PrivateMessage refactor being needed"]
     #[tokio::test]
     async fn test_dkg_round2_private_requests() {
         let mut cluster = MockNodeCluster::new(3, 2, 3).await;
@@ -178,7 +177,6 @@ mod dkg_test {
         cluster.tear_down().await;
     }
 
-    #[ignore = "This test does not work due to PrivateMessage refactor being needed"]
     #[tokio::test]
     async fn test_dkg_completion() {
         let mut cluster = MockNodeCluster::new(3, 2, 3).await;

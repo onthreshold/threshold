@@ -81,7 +81,7 @@ pub async fn start_node(
 
     let allowed_peers = config.allowed_peers.clone();
 
-    let (network_handle, mut swarm, network_events_stream) =
+    let (network_handle, mut swarm) =
         build_swarm(keypair.clone(), allowed_peers.clone()).expect("Failed to build swarm");
 
     let mut node_state = NodeState::new_from_config(
@@ -90,7 +90,7 @@ pub async fn start_node(
         max_signers,
         config,
         RocksDb::new("nodedb.db"),
-        network_events_stream,
+        swarm.network_events.clone(),
     )
     .expect("Failed to create node");
 
