@@ -61,7 +61,6 @@ pub enum DirectMessage {
 pub enum SelfRequest {
     GetFrostPublicKey,
     StartSigningSession { hex_message: String },
-    InsertBlock { block: Block },
     Spend { amount_sat: u64 },
 }
 
