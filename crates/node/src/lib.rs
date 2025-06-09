@@ -8,13 +8,9 @@ use argon2::{
     },
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use bitcoin::{Address, Network as BitcoinNetwork};
-use clients::{EsploraApiClient, WindowedConfirmedTransactionProvider};
-use esplora_client::Builder;
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::{PeerId, identity::Keypair};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::{Network, NetworkEvent};
 use tokio::sync::broadcast;
@@ -205,6 +201,10 @@ pub struct NodeState<N: Network, D: Db> {
     pub network_handle: N,
 
     pub network_events_stream: broadcast::Receiver<NetworkEvent>,
+
+    // track deposits and then send new addresses over a channel to the polling thread
+    pub deposit_addresses: HashSet<String>,
+    pub deposit_intent_tx: broadcast::Sender<String>,
 }
 
 impl<N: Network, D: Db> NodeState<N, D> {
@@ -215,6 +215,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
         config: NodeConfig,
         storage_db: D,
         network_events_sender: broadcast::Sender<NetworkEvent>,
+        deposit_intent_tx: broadcast::Sender<String>,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
@@ -235,6 +236,8 @@ impl<N: Network, D: Db> NodeState<N, D> {
             handlers: vec![Box::new(dkg_state), Box::new(signing_state)],
             pubkey_package: None,
             private_key_package: None,
+            deposit_addresses: HashSet::new(),
+            deposit_intent_tx,
         };
 
         if let Some((private_key, pubkey)) = keys {
@@ -251,28 +254,17 @@ impl<N: Network, D: Db> NodeState<N, D> {
     ) -> Result<(), NodeError> {
         self.db.insert_deposit_intent(deposit_intent.clone())?;
 
-        self.listen_for_deposit_intents(deposit_intent.deposit_address)?;
-
-        Ok(())
-    }
-
-    pub fn listen_for_deposit_intents(&mut self, deposit_address: String) -> Result<(), NodeError> {
-        let address = Address::from_str(&deposit_address)
-            .map_err(|e| NodeError::Error(format!("Failed to parse deposit address: {}", e)))?;
-
-        let address = address
-            .require_network(BitcoinNetwork::Bitcoin)
-            .map_err(|e| NodeError::Error(format!("Invalid Bitcoin network for address: {}", e)))?;
-
-        tokio::spawn(async move {
-            let client = EsploraApiClient::new(
-                Builder::new("https://blockstream.info/api")
-                    .build_async()
-                    .unwrap(),
-                100,
-            );
-            client.poll_new_transactions(address).await;
-        });
+        if self
+            .deposit_addresses
+            .insert(deposit_intent.deposit_address.clone())
+        {
+            if let Err(e) = self
+                .deposit_intent_tx
+                .send(deposit_intent.deposit_address.clone())
+            {
+                error!("Failed to notify deposit monitor of new address: {}", e);
+            }
+        }
 
         Ok(())
     }

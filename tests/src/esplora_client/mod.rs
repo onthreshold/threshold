@@ -18,7 +18,7 @@ mod esplora_client_test {
             .require_network(Network::Bitcoin)
             .unwrap();
         let transactions = client
-            .get_confirmed_transactions(address.clone(), 899900, 899930)
+            .get_confirmed_transactions(vec![address.clone()], 899900, 899930)
             .await
             .unwrap();
 
