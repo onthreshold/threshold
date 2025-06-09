@@ -40,23 +40,18 @@ impl<N: Network, D: Db> NodeState<N, D> {
 
         match send_message {
             Some(NetworkEvent::SelfRequest {
-                request,
+                request: SelfRequest::GetFrostPublicKey,
                 response_channel,
-            }) => match request {
-                SelfRequest::GetFrostPublicKey => {
-                    let response = self.get_frost_public_key();
-                    if let Some(response_channel) = response_channel {
-                        response_channel
-                            .send(SelfResponse::GetFrostPublicKeyResponse {
-                                public_key: response,
-                            })
-                            .map_err(|e| {
-                                NodeError::Error(format!("Failed to send response: {}", e))
-                            })?;
-                    }
+            }) => {
+                let response = self.get_frost_public_key();
+                if let Some(response_channel) = response_channel {
+                    response_channel
+                        .send(SelfResponse::GetFrostPublicKeyResponse {
+                            public_key: response,
+                        })
+                        .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
                 }
-                _ => {}
-            },
+            }
             Some(NetworkEvent::PeersConnected(list)) => {
                 for (peer_id, _multiaddr) in list {
                     self.peers.insert(peer_id);

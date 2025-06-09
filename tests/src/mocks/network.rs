@@ -74,7 +74,6 @@ impl Network for MockNetwork {
         topic: libp2p::gossipsub::IdentTopic,
         message: Vec<u8>,
     ) -> Result<(), errors::NetworkError> {
-        println!("sent broadcast {}", topic);
         let gossip_message = libp2p::gossipsub::Message {
             source: Some(self.peer),
             data: message,
@@ -98,12 +97,11 @@ impl Network for MockNetwork {
         peer_id: libp2p::PeerId,
         request: node::swarm_manager::DirectMessage,
     ) -> Result<(), errors::NetworkError> {
-        println!("sent private message to {} {:?}", peer_id, request);
         // For mock purposes, we'll create a simplified message event
         // In a real implementation, this would use proper request-response channels
         let pending_event = PendingNetworkEvent {
             from_peer: self.peer,
-            event: NetworkEvent::MessageEvent((peer_id, request)),
+            event: NetworkEvent::MessageEvent((self.peer_id(), request)),
             target_peers: vec![peer_id],
         };
 
@@ -142,7 +140,8 @@ impl MockNodeCluster {
         let mut config_path = PathBuf::new();
         config_path.push("config.toml");
 
-        let node_config = node::NodeConfig::new(path.clone(), config_path, None);
+        let node_config = node::NodeConfig::new(path.clone(), config_path, None, "test-password")
+            .expect("Failed to create node config");
 
         let mut nodes = BTreeMap::new();
         let mut senders = BTreeMap::new();
@@ -172,6 +171,12 @@ impl MockNodeCluster {
     }
 
     pub async fn setup(&mut self) {
+        // Set environment variable for testing
+        #[allow(clippy::missing_safety_doc)]
+        unsafe {
+            std::env::set_var("KEY_PASSWORD", "test-password");
+        }
+
         let peers: Vec<libp2p::PeerId> = self.nodes.keys().cloned().collect();
         for (receipient_peer, sender) in self.senders.iter_mut() {
             sender.queue(NetworkEvent::PeersConnected(

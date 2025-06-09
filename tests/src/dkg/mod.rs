@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod dkg_test {
     use crate::mocks::network::MockNodeCluster;
+    use node::swarm_manager::DirectMessage;
     use node::swarm_manager::NetworkEvent;
 
     #[tokio::test]
@@ -111,32 +112,27 @@ mod dkg_test {
             // Check for round2 private messages in the pending events
             let mut current_round2_requests = 0;
 
-            for (_, network) in cluster.networks.iter() {
-                let pending_events = network.pending_events.lock().unwrap();
-
+            for (_, sender) in cluster.senders.iter() {
+                let pending_events = &sender.pending_events;
+                println!("  {} pending events", pending_events.len());
                 for event in pending_events.iter() {
-                    if let NetworkEvent::GossipsubMessage(msg) = &event.event {
-                        let data_str = String::from_utf8_lossy(&msg.data);
-
-                        // Check if this is a private message (has specific target peers)
-                        if !event.target_peers.is_empty() {
-                            println!(
-                                "  Private message from {} to {:?}: {}",
-                                event.from_peer,
-                                event.target_peers,
-                                &data_str[..std::cmp::min(50, data_str.len())]
-                            );
-
-                            if data_str.contains("Round2") || data_str.contains("private_message") {
-                                current_round2_requests += 1;
-                            }
-                        } else {
+                    match &event {
+                        NetworkEvent::GossipsubMessage(msg) => {
+                            let data_str = String::from_utf8_lossy(&msg.data);
                             // This is a broadcast
                             if data_str.contains("Round1") {
                                 println!("  Still processing Round1 broadcasts");
-                            } else if data_str.contains("Round2") {
-                                println!("  Round2 broadcast detected");
                             }
+                        }
+                        NetworkEvent::MessageEvent((_, direct_message)) => {
+                            println!("  Found MessageEvent");
+                            if let DirectMessage::Round2Package(_) = direct_message {
+                                println!("  Found Round2 private request");
+                                current_round2_requests += 1;
+                            }
+                        }
+                        _ => {
+                            println!("  Other event: {:?}", event);
                         }
                     }
                 }

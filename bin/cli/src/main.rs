@@ -277,7 +277,9 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
         paths.key_file_path.clone(),
         paths.config_file_path.clone(),
         get_log_file_path().ok(),
-    );
+        &user_password,
+    )
+    .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
     config.set_key_data(key_data);
 

@@ -1,6 +1,15 @@
 use crate::{db::Db, dkg::DkgState, handler::Handler, signing::SigningState};
+use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
+use argon2::{
+    Argon2,
+    password_hash::{
+        SaltString,
+        rand_core::{OsRng, RngCore},
+    },
+};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use frost_secp256k1::{self as frost, Identifier};
-use libp2p::PeerId;
+use libp2p::{PeerId, identity::Keypair};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::{Network, NetworkEvent};
@@ -76,23 +85,64 @@ impl NodeConfig {
         key_file_path: PathBuf,
         config_file_path: PathBuf,
         log_file_path: Option<PathBuf>,
-    ) -> Self {
-        NodeConfig {
-            allowed_peers: Vec::new(),
-            key_data: KeyData {
-                public_key_b58: String::new(),
-                encrypted_private_key_b64: String::new(),
-                encryption_params: EncryptionParams {
-                    kdf: String::new(),
-                    salt_b64: String::new(),
-                    iv_b64: String::new(),
-                },
+        password: &str,
+    ) -> Result<Self, NodeError> {
+        // Generate a new keypair
+        let keypair = Keypair::generate_ed25519();
+        let public_key_b58 = keypair.public().to_peer_id().to_base58();
+
+        // Generate salt for encryption
+        let salt = SaltString::generate(&mut OsRng);
+        let salt_b64 = salt.to_string();
+
+        // Derive encryption key from password
+        let argon2 = Argon2::default();
+        let mut key_bytes = vec![0u8; 32];
+        argon2
+            .hash_password_into(
+                password.as_bytes(),
+                salt.as_str().as_bytes(),
+                &mut key_bytes,
+            )
+            .map_err(|e| NodeError::Error(format!("Argon2 key derivation failed: {}", e)))?;
+
+        // Generate random IV for AES encryption
+        let mut iv = [0u8; 12];
+        frost::rand_core::OsRng.fill_bytes(&mut iv);
+        let nonce = Nonce::from_slice(&iv);
+
+        // Get private key bytes
+        let private_key_bytes = keypair
+            .to_protobuf_encoding()
+            .map_err(|e| NodeError::Error(format!("Failed to encode private key: {}", e)))?;
+
+        // Encrypt the private key
+        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key_bytes));
+        let ciphertext = cipher
+            .encrypt(nonce, private_key_bytes.as_ref())
+            .map_err(|e| NodeError::Error(format!("AES encryption failed: {}", e)))?;
+
+        let encrypted_private_key_b64 = BASE64.encode(ciphertext);
+        let iv_b64 = BASE64.encode(iv);
+
+        let key_data = KeyData {
+            public_key_b58,
+            encrypted_private_key_b64,
+            encryption_params: EncryptionParams {
+                kdf: "argon2id".to_string(),
+                salt_b64,
+                iv_b64,
             },
+        };
+
+        Ok(NodeConfig {
+            allowed_peers: Vec::new(),
+            key_data,
             dkg_keys: None,
             log_file_path,
             key_file_path,
             config_file_path,
-        }
+        })
     }
 
     pub fn save_to_file(&self) -> Result<(), NodeError> {
