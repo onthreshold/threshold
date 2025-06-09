@@ -235,8 +235,10 @@ impl<N: Network, D: Db> NodeState<N, D> {
         // Load existing config or create new one
         // Update DKG keys if they exist
 
-        let password = get_password_from_prompt()
-            .map_err(|e| NodeError::Error(format!("Failed to get password for DKG: {}", e)))?;
+        let password = match std::env::var("KEY_PASSWORD") {
+            Ok(pw) => pw,
+            Err(_) => get_password_from_prompt()?,
+        };
 
         // Serialize private key to bytes
         let private_key_bytes = private_key

@@ -7,8 +7,30 @@ use crate::{Network, NodeState};
 use types::errors::NodeError;
 
 impl<N: Network, D: Db> NodeState<N, D> {
+    pub async fn try_poll(&mut self) -> Result<bool, NodeError> {
+        let send_message = self.network_events_stream.try_recv().ok();
+        if let Some(event) = send_message {
+            self.handle(Some(event)).await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     pub async fn poll(&mut self) -> Result<(), NodeError> {
         let send_message = self.network_events_stream.recv().await;
+        self.handle(send_message).await
+    }
+
+    pub async fn start(&mut self) -> Result<(), NodeError> {
+        info!("Local peer id: {}", self.peer_id);
+
+        loop {
+            self.poll().await?
+        }
+    }
+
+    pub async fn handle(&mut self, send_message: Option<NetworkEvent>) -> Result<(), NodeError> {
         for handler in self.handlers.iter_mut() {
             let handler_message = send_message.as_ref().map(|event| event.into());
             handler
@@ -129,15 +151,6 @@ impl<N: Network, D: Db> NodeState<N, D> {
             },
             _ => {}
         }
-
         Ok(())
-    }
-
-    pub async fn start(&mut self) -> Result<(), NodeError> {
-        info!("Local peer id: {}", self.peer_id);
-
-        loop {
-            self.poll().await?
-        }
     }
 }
