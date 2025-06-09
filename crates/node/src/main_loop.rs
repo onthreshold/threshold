@@ -33,8 +33,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
         let mut handlers = std::mem::take(&mut self.handlers);
 
         for handler in handlers.iter_mut() {
-            let handler_message = send_message.as_ref().map(|event| event.into());
-            handler.handle(self, handler_message).await?;
+            handler.handle(self, send_message.clone()).await?;
         }
 
         self.handlers = handlers;

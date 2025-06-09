@@ -26,7 +26,6 @@ use tokio::{
 };
 
 use crate::PeerData;
-use protocol::block::Block;
 use types::errors::{NetworkError, NodeError};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -181,27 +180,8 @@ impl Network for NetworkHandle {
     }
 }
 
-#[derive(Debug)]
-pub enum NetworkEvent {
-    // SwarmEvent(SwarmEvent<MyBehaviourEvent>),
-    // NetworkMessage(NetworkMessage),
-    SelfRequest {
-        request: SelfRequest,
-        response_channel: Option<mpsc::UnboundedSender<SelfResponse>>,
-    },
-    Subscribed {
-        peer_id: PeerId,
-        topic: gossipsub::TopicHash,
-    },
-    GossipsubMessage(gossipsub::Message),
-    MessageEvent(request_response::Event<DirectMessage, ()>),
-
-    PeersConnected(Vec<(PeerId, Multiaddr)>),
-    PeersDisconnected(Vec<(PeerId, Multiaddr)>),
-}
-
 #[derive(Debug, Clone)]
-pub enum HandlerMessage {
+pub enum NetworkEvent {
     SelfRequest {
         request: SelfRequest,
         response_channel: Option<mpsc::UnboundedSender<SelfResponse>>,
@@ -215,63 +195,6 @@ pub enum HandlerMessage {
     PeersConnected(Vec<(PeerId, Multiaddr)>),
     PeersDisconnected(Vec<(PeerId, Multiaddr)>),
     Unknown,
-}
-
-impl From<&NetworkEvent> for HandlerMessage {
-    fn from(event: &NetworkEvent) -> Self {
-        match event {
-            NetworkEvent::SelfRequest {
-                request,
-                response_channel,
-            } => HandlerMessage::SelfRequest {
-                request: request.clone(),
-                response_channel: response_channel.clone(),
-            },
-            NetworkEvent::Subscribed { peer_id, topic } => HandlerMessage::Subscribed {
-                peer_id: *peer_id,
-                topic: topic.clone(),
-            },
-            NetworkEvent::GossipsubMessage(message) => {
-                HandlerMessage::GossipsubMessage(message.clone())
-            }
-            NetworkEvent::MessageEvent(Event::Message {
-                peer,
-                message: Message::Request { request, .. },
-                ..
-            }) => HandlerMessage::MessageEvent((*peer, request.clone())),
-            NetworkEvent::PeersConnected(peers) => HandlerMessage::PeersConnected(peers.clone()),
-            NetworkEvent::PeersDisconnected(peers) => {
-                HandlerMessage::PeersDisconnected(peers.clone())
-            }
-            _ => HandlerMessage::Unknown,
-        }
-    }
-}
-
-impl From<NetworkEvent> for HandlerMessage {
-    fn from(event: NetworkEvent) -> Self {
-        match event {
-            NetworkEvent::SelfRequest {
-                request,
-                response_channel,
-            } => HandlerMessage::SelfRequest {
-                request,
-                response_channel,
-            },
-            NetworkEvent::Subscribed { peer_id, topic } => {
-                HandlerMessage::Subscribed { peer_id, topic }
-            }
-            NetworkEvent::GossipsubMessage(message) => HandlerMessage::GossipsubMessage(message),
-            NetworkEvent::MessageEvent(Event::Message {
-                peer,
-                message: Message::Request { request, .. },
-                ..
-            }) => HandlerMessage::MessageEvent((peer, request)),
-            NetworkEvent::PeersConnected(peers) => HandlerMessage::PeersConnected(peers),
-            NetworkEvent::PeersDisconnected(peers) => HandlerMessage::PeersDisconnected(peers),
-            _ => HandlerMessage::Unknown,
-        }
-    }
 }
 
 pub struct SwarmManager {
@@ -404,8 +327,12 @@ impl SwarmManager {
                         })) => {
                             self.network_events.send(NetworkEvent::GossipsubMessage(message.clone())).unwrap();
                         },
-                        SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(message) ) => {
-                            self.network_events.send(NetworkEvent::MessageEvent(message)).unwrap();
+                        SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(Event::Message {
+                            peer,
+                            message: Message::Request { request, .. },
+                            ..
+                        }) ) => {
+                            self.network_events.send(NetworkEvent::MessageEvent((peer, request))).unwrap();
                         },
                         SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed { peer_id, topic })) => {
                             self.network_events.send(NetworkEvent::Subscribed { peer_id, topic }).unwrap();
