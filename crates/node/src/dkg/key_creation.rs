@@ -52,7 +52,6 @@ impl DkgState {
         &mut self,
         network_handle: &impl Network,
     ) -> Result<(), NodeError> {
-        println!("handle_dkg_start");
         if self.dkg_started {
             debug!("DKG already started, skipping DKG process");
             return Ok(());
@@ -61,7 +60,6 @@ impl DkgState {
         // Check if DKG keys already exist
         if self.dkg_completed {
             info!("DKG keys already exist, skipping DKG process");
-            println!("DKG keys already exist, skipping DKG process");
             return Ok(());
         }
 
@@ -72,7 +70,6 @@ impl DkgState {
             );
             return Ok(());
         }
-        println!("Starting now");
 
         info!("Starting DKG process");
 
@@ -139,7 +136,6 @@ impl DkgState {
         sender_peer_id: PeerId,
         package: &[u8],
     ) -> Result<(), NodeError> {
-        println!("handle_round1_payload");
         let identifier = peer_id_to_identifier(&sender_peer_id);
         let package = match frost::keys::dkg::round1::Package::deserialize(package) {
             Ok(package) => package,
@@ -153,10 +149,6 @@ impl DkgState {
         // Add package to peer packages
         self.round1_peer_packages.insert(identifier, package);
 
-        println!(
-            "self.round1_peer_packages.len(): {}",
-            self.round1_peer_packages.len()
-        );
         debug!(
             "Received round1 package from {} ({}/{})",
             sender_peer_id,
@@ -170,7 +162,6 @@ impl DkgState {
     }
 
     pub fn try_enter_round2(&mut self, network_handle: &impl Network) -> Result<(), NodeError> {
-        println!("try_enter_round2");
         if let Some(r1_secret_package) = self.r1_secret_package.as_ref() {
             if self.round1_peer_packages.len() + 1 == self.max_signers as usize {
                 info!("Received all round1 packages, entering part2");
@@ -180,7 +171,6 @@ impl DkgState {
                 match part2_result {
                     Ok((round2_secret_package, round2_packages)) => {
                         info!("-------------------- ENTERING ROUND 2 ---------------------");
-                        println!("-------------------- ENTERING ROUND 2 --------------------- {:?}", self.peer_id);
                         self.r1_secret_package = None;
                         self.r2_secret_package = Some(round2_secret_package);
 
@@ -201,8 +191,10 @@ impl DkgState {
 
                             match network_handle.send_private_message(*peer_to_send_to, request) {
                                 Ok(_) => {
-                                    debug!("{} Sent round2 package to {}", self.peer_id, peer_to_send_to);
-                                    println!("{} Sent round2 package to {}", self.peer_id, peer_to_send_to);
+                                    debug!(
+                                        "{} Sent round2 package to {}",
+                                        self.peer_id, peer_to_send_to
+                                    );
                                 }
                                 Err(e) => {
                                     error!("Round2 package not found for {}", peer_to_send_to);
@@ -232,7 +224,6 @@ impl DkgState {
         sender_peer_id: PeerId,
         package: round2::Package,
     ) -> Result<(), NodeError> {
-        println!("handle_round2_payload");
         let identifier = peer_id_to_identifier(&sender_peer_id);
 
         match network_handle.send_private_message(sender_peer_id, DirectMessage::Pong) {
@@ -267,10 +258,6 @@ impl DkgState {
                 match part3_result {
                     Ok((private_key_package, pubkey_package)) => {
                         info!(
-                            "🎉 DKG finished successfully. Public key: {:?}",
-                            pubkey_package.verifying_key()
-                        );
-                        println!(
                             "🎉 DKG finished successfully. Public key: {:?}",
                             pubkey_package.verifying_key()
                         );
