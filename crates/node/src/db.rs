@@ -1,10 +1,21 @@
 use rocksdb::DB;
+use serde::{Serialize, Deserialize};
+use bincode::{Encode, Decode};
 
 use protocol::{
     block::{Block, BlockHash},
     chain_state::ChainState,
 };
 use types::errors::NodeError;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
+pub struct DepositIntent {
+    pub user_id: String,
+    pub amount_sat: u64,
+    pub deposit_tracking_id: String,
+    pub deposit_address: String,
+    pub timestamp: u64,
+}
 
 pub trait Db: Send {
     fn get_block_by_height(&self, height: u64) -> Result<Option<Block>, NodeError>;
@@ -13,6 +24,8 @@ pub trait Db: Send {
     fn get_chain_state(&self) -> Result<Option<ChainState>, NodeError>;
     fn insert_chain_state(&mut self, chain_state: ChainState) -> Result<(), NodeError>;
     fn insert_block(&mut self, block: Block) -> Result<(), NodeError>;
+    fn insert_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError>;
+    fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError>;
 }
 
 pub struct RocksDb {
@@ -21,7 +34,13 @@ pub struct RocksDb {
 
 impl RocksDb {
     pub fn new(path: &str) -> Self {
-        let db = DB::open_default(path).unwrap();
+        let mut opts = rocksdb::Options::default();
+        opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
+        
+        let cfs = vec!["deposit_intents"];
+        let db = DB::open_cf(&opts, path, cfs).unwrap();
+        
         Self { db }
     }
 }
@@ -70,5 +89,25 @@ impl Db for RocksDb {
         self.db.put("h:tip", block_hash)?;
 
         Ok(())
+    }
+
+    fn insert_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError> {
+        let key = format!("di:{}", intent.deposit_tracking_id);
+        let value = bincode::encode_to_vec(&intent, bincode::config::standard())
+            .map_err(|e| NodeError::Error(format!("Failed to serialize deposit intent: {}", e)))?;
+        
+        self.db.put_cf(self.db.cf_handle("deposit_intents").unwrap(), key, value)?;
+        Ok(())
+    }
+
+    fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError> {
+        let key = format!("di:{}", tracking_id);
+        let value = self.db.get_cf(self.db.cf_handle("deposit_intents").unwrap(), key)?;
+        
+        Ok(value.and_then(|v| {
+            bincode::decode_from_slice(&v, bincode::config::standard())
+                .ok()
+                .map(|(intent, _)| intent)
+        }))
     }
 }

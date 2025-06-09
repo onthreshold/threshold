@@ -6,12 +6,12 @@ use crate::grpc::grpc_handler::node_proto::{
 use crate::swarm_manager::{
     DirectMessage, Network, NetworkHandle, PingBody, SelfRequest, SelfResponse,
 };
+use bitcoin::Address;
 use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use tonic::{Request, Response, Status};
 use tracing::{debug, info};
 
-use bitcoin::script::Builder;
 use std::str::FromStr;
 use uuid::Uuid;
 
@@ -157,12 +157,30 @@ pub async fn create_deposit_intent(
     let public_key = bitcoin::PublicKey::from_str(&public_key)
         .map_err(|e| Status::internal(format!("Failed to parse public key: {}", e)))?;
 
-    let witness_script = Builder::new()
-        .push_key(&public_key)
-        .push_opcode(bitcoin::opcodes::all::OP_CHECKSIG)
-        .into_script();
+    let secp = bitcoin::secp256k1::Secp256k1::new();
 
-    let deposit_address = bitcoin::Address::p2wsh(&witness_script, bitcoin::Network::Testnet);
+    let internal_key = bitcoin::secp256k1::XOnlyPublicKey::from_str(&public_key.to_string())
+        .map_err(|e| Status::internal(format!("Failed to create internal key: {}", e)))?;
+    
+    let deposit_address = Address::p2tr(&secp, internal_key, None, bitcoin::Network::Bitcoin);
+
+    let deposit_intent = crate::db::DepositIntent {
+        user_id: user_id.to_string(),
+        amount_sat,
+        deposit_tracking_id: deposit_tracking_id.clone(),
+        deposit_address: deposit_address.to_string(),
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    };
+
+    let create_deposit = network
+        .send_self_request(SelfRequest::CreateDeposit { deposit_intent }, true)
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .ok_or(Status::internal("No response from node"))?
+        .await
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
     info!(
         "Received request to create deposit intent for user {} with amount {}. Tracking ID: {}. Deposit Address: {}",
