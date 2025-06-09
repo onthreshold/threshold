@@ -6,7 +6,7 @@ use protocol::{
 };
 use types::errors::NodeError;
 
-pub trait Db {
+pub trait Db: Send {
     fn get_block_by_height(&self, height: u64) -> Result<Option<Block>, NodeError>;
     fn get_block_by_hash(&self, hash: BlockHash) -> Result<Option<Block>, NodeError>;
     fn get_tip_block_hash(&self) -> Result<Option<BlockHash>, NodeError>;

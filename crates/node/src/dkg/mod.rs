@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 
 use frost_secp256k1::{
-    self as frost, Identifier,
+    Identifier,
     keys::dkg::{round1, round2},
 };
 use libp2p::PeerId;
@@ -11,11 +11,6 @@ pub mod utils;
 
 pub struct DkgState {
     pub dkg_started: bool,
-    pub dkg_completed: bool,
-    pub min_signers: u16,
-    pub max_signers: u16,
-    pub rng: frost::rand_core::OsRng,
-    pub peer_id: PeerId,
     pub dkg_listeners: HashSet<PeerId>,
 
     pub start_dkg_topic: libp2p::gossipsub::IdentTopic,
