@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use frost_secp256k1::Identifier;
 use node::{
     NodeState,
     swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture},
@@ -13,6 +14,8 @@ use types::errors;
 
 // Import MockDb from our mocks module
 use crate::mocks::db::MockDb;
+
+use crate::util::local_dkg::perform_distributed_key_generation;
 
 #[derive(Debug)]
 pub struct SenderToNode {
@@ -408,6 +411,32 @@ impl MockNodeCluster {
     // Helper method to get peer IDs for testing
     pub fn get_peer_ids(&self) -> Vec<libp2p::PeerId> {
         self.nodes.keys().cloned().collect()
+    }
+
+    pub async fn new_with_keys(peers: u32, min_signers: u16, max_signers: u16) -> Self {
+        let mut cluster = Self::new(peers, min_signers, max_signers).await;
+        let identifiers: Vec<Identifier> = cluster
+            .nodes
+            .keys()
+            .map(node::peer_id_to_identifier)
+            .collect();
+
+        // Run offline DKG once and distribute keys
+        let dkg_out =
+            perform_distributed_key_generation(identifiers, max_signers, min_signers).unwrap();
+
+        for (peer_id, node) in cluster.nodes.iter_mut() {
+            let id = node::peer_id_to_identifier(peer_id);
+            let key_pkg = dkg_out
+                .key_packages
+                .get(&id)
+                .expect("missing key package")
+                .clone();
+            node.private_key_package = Some(key_pkg);
+            node.pubkey_package = Some(dkg_out.pubkey_package.clone());
+        }
+
+        cluster
     }
 }
 
