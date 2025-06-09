@@ -169,3 +169,29 @@ pub fn load_and_decrypt_keypair(config_data: &NodeConfig) -> Result<Keypair, Nod
         ))
     })
 }
+
+pub fn load_dkg_keys(
+    config: NodeConfig,
+) -> Result<
+    Option<(frost::keys::KeyPackage, frost::keys::PublicKeyPackage)>,
+    Box<dyn std::error::Error>,
+> {
+    if let Some(dkg_keys) = config.dkg_keys {
+        let password = get_password_from_prompt()?;
+
+        let private_key_bytes = decrypt_private_key(
+            &dkg_keys.encrypted_private_key_package_b64,
+            &password,
+            &dkg_keys.dkg_encryption_params,
+        )?;
+
+        let private_key = frost::keys::KeyPackage::deserialize(&private_key_bytes)?;
+
+        let pubkey_bytes = BASE64.decode(&dkg_keys.pubkey_package_b64)?;
+        let pubkey = frost::keys::PublicKeyPackage::deserialize(&pubkey_bytes)?;
+
+        Ok(Some((private_key, pubkey)))
+    } else {
+        Ok(None)
+    }
+}

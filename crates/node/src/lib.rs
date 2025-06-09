@@ -175,7 +175,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
         storage_db: D,
         network_events_emitter: UnboundedReceiver<NetworkEvent>,
     ) -> Result<Self, NodeError> {
-        let keys = DkgState::load_dkg_keys(config.clone())
+        let keys = key_manager::load_dkg_keys(config.clone())
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
         let dkg_state = DkgState::new(
             min_signers,

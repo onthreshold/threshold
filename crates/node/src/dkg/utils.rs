@@ -1,14 +1,7 @@
-use std::collections::{BTreeMap, HashSet};
-
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use crate::dkg::DkgState;
 use frost_secp256k1::{self as frost};
 use libp2p::{PeerId, gossipsub};
-
-use crate::{
-    NodeConfig,
-    dkg::DkgState,
-    key_manager::{decrypt_private_key, get_password_from_prompt},
-};
+use std::collections::{BTreeMap, HashSet};
 use types::errors::NodeError;
 
 impl DkgState {
@@ -33,34 +26,5 @@ impl DkgState {
             dkg_started: false,
             dkg_completed,
         })
-    }
-
-    pub fn load_dkg_keys(
-        config: NodeConfig,
-    ) -> Result<
-        Option<(frost::keys::KeyPackage, frost::keys::PublicKeyPackage)>,
-        Box<dyn std::error::Error>,
-    > {
-        if let Some(dkg_keys) = config.dkg_keys {
-            let password = get_password_from_prompt()?;
-
-            // Decrypt the private key package
-            let private_key_bytes = decrypt_private_key(
-                &dkg_keys.encrypted_private_key_package_b64,
-                &password,
-                &dkg_keys.dkg_encryption_params,
-            )?;
-
-            // Deserialize the private key from decrypted bytes
-            let private_key = frost::keys::KeyPackage::deserialize(&private_key_bytes)?;
-
-            // Deserialize the public key from base64
-            let pubkey_bytes = BASE64.decode(&dkg_keys.pubkey_package_b64)?;
-            let pubkey = frost::keys::PublicKeyPackage::deserialize(&pubkey_bytes)?;
-
-            Ok(Some((private_key, pubkey)))
-        } else {
-            Ok(None)
-        }
     }
 }
