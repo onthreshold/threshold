@@ -8,5 +8,13 @@
       "iv_b64": "iUFZGmQSBJrHw4p2"
     }
   },
-  "dkg_keys": null
+  "dkg_keys": {
+    "encrypted_private_key_package_b64": "oVXCpEsmvaX+2airkf3k1pJfCprtzpfDHtRhoc1EuDwhZhCIP3fSajEnBMCJMwSFITrpkCCp/2dIym4pCfx1mH4M6mXlz5Zxq/rAdsKgpDps40JZLfOJ3D47MlFQj6XtvF/SxaKSEwA6TQeOvDR/I9/bGfXQHEvXgeX+vIrfHDmX37wei6H0s008ABUClhE/CWVGQAth91U=",
+    "dkg_encryption_params": {
+      "kdf": "argon2id",
+      "salt_b64": "fo8P+XSzIawTPFnIfGoicg",
+      "iv_b64": "bNmqRV6yK0u/W68A"
+    },
+    "pubkey_package_b64": "AO7WsbEFCTEpgB4BW1MfX9IQi1QiUnsgxNAGNMBIpkDgxnfD7T4CFLtmg30QOQ3w4Dg7RWaeeCBPoyCJRflpX/g/MAqYHKshwxjkagByQacgXuIhaoUYbday+6gx3ydtFEbSTP/hbgMkd86G+1We6P00axq9l8QiZM2hBqIu7is63HkTQBlCwJ4nLFuuCwe6gvYEvVyubBbiDj9zpGczjuxXKIkPtk63AwHGKfSIXUZZT5xJ05aWm2OSyWf16DBguy2o5c4eaemTtrUM3mfZveUmz5JFQIVxXX/QFrTqPOQidmU3y6+oIIED1NF8XFQWp8sTzdJJKjO/xq7/ouyHpVmd1cuWJ9TrUFy81P0AY5v1898BjDyhSmZwcF5VorFMCzBRr9lCLfMYmgOeaNAQJW2Qtjx4KOfPEerD7/CTw/GUBWUheiO3sxdT9AKUfwNN8xI0oe6mPoNRMzYhYexsdIdEM1NS9tWGoCmHRQ=="
+  }
 }

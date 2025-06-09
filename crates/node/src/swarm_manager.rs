@@ -60,19 +60,9 @@ pub enum DirectMessage {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SelfRequest {
     GetFrostPublicKey,
-    StartSigningSession {
-        hex_message: String,
-    },
-    InsertBlock {
-        block: Block,
-    },
-    Spend {
-        amount_sat: u64,
-    },
-    SetFrostKeys {
-        private_key: Vec<u8>,
-        public_key: Vec<u8>,
-    },
+    StartSigningSession { hex_message: String },
+    InsertBlock { block: Block },
+    Spend { amount_sat: u64 },
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -111,7 +101,7 @@ pub struct NetworkHandle {
     tx: mpsc::UnboundedSender<NetworkMessage>,
 }
 
-pub trait Network: Clone + Debug + Sync {
+pub trait Network: Clone + Debug + Sync + Send {
     fn peer_id(&self) -> PeerId;
     fn send_broadcast(
         &self,

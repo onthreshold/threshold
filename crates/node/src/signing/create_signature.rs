@@ -7,16 +7,77 @@ use hex;
 use libp2p::PeerId;
 use tracing::{debug, error, info, warn};
 
+use crate::NodeState;
 use crate::db::Db;
-use crate::swarm_manager::{DirectMessage, Network};
-use crate::{ActiveSigning, NodeState, peer_id_to_identifier};
+use crate::handler::Handler;
+use crate::signing::ActiveSigning;
+use crate::swarm_manager::{DirectMessage, HandlerMessage, Network, SelfRequest, SelfResponse};
+use crate::{peer_id_to_identifier, signing::SigningState};
 use types::errors::NodeError;
 
-impl<N: Network, D: Db> NodeState<N, D> {
-    /// Coordinator entrypoint. Start a threshold signing session across the network.
-    /// `message_hex` must be hex-encoded 32-byte sighash.
-    pub fn start_signing_session(&mut self, message_hex: &str) -> Result<Option<u64>, NodeError> {
-        if self.private_key_package.is_none() || self.pubkey_package.is_none() {
+#[async_trait::async_trait]
+impl<N: Network, D: Db> Handler<N, D> for SigningState {
+    async fn handle(
+        &mut self,
+        node: &mut NodeState<N, D>,
+        message: Option<HandlerMessage>,
+    ) -> Result<(), NodeError> {
+        match message {
+            Some(HandlerMessage::SelfRequest {
+                request: SelfRequest::StartSigningSession { hex_message },
+                ..
+            }) => {
+                let _ = self.start_signing_session(node, &hex_message)?;
+            }
+            Some(HandlerMessage::SelfRequest {
+                request: SelfRequest::Spend { amount_sat },
+                response_channel,
+            }) => {
+                let response = self.start_spend_request(node, amount_sat);
+                if let Some(response_channel) = response_channel {
+                    response_channel
+                        .send(SelfResponse::SpendRequestSent {
+                            sighash: response.unwrap_or("No sighash".to_string()),
+                        })
+                        .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
+                }
+            }
+            Some(HandlerMessage::MessageEvent((
+                peer,
+                DirectMessage::SignRequest { sign_id, message },
+            ))) => self.handle_sign_request(node, peer, sign_id, message)?,
+            Some(HandlerMessage::MessageEvent((
+                peer,
+                DirectMessage::SignPackage { sign_id, package },
+            ))) => self.handle_sign_package(node, peer, sign_id, package)?,
+            Some(HandlerMessage::MessageEvent((
+                peer,
+                DirectMessage::Commitments {
+                    sign_id,
+                    commitments,
+                },
+            ))) => self.handle_commitments_response(node, peer, sign_id, commitments)?,
+            Some(HandlerMessage::MessageEvent((
+                peer,
+                DirectMessage::SignatureShare {
+                    sign_id,
+                    signature_share,
+                },
+            ))) => self.handle_signature_share(node, peer, sign_id, signature_share)?,
+            _ => (),
+        }
+
+        Ok(())
+    }
+}
+
+impl SigningState {
+    pub fn start_signing_session<N: Network, D: Db>(
+        &mut self,
+        node: &mut NodeState<N, D>,
+        message_hex: &str,
+    ) -> Result<Option<u64>, NodeError> {
+        if node.private_key_package.is_none() || node.pubkey_package.is_none() {
             error!("❌ DKG not completed – cannot start signing");
             return Err(NodeError::Error("DKG not completed".to_string()));
         }
@@ -44,18 +105,18 @@ impl<N: Network, D: Db> NodeState<N, D> {
             ));
         }
 
-        let sign_id = self.rng.next_u64();
-        let self_identifier = peer_id_to_identifier(&self.peer_id);
+        let sign_id = node.rng.next_u64();
+        let self_identifier = peer_id_to_identifier(&node.peer_id);
 
         // Select participants: self + first (min_signers -1) peers
-        let required = (self.min_signers - 1) as usize;
-        if self.peers.len() < required {
+        let required = (node.min_signers - 1) as usize;
+        if node.peers.len() < required {
             error!("❌ Not enough peers – need at least {} others", required);
             return Err(NodeError::Error("Not enough peers".to_string()));
         }
         // Randomly shuffle peers and pick required number
         let mut rng_rand = rand::rng();
-        let mut peer_pool = self.peers.clone().into_iter().collect::<Vec<_>>();
+        let mut peer_pool = node.peers.clone().into_iter().collect::<Vec<_>>();
         peer_pool.shuffle(&mut rng_rand);
 
         let selected_peers: Vec<PeerId> = peer_pool.into_iter().take(required).collect();
@@ -67,13 +128,13 @@ impl<N: Network, D: Db> NodeState<N, D> {
         }
 
         // Generate nonces & commitments for self
-        let key_pkg = match self.private_key_package.as_ref() {
+        let key_pkg = match node.private_key_package.as_ref() {
             Some(key_pkg) => key_pkg.clone(),
             None => {
                 return Err(NodeError::Error("No private key found".to_string()));
             }
         };
-        let (nonces, commitments) = frost::round1::commit(key_pkg.signing_share(), &mut self.rng);
+        let (nonces, commitments) = frost::round1::commit(key_pkg.signing_share(), &mut node.rng);
 
         let mut commitments_map = BTreeMap::new();
         commitments_map.insert(self_identifier, commitments);
@@ -96,7 +157,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
                 sign_id,
                 message: message.clone(),
             };
-            self.network_handle
+            node.network_handle
                 .send_private_message(*peer, req)
                 .map_err(|e| {
                     NodeError::Error(format!("Failed to send private request: {:?}", e))
@@ -107,14 +168,15 @@ impl<N: Network, D: Db> NodeState<N, D> {
     }
 
     /// Handle incoming SignRequest (participant side)
-    pub fn handle_sign_request(
+    pub fn handle_sign_request<N: Network, D: Db>(
         &mut self,
+        node: &mut NodeState<N, D>,
         peer: PeerId,
         sign_id: u64,
         message: Vec<u8>,
     ) -> Result<(), NodeError> {
-        if self.private_key_package.is_none() {
-            let _ = self.network_handle.send_private_message(
+        if node.private_key_package.is_none() {
+            let _ = node.network_handle.send_private_message(
                 peer,
                 DirectMessage::Commitments {
                     sign_id,
@@ -124,13 +186,13 @@ impl<N: Network, D: Db> NodeState<N, D> {
             return Ok(());
         }
 
-        let key_pkg = match self.private_key_package.as_ref() {
+        let key_pkg = match node.private_key_package.as_ref() {
             Some(key_pkg) => key_pkg.clone(),
             None => {
                 return Err(NodeError::Error("No private key found".to_string()));
             }
         };
-        let (nonces, commitments) = frost::round1::commit(key_pkg.signing_share(), &mut self.rng);
+        let (nonces, commitments) = frost::round1::commit(key_pkg.signing_share(), &mut node.rng);
 
         // Save session (one at a time for simplicity)
         self.active_signing = Some(ActiveSigning {
@@ -154,7 +216,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
             sign_id,
             commitments: commit_bytes,
         };
-        let _ = self.network_handle.send_private_message(peer, resp);
+        let _ = node.network_handle.send_private_message(peer, resp);
 
         debug!(
             "🔐 Provided commitments for sign_id {} to {}",
@@ -165,8 +227,9 @@ impl<N: Network, D: Db> NodeState<N, D> {
     }
 
     /// Coordinator receives commitments responses
-    pub fn handle_commitments_response(
+    pub fn handle_commitments_response<N: Network, D: Db>(
         &mut self,
+        node: &mut NodeState<N, D>,
         peer: PeerId,
         sign_id: u64,
         commitments_bytes: Vec<u8>,
@@ -191,10 +254,10 @@ impl<N: Network, D: Db> NodeState<N, D> {
             "📩 Received commitments from {} (total {}/{})",
             peer,
             active.commitments.len(),
-            self.min_signers
+            node.min_signers
         );
 
-        if active.commitments.len() == self.min_signers as usize {
+        if active.commitments.len() == node.min_signers as usize {
             // Build signing package
             let signing_package =
                 frost::SigningPackage::new(active.commitments.clone(), &active.message);
@@ -212,14 +275,14 @@ impl<N: Network, D: Db> NodeState<N, D> {
                     sign_id,
                     package: pkg_bytes.clone(),
                 };
-                let _ = self.network_handle.send_private_message(*peer, req);
+                let _ = node.network_handle.send_private_message(*peer, req);
             }
 
             // Generate our signature share
             let sig_share = frost::round2::sign(
                 &signing_package,
                 &active.nonces,
-                match self.private_key_package.as_ref() {
+                match node.private_key_package.as_ref() {
                     Some(key_pkg) => key_pkg,
                     None => {
                         return Err(NodeError::Error("No private key found".to_string()));
@@ -230,7 +293,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
                 Ok(sig_share) => {
                     active
                         .signature_shares
-                        .insert(peer_id_to_identifier(&self.peer_id), sig_share);
+                        .insert(peer_id_to_identifier(&node.peer_id), sig_share);
                 }
                 Err(e) => {
                     return Err(NodeError::Error(format!("Failed to sign: {}", e)));
@@ -244,8 +307,9 @@ impl<N: Network, D: Db> NodeState<N, D> {
     }
 
     /// Participant handles SignPackage request
-    pub fn handle_sign_package(
+    pub fn handle_sign_package<N: Network, D: Db>(
         &mut self,
+        node: &mut NodeState<N, D>,
         peer: PeerId,
         sign_id: u64,
         package_bytes: Vec<u8>,
@@ -269,7 +333,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
         let sig_share = frost::round2::sign(
             &signing_package,
             &active.nonces,
-            match self.private_key_package.as_ref() {
+            match node.private_key_package.as_ref() {
                 Some(key_pkg) => key_pkg,
                 None => {
                     return Err(NodeError::Error("No private key found".to_string()));
@@ -283,7 +347,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
                     sign_id,
                     signature_share: sig_bytes,
                 };
-                let _ = self.network_handle.send_private_message(peer, resp);
+                let _ = node.network_handle.send_private_message(peer, resp);
             }
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to sign: {}", e)));
@@ -299,8 +363,9 @@ impl<N: Network, D: Db> NodeState<N, D> {
     }
 
     /// Coordinator handles incoming signature share
-    pub fn handle_signature_share(
+    pub fn handle_signature_share<N: Network, D: Db>(
         &mut self,
+        node: &mut NodeState<N, D>,
         peer: PeerId,
         sign_id: u64,
         sig_bytes: Vec<u8>,
@@ -324,10 +389,10 @@ impl<N: Network, D: Db> NodeState<N, D> {
             "✅ Received signature share from {} (total {}/{})",
             peer,
             active.signature_shares.len(),
-            self.min_signers
+            node.min_signers
         );
 
-        if active.signature_shares.len() == self.min_signers as usize {
+        if active.signature_shares.len() == node.min_signers as usize {
             let signing_package = match active.signing_package.clone() {
                 Some(signing_package) => signing_package,
                 None => {
@@ -337,7 +402,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
             let group_sig = frost::aggregate(
                 &signing_package,
                 &active.signature_shares,
-                match self.pubkey_package.as_ref() {
+                match node.pubkey_package.as_ref() {
                     Some(public_key) => public_key,
                     None => {
                         return Err(NodeError::Error("No public key found".to_string()));

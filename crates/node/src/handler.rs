@@ -1,12 +1,12 @@
 use types::errors::NodeError;
 
-use crate::{Network, swarm_manager::HandlerMessage};
+use crate::{Network, NodeState, db::Db, swarm_manager::HandlerMessage};
 
 #[async_trait::async_trait]
-pub trait Handler<N: Network>: Send {
+pub trait Handler<N: Network, D: Db>: Send {
     async fn handle(
         &mut self,
+        node: &mut NodeState<N, D>,
         message: Option<HandlerMessage>,
-        network_handle: &N,
     ) -> Result<(), NodeError>;
 }
