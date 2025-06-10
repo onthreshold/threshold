@@ -4,13 +4,9 @@ use crate::{
     NodeConfig, NodeState, db::RocksDb, grpc::grpc_handler::NodeControlService,
     key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm,
 };
-use bitcoin::Address;
-use bitcoin::Network as BitcoinNetwork;
 use clients::{EsploraApiClient, WindowedConfirmedTransactionProvider};
 use esplora_client::Builder;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use tokio::sync::broadcast;
 use tonic::transport::Server;
 use tracing::{error, info};
@@ -91,7 +87,7 @@ pub async fn start_node(
     let (network_handle, mut swarm) =
         build_swarm(keypair.clone(), allowed_peers.clone()).expect("Failed to build swarm");
 
-    let (deposit_intent_tx, mut deposit_intent_rx) = broadcast::channel(100);
+    let (deposit_intent_tx, deposit_intent_rx) = broadcast::channel(100);
 
     let mut node_state = NodeState::new_from_config(
         network_handle,
@@ -129,34 +125,15 @@ pub async fn start_node(
     let main_loop_handle = tokio::spawn(async move { node_state.start().await });
 
     let deposit_monitor_handle = tokio::spawn(async move {
-        let client = EsploraApiClient::new(
+        let mut client = EsploraApiClient::new(
             Builder::new("https://blockstream.info/api")
                 .build_async()
                 .unwrap(),
             100,
+            Some(deposit_intent_rx),
         );
 
-        let client_clone = client.clone();
-        tokio::spawn(async move {
-            client_clone.poll_new_transactions(vec![]).await;
-        });
-
-        let mut addresses = HashSet::new();
-        while let Ok(address_str) = deposit_intent_rx.recv().await {
-            info!("Received new deposit address to monitor: {}", &address_str);
-            if addresses.insert(address_str) {
-                let addresses_vec: Vec<Address> = addresses
-                    .iter()
-                    .filter_map(|addr_str| Address::from_str(addr_str).ok())
-                    .filter_map(|addr| addr.require_network(BitcoinNetwork::Bitcoin).ok())
-                    .collect();
-
-                if !addresses_vec.is_empty() {
-                    info!("Now polling {} addresses.", addresses_vec.len());
-                    client.update_addresses(addresses_vec).await;
-                }
-            }
-        }
+        client.poll_new_transactions(vec![]).await;
     });
 
     // Wait for either task to complete (they should run indefinitely)

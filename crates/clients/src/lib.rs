@@ -1,10 +1,10 @@
 use async_trait::async_trait;
-use bitcoin::{consensus, Address, Transaction};
+use bitcoin::{consensus, Address, Network, Transaction};
 use esplora_client::AsyncClient;
-use std::sync::Arc;
+use std::{collections::HashSet, str::FromStr};
 use tokio::sync::broadcast;
-use tokio::sync::Mutex as TokioMutex;
 use tokio::time::{sleep, Duration};
+use tracing::{error, info};
 
 #[derive(Debug)]
 pub enum NodeError {
@@ -23,28 +23,27 @@ pub trait WindowedConfirmedTransactionProvider {
     ) -> Result<Vec<Transaction>, NodeError>;
 
     // Must poll for new transactions and send them to the given channel.
-    async fn poll_new_transactions(&self, addresses: Vec<Address>);
+    async fn poll_new_transactions(&mut self, addresses: Vec<Address>);
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EsploraApiClient {
     client: AsyncClient,
     tx_channel: broadcast::Sender<Transaction>,
-    addresses: Arc<TokioMutex<Vec<Address>>>,
+    deposit_intent_rx: Option<broadcast::Receiver<String>>,
 }
 
 impl EsploraApiClient {
-    pub fn new(client: AsyncClient, capacity: usize) -> Self {
+    pub fn new(
+        client: AsyncClient,
+        capacity: usize,
+        deposit_intent_rx: Option<broadcast::Receiver<String>>,
+    ) -> Self {
         Self {
             client,
             tx_channel: broadcast::channel(capacity).0,
-            addresses: Arc::new(TokioMutex::new(Vec::new())),
+            deposit_intent_rx,
         }
-    }
-
-    pub async fn update_addresses(&self, new_addresses: Vec<Address>) {
-        let mut addresses = self.addresses.lock().await;
-        *addresses = new_addresses;
     }
 }
 
@@ -110,70 +109,82 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
         Ok(confirmed_txs)
     }
 
-    async fn poll_new_transactions(&self, addresses: Vec<Address>) {
-        self.update_addresses(addresses).await;
-
+    async fn poll_new_transactions(&mut self, addresses: Vec<Address>) {
         let mut last_confirmed_height = match self.client.get_height().await {
             Ok(height) => height - 6,
             Err(e) => {
-                eprintln!("Cannot retrieve height of blockchain: {}", e);
+                error!("Cannot retrieve height of blockchain: {}", e);
                 return;
             }
         };
 
-        println!(
+        info!(
             "Polling for new transactions, starting from confirmed height {}",
             last_confirmed_height
         );
 
+        let mut deposit_intent_rx = self.deposit_intent_rx.take().unwrap();
+        let mut addresses: HashSet<_> = addresses.into_iter().collect();
+
         loop {
-            sleep(Duration::from_secs(60)).await;
-
-            let current_height = match self.client.get_height().await {
-                Ok(height) => height,
-                Err(e) => {
-                    eprintln!("Cannot retrieve height of blockchain: {}", e);
-                    continue;
-                }
-            };
-
-            let new_confirmed_height = current_height - 6;
-
-            if new_confirmed_height > last_confirmed_height {
-                println!(
-                    "New confirmed block found. From height {} to {}",
-                    last_confirmed_height + 1,
-                    new_confirmed_height
-                );
-
-                let addresses = self.addresses.lock().await.clone();
-
-                let new_txs = match self
-                    .get_confirmed_transactions(
-                        addresses,
-                        last_confirmed_height + 1,
-                        new_confirmed_height,
-                    )
-                    .await
-                {
-                    Ok(txs) => txs,
-                    Err(e) => {
-                        eprintln!("Error getting confirmed transactions: {:?}", e);
-                        continue;
-                    }
-                };
-
-                for tx in new_txs {
-                    println!("Found new confirmed transaction: {}", tx.compute_txid());
-                    match self.tx_channel.send(tx) {
-                        Ok(_) => (),
+            tokio::select! {
+                _ = sleep(Duration::from_secs(30)) => {
+                    let current_height = match self.client.get_height().await {
+                        Ok(height) => height,
                         Err(e) => {
-                            eprintln!("Error sending transaction to channel: {:?}", e);
+                            error!("Cannot retrieve height of blockchain: {}", e);
+                            continue;
                         }
+                    };
+
+                    let new_confirmed_height = current_height - 6;
+
+                    if new_confirmed_height > last_confirmed_height {
+                        info!(
+                            "New confirmed block found. From height {} to {}",
+                            last_confirmed_height + 1,
+                            new_confirmed_height
+                        );
+
+                        let new_txs = match self
+                            .get_confirmed_transactions(
+                                addresses.iter().cloned().collect(),
+                                last_confirmed_height + 1,
+                                new_confirmed_height,
+                            )
+                            .await
+                        {
+                            Ok(txs) => txs,
+                            Err(e) => {
+                                error!("Error getting confirmed transactions: {:?}", e);
+                                continue;
+                            }
+                        };
+
+                        for tx in new_txs {
+                            println!("Found new confirmed transaction: {}", tx.compute_txid());
+                            match self.tx_channel.send(tx) {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    error!("Error sending transaction to channel: {:?}", e);
+                                }
+                            }
+                        }
+
+                        last_confirmed_height = new_confirmed_height;
                     }
                 }
-
-                last_confirmed_height = new_confirmed_height;
+                Ok(address_str) = deposit_intent_rx.recv() => {
+                    info!("Received new deposit address to monitor: {}", &address_str);
+                    if addresses.insert(
+                        Address::from_str(&address_str)
+                            .unwrap()
+                            .require_network(Network::Bitcoin)
+                            .unwrap(),
+                    ) {
+                        info!("Now polling {} addresses.", addresses.len());
+                    }
+                }
             }
         }
     }

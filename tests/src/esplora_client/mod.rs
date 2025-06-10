@@ -12,6 +12,7 @@ mod esplora_client_test {
                 .build_async()
                 .unwrap(),
             100,
+            None,
         );
         let address = Address::from_str("bc1qezwz3yt46nsgzcwlg0dsw680nryjpq5u8pvzts")
             .unwrap()
