@@ -5,28 +5,31 @@ use types::errors::NodeError;
 use crate::{
     NodeState,
     db::Db,
-    deposit_intents::{DepositIntent, DepositIntentState},
+    deposit::{DepositIntent, DepositIntentState},
     handler::Handler,
     swarm_manager::{Network, NetworkEvent, SelfRequest, SelfResponse},
 };
+use protocol::oracle::Oracle;
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db> Handler<N, D> for DepositIntentState {
+impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for DepositIntentState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         match message {
             Some(NetworkEvent::SelfRequest {
-                request: SelfRequest::CreateDeposit { deposit_intent },
+                request: SelfRequest::CreateDeposit { amount_sat },
                 response_channel,
             }) => {
-                let response = self.create_deposit(node, deposit_intent).await;
+                let (deposit_tracking_id, deposit_address) =
+                    self.create_deposit(node, amount_sat).await?;
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::CreateDepositResponse {
-                            success: response.is_ok(),
+                            deposit_tracking_id,
+                            deposit_address,
                         })
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
                 }
@@ -49,7 +52,7 @@ impl<N: Network, D: Db> Handler<N, D> for DepositIntentState {
                             NodeError::Error(format!("Failed to parse deposit intent: {}", e))
                         })?;
 
-                    if let Err(e) = self.create_deposit(node, deposit_intent).await {
+                    if let Err(e) = self.create_deposit_from_intent(node, deposit_intent) {
                         info!("Failed to store deposit intent: {}", e);
                     }
                 }

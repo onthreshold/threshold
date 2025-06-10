@@ -5,6 +5,7 @@ use tracing::{error, info};
 use types::errors::NodeError;
 
 use crate::{NodeState, db::Db, signing::SigningState, swarm_manager::Network};
+use protocol::oracle::Oracle;
 
 impl SigningState {
     pub fn new() -> Result<Self, NodeError> {
@@ -31,15 +32,15 @@ impl SigningState {
             .map_err(|e| format!("Parse schnorr sig: {}", e))
     }
 
-    pub fn start_spend_request<N: Network, D: Db>(
+    pub fn start_spend_request<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         amount_sat: u64,
         address: &str,
     ) -> Option<String> {
         info!("🚀 Creating spend request for {} sat", amount_sat);
         let address = bitcoin::Address::from_str(address).ok()?.assume_checked();
-        match node.wallet.create_spend(amount_sat, &address) {
+        match node.wallet.create_spend(amount_sat, 200, &address) {
             Ok((tx, sighash)) => {
                 let sighash_hex = hex::encode(sighash);
                 match self.start_signing_session(node, &sighash_hex) {

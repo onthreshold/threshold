@@ -4,8 +4,8 @@ use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
+pub mod create_deposit;
 pub mod handler;
-pub mod utils;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct DepositIntent {

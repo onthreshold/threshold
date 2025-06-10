@@ -1,3 +1,4 @@
+use protocol::oracle::EsploraOracle;
 use types::errors::NodeError;
 
 use crate::{
@@ -97,6 +98,7 @@ pub async fn start_node(
         RocksDb::new("nodedb.db"),
         swarm.network_events.clone(),
         deposit_intent_tx,
+        EsploraOracle::default(),
     )
     .expect("Failed to create node");
 

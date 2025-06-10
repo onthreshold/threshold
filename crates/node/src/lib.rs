@@ -1,6 +1,5 @@
 use crate::{
-    db::Db, deposit_intents::DepositIntentState, dkg::DkgState, handler::Handler,
-    signing::SigningState,
+    db::Db, deposit::DepositIntentState, dkg::DkgState, handler::Handler, signing::SigningState,
 };
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{
@@ -13,6 +12,7 @@ use argon2::{
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::{PeerId, identity::Keypair};
+use protocol::{chain_state::ChainState, oracle::Oracle};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::{Network, NetworkEvent};
@@ -21,7 +21,7 @@ use tracing::error;
 use types::errors::NodeError;
 
 pub mod db;
-pub mod deposit_intents;
+pub mod deposit;
 pub mod dkg;
 pub mod grpc;
 pub mod handler;
@@ -31,6 +31,7 @@ pub mod signing;
 pub mod start_node;
 pub mod swarm_manager;
 pub mod wallet;
+pub mod withdrawl;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct PeerData {
@@ -184,9 +185,10 @@ impl NodeConfig {
     }
 }
 
-pub struct NodeState<N: Network, D: Db> {
-    pub handlers: Vec<Box<dyn Handler<N, D>>>,
+pub struct NodeState<N: Network, D: Db, O: Oracle> {
+    pub handlers: Vec<Box<dyn Handler<N, D, O>>>,
     pub db: D,
+    pub chain_state: ChainState,
 
     pub peer_id: PeerId,
     pub peers: HashSet<PeerId>,
@@ -199,16 +201,15 @@ pub struct NodeState<N: Network, D: Db> {
 
     // FROST signing
     pub wallet: crate::wallet::SimpleWallet,
-
     pub config: NodeConfig,
-
     pub network_handle: N,
-
     pub network_events_stream: broadcast::Receiver<NetworkEvent>,
-    // track deposits and then send new addresses over a channel to the polling thread
+
+    pub oracle: O,
 }
 
-impl<N: Network, D: Db> NodeState<N, D> {
+impl<N: Network, D: Db, O: Oracle> NodeState<N, D, O> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new_from_config(
         network_handle: N,
         min_signers: u16,
@@ -217,6 +218,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
         storage_db: D,
         network_events_sender: broadcast::Sender<NetworkEvent>,
         deposit_intent_tx: broadcast::Sender<String>,
+        oracle: O,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
@@ -242,6 +244,8 @@ impl<N: Network, D: Db> NodeState<N, D> {
             ],
             pubkey_package: None,
             private_key_package: None,
+            chain_state: ChainState::default(),
+            oracle,
         };
 
         if let Some((private_key, pubkey)) = keys {

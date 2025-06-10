@@ -59,4 +59,8 @@ impl Oracle for MockOracle {
             None => Err(NodeError::Error("Transaction not found".to_string())),
         }
     }
+
+    async fn get_current_fee_per_vb(&self, priority: Option<u16>) -> Result<f64, NodeError> {
+        Ok(1.0)
+    }
 }

@@ -10,11 +10,12 @@ use crate::{
     peer_id_to_identifier,
     swarm_manager::{DirectMessage, Network},
 };
+use protocol::oracle::Oracle;
 
 impl DkgState {
-    pub async fn handle_dkg_start<N: Network, D: Db>(
+    pub async fn handle_dkg_start<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
     ) -> Result<(), NodeError> {
         if self.dkg_started {
             debug!("DKG already started, skipping DKG process");
@@ -96,9 +97,9 @@ impl DkgState {
         }
     }
 
-    pub fn handle_round1_payload<N: Network, D: Db>(
+    pub fn handle_round1_payload<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         sender_peer_id: PeerId,
         package: &[u8],
     ) -> Result<(), NodeError> {
@@ -127,9 +128,9 @@ impl DkgState {
         Ok(())
     }
 
-    pub fn try_enter_round2<N: Network, D: Db>(
+    pub fn try_enter_round2<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
     ) -> Result<(), NodeError> {
         if let Some(r1_secret_package) = self.r1_secret_package.as_ref() {
             if self.round1_peer_packages.len() + 1 == node.max_signers as usize {
@@ -190,9 +191,9 @@ impl DkgState {
         Ok(())
     }
 
-    pub fn handle_round2_payload<N: Network, D: Db>(
+    pub fn handle_round2_payload<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         sender_peer_id: PeerId,
         package: round2::Package,
     ) -> Result<(), NodeError> {
