@@ -1,9 +1,9 @@
 use bitcoin::absolute::LockTime;
-use bitcoin::consensus::encode::serialize;
 use bitcoin::hashes::Hash;
+use bitcoin::sighash::{EcdsaSighashType, SighashCache};
 use bitcoin::transaction::{OutPoint, Version};
 use bitcoin::witness::Witness;
-use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut, hashes::sha256};
+use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut};
 
 use crate::db::Db;
 use crate::{Network, NodeState};
@@ -63,16 +63,21 @@ impl SimpleWallet {
         amount_sat: u64,
         address: &bitcoin::Address,
     ) -> Result<(Transaction, [u8; 32]), String> {
+        let estimated_fee_sat = 200u64;
+
+        let total_needed = amount_sat + estimated_fee_sat;
+
         let pos = self
             .utxos
             .iter()
-            .position(|u| u.value.to_sat() >= amount_sat)
+            .position(|u| u.value.to_sat() >= total_needed)
             .ok_or_else(|| {
-                "No single UTXO large enough – coin selection not implemented".to_string()
+                format!("No single UTXO large enough – need {} sats (amount: {} + fee: {}), coin selection not implemented", 
+                        total_needed, amount_sat, estimated_fee_sat)
             })?;
 
         let utxo = self.utxos.remove(pos);
-        let change_sat = utxo.value.to_sat() - amount_sat;
+        let change_sat = utxo.value.to_sat() - amount_sat - estimated_fee_sat;
 
         let input = TxIn {
             previous_output: utxo.outpoint,
@@ -88,11 +93,12 @@ impl SimpleWallet {
 
         let mut outputs = vec![recipient_output];
 
-        // Add change output if needed
-        if change_sat > 0 {
+        // Add change output if needed (only if change is meaningful, e.g., > dust threshold)
+        if change_sat > 546 {
+            // 546 sats is typical dust threshold for P2WPKH
             outputs.push(TxOut {
                 value: Amount::from_sat(change_sat),
-                script_pubkey: ScriptBuf::new(),
+                script_pubkey: self.address.as_ref().unwrap().script_pubkey(),
             });
         }
 
@@ -103,7 +109,16 @@ impl SimpleWallet {
             output: outputs,
         };
 
-        let sighash = sha256::Hash::hash(&serialize(&tx));
+        let mut sighash_cache = SighashCache::new(&tx);
+        let sighash = sighash_cache
+            .p2wpkh_signature_hash(
+                0, // input index
+                &utxo.script_pubkey,
+                utxo.value,
+                EcdsaSighashType::All,
+            )
+            .map_err(|e| format!("Failed to calculate sighash: {}", e))?;
+
         Ok((tx, sighash.to_byte_array()))
     }
 }

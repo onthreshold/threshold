@@ -27,7 +27,7 @@ async fn main() {
 
     let (mut tx, sighash) = wallet.create_spend(1000, &address_to).unwrap();
     println!("Tx: {:?}", tx);
-    println!("Sighash: {:?}", sighash);
+    println!("Sighash: {:?}", hex::encode(sighash));
 
     // Sign the transaction
     sign_transaction(&mut tx, &private_key, &sighash);
@@ -42,7 +42,7 @@ fn sign_transaction(tx: &mut Transaction, private_key: &PrivateKey, sighash: &[u
     // For P2WPKH, we need to create a witness signature
     let secp = Secp256k1::new();
 
-    // Create the signature (this is simplified - in practice you'd need proper sighash computation)
+    // Create the signature using the properly calculated sighash
     let message = bitcoin::secp256k1::Message::from_digest(*sighash);
     let signature = secp.sign_ecdsa(&message, &private_key.inner);
 
@@ -91,11 +91,11 @@ async fn broadcast_transaction(tx: &Transaction) {
 pub fn get_utxos_for_address(address: &Address) -> Vec<node::wallet::Utxo> {
     let utxos = vec![node::wallet::Utxo {
         outpoint: OutPoint::new(
-            Txid::from_str("f0d3f62a1a516e75ff5e5c4946a2d714a8a813167d79224b3a1ec0a241cf0e89")
+            Txid::from_str("f0599c6679a42ffd8b45f16e7944f1d73ad72cc4b7193e6d7485587ebd8e3e9d")
                 .unwrap(),
             0,
         ),
-        value: Amount::from_sat(50_000_000),
+        value: Amount::from_sat(4_000),
         script_pubkey: address.script_pubkey(),
     }];
     utxos
@@ -112,18 +112,18 @@ pub fn generate_from_mnemonic(mnemonic: &str) -> (Address, PrivateKey) {
 
     // Create extended private key
     let secp = Secp256k1::new();
-    let xprv = ExtendedPrivKey::new_master(Network::Testnet4, &seed).unwrap();
+    let xprv = ExtendedPrivKey::new_master(Network::Testnet, &seed).unwrap();
 
     // Derive key at standard path (m/84'/1'/0'/0/0 for signet P2WPKH)
     let derivation_path = DerivationPath::from_str("m/84'/1'/0'/0/0").unwrap();
     let derived_xprv = xprv.derive_priv(&secp, &derivation_path).unwrap();
 
     // Get the private key
-    let private_key = PrivateKey::new(derived_xprv.private_key, Network::Testnet4);
+    let private_key = PrivateKey::new(derived_xprv.private_key, Network::Testnet);
     let compressed_public_key: CompressedPublicKey =
         CompressedPublicKey::from_private_key(&secp, &private_key)
             .expect("Failed to convert public key to compressed public key");
-    let address = Address::p2wpkh(&compressed_public_key, Network::Testnet4);
+    let address = Address::p2wpkh(&compressed_public_key, Network::Testnet);
 
     println!("Extended Private Key: {}", xprv);
     println!("Derived Private Key (WIF): {}", private_key.to_wif());
