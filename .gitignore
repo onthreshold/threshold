@@ -58,3 +58,4 @@ Cargo.lock
 *.rej
 *.sublime-workspace
 *.sublime-project
+.env
