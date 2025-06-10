@@ -108,7 +108,7 @@ impl DkgState {
             pubkey_package_b64,
         });
 
-        let validators = node
+        let mut validators: Vec<ValidatorInfo> = node
             .peers
             .iter()
             .map(|peer_id| ValidatorInfo {
@@ -116,6 +116,8 @@ impl DkgState {
                 stake: 100,
             })
             .collect();
+
+        validators.sort_by(|a, b| a.pub_key.cmp(&b.pub_key));
 
         let chain_config = ChainConfig {
             block_time_seconds: 10,
