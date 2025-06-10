@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use bitcoin::{consensus, Address, Network, Transaction};
-use esplora_client::AsyncClient;
+use bitcoin::{consensus, Address, Amount, Network, OutPoint, ScriptBuf, Transaction};
+use esplora_client::{AsyncClient, Builder};
 use std::{collections::HashSet, str::FromStr};
 use tokio::sync::broadcast;
 use tokio::time::{sleep, Duration};
@@ -28,20 +28,34 @@ pub trait WindowedConfirmedTransactionProvider {
 
 #[derive(Debug)]
 pub struct EsploraApiClient {
-    client: AsyncClient,
-    tx_channel: broadcast::Sender<Transaction>,
-    deposit_intent_rx: Option<broadcast::Receiver<String>>,
+    pub client: AsyncClient,
+    pub tx_channel: Option<broadcast::Sender<Transaction>>,
+    pub deposit_intent_rx: Option<broadcast::Receiver<String>>,
+}
+
+pub struct Utxo {
+    pub outpoint: OutPoint,
+    pub value: Amount,
+    pub script_pubkey: ScriptBuf,
+}
+
+impl Default for EsploraApiClient {
+    fn default() -> Self {
+        let builder = Builder::new("https://blockstream.info/api");
+        let client = builder.build_async().unwrap();
+        Self::new(client, None, None)
+    }
 }
 
 impl EsploraApiClient {
     pub fn new(
         client: AsyncClient,
-        capacity: usize,
+        capacity: Option<usize>,
         deposit_intent_rx: Option<broadcast::Receiver<String>>,
     ) -> Self {
         Self {
             client,
-            tx_channel: broadcast::channel(capacity).0,
+            tx_channel: capacity.map(|c| broadcast::channel(c).0),
             deposit_intent_rx,
         }
     }
@@ -163,7 +177,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
 
                         for tx in new_txs {
                             println!("Found new confirmed transaction: {}", tx.compute_txid());
-                            match self.tx_channel.send(tx) {
+                            match self.tx_channel.as_ref().unwrap().send(tx) {
                                 Ok(_) => (),
                                 Err(e) => {
                                     error!("Error sending transaction to channel: {:?}", e);

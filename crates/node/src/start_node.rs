@@ -129,7 +129,7 @@ pub async fn start_node(
             Builder::new("https://blockstream.info/testnet/api")
                 .build_async()
                 .unwrap(),
-            100,
+            Some(100),
             Some(deposit_intent_rx),
         );
 
