@@ -19,20 +19,16 @@ pub struct Utxo {
 /// Wallet that only tracks a list of local UTXOs and is able to construct a
 /// single-input spending transaction that possibly creates a change output. No
 /// fee calculation is performed – this is purely for demonstration purposes.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SimpleWallet {
     pub utxos: Vec<Utxo>,
-}
-
-impl Default for SimpleWallet {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub address: Option<bitcoin::Address>,
 }
 
 impl SimpleWallet {
-    pub fn new() -> Self {
+    pub fn new(address: &bitcoin::Address) -> Self {
         Self {
+            address: Some(address.clone()),
             utxos: vec![
                 Utxo {
                     outpoint: OutPoint {
@@ -40,7 +36,7 @@ impl SimpleWallet {
                         vout: 0,
                     },
                     value: Amount::from_sat(100_000),
-                    script_pubkey: ScriptBuf::new(),
+                    script_pubkey: address.script_pubkey(),
                 },
                 Utxo {
                     outpoint: OutPoint {
@@ -48,7 +44,7 @@ impl SimpleWallet {
                         vout: 0,
                     },
                     value: Amount::from_sat(50_000),
-                    script_pubkey: ScriptBuf::new(),
+                    script_pubkey: address.script_pubkey(),
                 },
                 Utxo {
                     outpoint: OutPoint {
@@ -56,13 +52,17 @@ impl SimpleWallet {
                         vout: 0,
                     },
                     value: Amount::from_sat(20_000),
-                    script_pubkey: ScriptBuf::new(),
+                    script_pubkey: address.script_pubkey(),
                 },
             ],
         }
     }
 
-    pub fn create_spend(&mut self, amount_sat: u64) -> Result<(Transaction, [u8; 32]), String> {
+    pub fn create_spend(
+        &mut self,
+        amount_sat: u64,
+        address: &bitcoin::Address,
+    ) -> Result<(Transaction, [u8; 32]), String> {
         let pos = self
             .utxos
             .iter()
@@ -83,7 +83,7 @@ impl SimpleWallet {
 
         let recipient_output = TxOut {
             value: Amount::from_sat(amount_sat),
-            script_pubkey: ScriptBuf::new(),
+            script_pubkey: address.script_pubkey(),
         };
 
         let mut outputs = vec![recipient_output];

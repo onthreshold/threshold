@@ -70,6 +70,7 @@ pub enum SelfRequest {
     },
     Spend {
         amount_sat: u64,
+        address_to: String,
     },
 }
 

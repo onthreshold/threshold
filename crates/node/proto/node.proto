@@ -29,6 +29,7 @@ message StartDkgResponse {
 
 message SpendFundsRequest {
     uint64 amount_satoshis = 1;
+    string address_to = 2;
 }
 
 message SpendFundsResponse {
@@ -38,8 +39,7 @@ message SpendFundsResponse {
 }
 
 message CreateDepositIntentRequest {
-    string user_id = 1;
-    uint64 amount_satoshis = 2;
+    uint64 amount_satoshis = 1;
 }
 
 message CreateDepositIntentResponse {

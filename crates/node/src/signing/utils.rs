@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use frost_secp256k1::{self as frost};
 use tracing::{error, info};
@@ -35,9 +35,11 @@ impl SigningState {
         &mut self,
         node: &mut NodeState<N, D>,
         amount_sat: u64,
+        address: &str,
     ) -> Option<String> {
         info!("🚀 Creating spend request for {} sat", amount_sat);
-        match node.wallet.create_spend(amount_sat) {
+        let address = bitcoin::Address::from_str(address).ok()?.assume_checked();
+        match node.wallet.create_spend(amount_sat, &address) {
             Ok((tx, sighash)) => {
                 let sighash_hex = hex::encode(sighash);
                 match self.start_signing_session(node, &sighash_hex) {

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "bin/cli",
+    "bin/utxo-spend",
     "tests",
     "crates/node",
     "crates/protocol",

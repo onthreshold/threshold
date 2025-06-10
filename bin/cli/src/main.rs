@@ -144,6 +144,7 @@ enum Commands {
     },
     Spend {
         amount: u64,
+        address_to: String,
         #[arg(short, long)]
         endpoint: Option<String>,
     },
@@ -159,7 +160,6 @@ enum Commands {
         endpoint: Option<String>,
     },
     Deposit {
-        peer_id: String,
         amount: u64,
         #[arg(short, long)]
         endpoint: Option<String>,
@@ -200,8 +200,12 @@ async fn main() -> Result<(), CliError> {
             .await
             .map_err(|e| CliError::NodeError(e.to_string()))?;
         }
-        Commands::Spend { amount, endpoint } => {
-            rpc_spend(endpoint, amount)
+        Commands::Spend {
+            amount,
+            endpoint,
+            address_to,
+        } => {
+            rpc_spend(endpoint, amount, address_to)
                 .await
                 .map_err(CliError::RpcError)?;
         }
@@ -222,14 +226,12 @@ async fn main() -> Result<(), CliError> {
                 .await
                 .map_err(CliError::RpcError)?;
         }
-        Commands::Deposit {
-            peer_id,
-            amount,
-            endpoint,
-        } => {
-            rpc_create_deposit_intent(endpoint, peer_id, amount)
+        Commands::Deposit { amount, endpoint } => {
+            let response = rpc_create_deposit_intent(endpoint, amount)
                 .await
                 .map_err(CliError::RpcError)?;
+
+            println!("Deposit intent created: {:?}", response);
         }
     }
 
