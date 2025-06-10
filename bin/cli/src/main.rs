@@ -227,8 +227,6 @@ async fn main() -> Result<(), CliError> {
             rpc_get_pending_deposit_intents(endpoint)
                 .await
                 .map_err(CliError::RpcError)?;
-
-            println!("Deposit intent created: {:?}", response);
         }
     }
 

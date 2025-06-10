@@ -1,20 +1,20 @@
 {
   "key_data": {
-    "public_key_b58": "12D3KooWL3y8EquvstyCyXwaZLtkViYDgGqcMviu2PtQZPQAbtqo",
-    "encrypted_private_key_b64": "/wmS9O4zoK33cjgh/3MaVKcf1IwO2UZdSZaHXGd8EP2I10esEfPLJ0B7zHXVaGjlAyZIqX23Ab1ZW3uiFfYhvZh2TzB5D7f+rOLQnG/xgOHdrcl7",
+    "public_key_b58": "12D3KooWA3VU9X7veJo5beBTG5srwshhAMJDRALatht3tTFBhG4Z",
+    "encrypted_private_key_b64": "mPzupjoQ3+aj1X3q9CWi/zoR7YPxTCpPXSABMOeZbqxdFsAhLw5IIE8ErzXWmqhMpYCUD0wDisp/khtg0baQB1SImKP21Hele35yQbF4oaJD5dw7",
     "encryption_params": {
       "kdf": "argon2id",
-      "salt_b64": "fhpsComWPKdHouPBFk+HTQ",
-      "iv_b64": "PcHTnBzCBm/9QT+v"
+      "salt_b64": "nmaa7m45Jc+l3mN6lG+5ig",
+      "iv_b64": "gyJOLlfy/iYeyz21"
     }
   },
   "dkg_keys": {
-    "encrypted_private_key_package_b64": "BHvtk2OQWbNal+2T/ekVCursh3cvg0/OTSiYukKl7Seffk6zj7Mr4OR1QeEPU9WRluiqIx2U+ta3WeJJJ/9gsP/E5g99uiSoyzGyWqaENKD7It4dvCWLjWP1HQ2P2CEqLUa2fU3cmB/YN0LfP/vnES4sNwWO3T/M5j4Egx33zAIElom15fCXCP9MrCyHWvPAWWVOozaHdHM=",
+    "encrypted_private_key_package_b64": "dIeqsOCxnvesS59M5dLTnNV1sellvhDgMXHzK2wLlBS7BjCujSfQQQkn25NnQeyOQi0yO4rYJcil8ZIRUZCTDB+gw6VF5pDFb9trSD8/w1Pk4If/C+JNYi8KGmiqg9+NLtVMc3P9sJ9QwuRZpsUNu6W4+QLIYx3+CsrDurAzDCAXBjBxedNQi90VQA1tIJxL3hKxzf7bl8w=",
     "dkg_encryption_params": {
       "kdf": "argon2id",
-      "salt_b64": "fhpsComWPKdHouPBFk+HTQ",
-      "iv_b64": "52/FGVGo4YxUkSPN"
+      "salt_b64": "nmaa7m45Jc+l3mN6lG+5ig",
+      "iv_b64": "ixsCddoQumev/3L0"
     },
-    "pubkey_package_b64": "AO7WsbEDKW86ySSGihM1t1jcXElmc3zDVE2bhdeCxINFnrNn/YED/3QdZfMMppBsuLpEMbs+vVi+Z/eAOWoBH18XEln4eo5grCrYmn94+D2fw9ttvwz5h0VighxA7wWpu6Rp2GYBYwO3IZo1P5ihH+9WlJw9+HT5RRMemNHtWYxtVHEqYqU2UfCjE9ufYbt/dmzRYZ/GMz4qKAF6oyTbZKO9IbAyM9vfAqcK2AksPAeUGr9/OSoNSBOfrs/eZw4pRJNXhDK1N637A5LIL3fw8nqkzkcr/7NVBFxAXwAky9itiGPZhXnnyMr/"
+    "pubkey_package_b64": "AO7WsbEDIrszyT6nWW7Psi/kCnzFbb66jbaC2C3aO8ty3IhhXLQCZ60g7UgTB55o9GbGRcPjW/3O3PGGrIMnv/V8hmTRu6F/bPTBmhCFIXOMneRWfsp10L1UtZ1bySrH7XgkNbHhTwIZQtM1RAXP56GMd1CLvrkD4byKT23InMR0qvqYFloyhqZPMMXWBpKszNDzoQI2DoyRMoe0vnyxl6LCCbB3QS25A7qA6Nfo97qtpVGFv0oDYnB34b7jCMCHECUyo/Bdf6VRAsw6f331yPhzqYWkLmG6iPqq8JDgwzb7/2Cr6kA/6saj"
   }
 }

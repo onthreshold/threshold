@@ -22,8 +22,7 @@ async fn main() {
             .unwrap()
             .assume_checked();
 
-    let mut wallet = SimpleWallet::new(&address);
-    wallet.utxos = get_utxos_for_address(&address);
+    let mut wallet = SimpleWallet::new(&address).await;
 
     let (mut tx, sighash) = wallet.create_spend(1000, &address_to).unwrap();
     println!("Tx: {:?}", tx);
