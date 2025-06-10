@@ -19,7 +19,10 @@ use libp2p::identity::Keypair;
 use rpc_client::{rpc_create_deposit_intent, rpc_spend, rpc_start_signing};
 use std::{fs, path::PathBuf};
 
-use crate::errors::{CliError, KeygenError};
+use crate::{
+    errors::{CliError, KeygenError},
+    rpc_client::rpc_get_pending_deposit_intents,
+};
 use node::{
     key_manager::get_config, start_node::start_node, EncryptionParams, KeyData, NodeConfig,
 };
@@ -156,6 +159,10 @@ enum Commands {
         #[arg(short, long)]
         endpoint: Option<String>,
     },
+    GetPendingDepositIntents {
+        #[arg(short, long)]
+        endpoint: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -215,6 +222,11 @@ async fn main() -> Result<(), CliError> {
                 .map_err(CliError::RpcError)?;
 
             println!("Deposit intent created: {:?}", response);
+        }
+        Commands::GetPendingDepositIntents { endpoint } => {
+            rpc_get_pending_deposit_intents(endpoint)
+                .await
+                .map_err(CliError::RpcError)?;
         }
     }
 

@@ -1,20 +1,20 @@
 {
   "key_data": {
-    "public_key_b58": "12D3KooWJfgcXxFCTU5roEStY5AYri1ydjLojtiZmM96w2xQ5xom",
-    "encrypted_private_key_b64": "zfvOzCfdStlfAQQXlLZDBHvJgas5GylHtHgzeIu0vVUlCqGALmTNUSnNgy7TnZLvWfugaxZ7GFqroNMJcibP9LNdMoiCLPgL5CZIodrOjIAmg2Oj",
+    "public_key_b58": "12D3KooWL3y8EquvstyCyXwaZLtkViYDgGqcMviu2PtQZPQAbtqo",
+    "encrypted_private_key_b64": "/wmS9O4zoK33cjgh/3MaVKcf1IwO2UZdSZaHXGd8EP2I10esEfPLJ0B7zHXVaGjlAyZIqX23Ab1ZW3uiFfYhvZh2TzB5D7f+rOLQnG/xgOHdrcl7",
     "encryption_params": {
       "kdf": "argon2id",
-      "salt_b64": "CAXOarrTLSssoaWGZsnmCQ",
-      "iv_b64": "uwqCxv0cqkxAeyMl"
+      "salt_b64": "fhpsComWPKdHouPBFk+HTQ",
+      "iv_b64": "PcHTnBzCBm/9QT+v"
     }
   },
   "dkg_keys": {
-    "encrypted_private_key_package_b64": "ZTPX9oWqZ0lL8GXDloq4ttiZ4tpdUfGjd0BI1frZ6Ml1kCQSdg3RxASl87jIKSs+eGW8tOoI1RO1fgoE147AzZUJGVrOCrG/8VysG0zwrRhnwVC1+W7TAlXcX0Nf+aAepNWTCXcMT5JeK5dg4QIeuoxOZSehm67mQbzHLNxSoAGxW7fa7Wu5qydgGgCBP22CN0GDVKpUlV4=",
+    "encrypted_private_key_package_b64": "BHvtk2OQWbNal+2T/ekVCursh3cvg0/OTSiYukKl7Seffk6zj7Mr4OR1QeEPU9WRluiqIx2U+ta3WeJJJ/9gsP/E5g99uiSoyzGyWqaENKD7It4dvCWLjWP1HQ2P2CEqLUa2fU3cmB/YN0LfP/vnES4sNwWO3T/M5j4Egx33zAIElom15fCXCP9MrCyHWvPAWWVOozaHdHM=",
     "dkg_encryption_params": {
       "kdf": "argon2id",
-      "salt_b64": "CAXOarrTLSssoaWGZsnmCQ",
-      "iv_b64": "Xn6CD5WDT+OozVFl"
+      "salt_b64": "fhpsComWPKdHouPBFk+HTQ",
+      "iv_b64": "52/FGVGo4YxUkSPN"
     },
-    "pubkey_package_b64": "AO7WsbEDKs2fU2ZXSAfKkDV/dHzzfO2b2wsxd7Lyq8JYq60hgDoCWPCtRYDM/PT2AGTq3JQZH+piBm6zZAIXx9HhRzObNZ8ynmifoP2mDUG5XCrxMk0U/9/W3g5uroIHxUhiGyFk+AKcQwOFjO3v9PQxLDFcBRDlITotSzVDAasQRE4xPoo76mJIjn3Bas2ZxpnwiHaq4Vk+XOjW0SgMh4NC72YOvI11AliuJlOUX1k4ZaPxGCoeka8BeLWjgKlPdghxBR/PcrfqAriQNsd1zlqSvNGClgsFp/0DlXLJ/4ilvYoRcV4QYNEI"
+    "pubkey_package_b64": "AO7WsbEDKW86ySSGihM1t1jcXElmc3zDVE2bhdeCxINFnrNn/YED/3QdZfMMppBsuLpEMbs+vVi+Z/eAOWoBH18XEln4eo5grCrYmn94+D2fw9ttvwz5h0VighxA7wWpu6Rp2GYBYwO3IZo1P5ihH+9WlJw9+HT5RRMemNHtWYxtVHEqYqU2UfCjE9ufYbt/dmzRYZ/GMz4qKAF6oyTbZKO9IbAyM9vfAqcK2AksPAeUGr9/OSoNSBOfrs/eZw4pRJNXhDK1N637A5LIL3fw8nqkzkcr/7NVBFxAXwAky9itiGPZhXnnyMr/"
   }
 }
