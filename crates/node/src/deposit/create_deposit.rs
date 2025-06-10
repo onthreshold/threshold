@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use bitcoin::{Address, hashes::Hash, secp256k1::Scalar, Network as BitcoinNetwork};
+use bitcoin::{Address, Network as BitcoinNetwork, hashes::Hash, secp256k1::Scalar};
 use libp2p::gossipsub::IdentTopic;
 use tokio::sync::broadcast;
 use tracing::{error, info};
