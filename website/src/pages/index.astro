@@ -1,0 +1,116 @@
+---
+import HomeLayout from "@layouts/HomeLayout.astro";
+import { keystatic } from "@lib/keystatic/client";
+import invariant from "tiny-invariant";
+
+const i18n = await keystatic.singletons.homepage.read({
+  resolveLinkedFiles: true,
+});
+invariant(i18n, "No homepage content found");
+---
+
+<HomeLayout
+  title={i18n.openGraph.title}
+  type={i18n.openGraph.type}
+  imageUrl={i18n.openGraph.image}
+  description={i18n.openGraph.description}
+  publishedTime={i18n.openGraph.publishedTime}
+  modifiedTime={i18n.openGraph.modifiedTime}
+  author={i18n.openGraph.author}
+  primaryCategory={i18n.openGraph.primaryCategory}
+>
+  <article
+    class="flex flex-col items-center justify-center min-h-screen bg-neutral-50 text-gray-800 p-4"
+  >
+    <header class="text-center mb-16">
+      <h1 class="text-6xl font-bold mb-2">athas</h1>
+      <p class="text-xl text-btcgray-600">lightweight code editor</p>
+    </header>
+
+    <div class="flex flex-col md:flex-row gap-16 w-full max-w-4xl">
+      <section class="flex-1">
+        <h2
+          class="text-2xl font-semibold mb-4 border-l-4 border-brand-500 pl-2"
+        >
+          join waitlist
+        </h2>
+        <p class="mb-4 text-btcgray-700">
+          Get early access to a minimalist coding environment designed for focus
+          and flow.
+        </p>
+        <form class="flex flex-col">
+          <input
+            type="email"
+            placeholder="your@email.com"
+            class="border border-btcgray-300 p-3 rounded mb-4 focus:ring-2 focus:ring-brand-500 outline-none"
+          />
+          <button
+            type="submit"
+            class="bg-btcgray-800 text-white p-3 rounded hover:bg-btcgray-700"
+            >join waitlist</button
+          >
+        </form>
+        <p class="mt-2 text-sm text-btcgray-600">
+          &rarr; 1,070 developers waiting
+        </p>
+      </section>
+
+      <section class="flex-1">
+        <h2
+          class="text-2xl font-semibold mb-4 border-l-4 border-brand-500 pl-2"
+        >
+          roadmap
+        </h2>
+        <ul class="space-y-4">
+          <li class="flex items-start">
+            <span class="bg-brand-500 rounded-full w-3 h-3 mr-3 mt-1.5"></span>
+            <div>
+              <h3 class="font-semibold">core features</h3>
+              <p class="text-sm text-btcgray-600">
+                minimal editor with syntax highlighting
+              </p>
+              <span class="text-xs text-brand-500">in progress</span>
+            </div>
+          </li>
+          <li class="flex items-start">
+            <span class="bg-brand-500 rounded-full w-3 h-3 mr-3 mt-1.5"></span>
+            <div>
+              <h3 class="font-semibold">vim mode</h3>
+              <p class="text-sm text-btcgray-600">vim mode for editing code</p>
+              <span class="text-xs text-brand-500">in progress</span>
+            </div>
+          </li>
+          <li class="flex items-start">
+            <span class="bg-btcgray-400 rounded-full w-3 h-3 mr-3 mt-1.5"
+            ></span>
+            <div>
+              <h3 class="font-semibold">customization</h3>
+              <p class="text-sm text-btcgray-600">
+                custom themes, fonts, and more
+              </p>
+              <span class="text-xs text-btcgray-500">not started</span>
+            </div>
+          </li>
+          <li class="flex items-start">
+            <span class="bg-btcgray-400 rounded-full w-3 h-3 mr-3 mt-1.5"
+            ></span>
+            <div>
+              <h3 class="font-semibold">collaboration</h3>
+              <p class="text-sm text-btcgray-600">real-time pair programming</p>
+              <span class="text-xs text-btcgray-500">not started</span>
+            </div>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <footer class="mt-16 text-center text-sm text-btcgray-600">
+      <p>
+        &copy; 2025 athas code editor &mdash; <a
+          href="#"
+          class="text-brand-500 hover:underline">@athasdev</a
+        >
+      </p>
+    </footer>
+  </article>
+</HomeLayout>
