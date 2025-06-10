@@ -153,7 +153,7 @@ impl Network for MockNetwork {
 }
 
 pub struct MockNodeCluster {
-    pub nodes: BTreeMap<libp2p::PeerId, NodeState<MockNetwork, MockDb>>,
+    pub nodes: BTreeMap<libp2p::PeerId, NodeState<MockNetwork, MockDb, MockOracle>>,
     pub senders: BTreeMap<libp2p::PeerId, SenderToNode>,
     pub networks: BTreeMap<libp2p::PeerId, MockNetwork>,
 }
@@ -469,7 +469,7 @@ pub fn create_node_network(
     node_config: node::NodeConfig,
     min_signers: u16,
     max_signers: u16,
-) -> Result<(NodeState<MockNetwork, MockDb>, MockNetwork), errors::NodeError> {
+) -> Result<(NodeState<MockNetwork, MockDb, MockOracle>, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(256);
     let (deposit_intent_tx, _) = broadcast::channel::<String>(100);
 

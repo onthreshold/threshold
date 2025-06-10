@@ -230,31 +230,3 @@ impl SimpleWallet {
 pub struct PendingSpend {
     pub tx: Transaction,
 }
-
-#[cfg(test)]
-mod tests {
-    use std::str::FromStr;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn create_spend_test() {
-        let mut wallet = SimpleWallet::new(
-            &bitcoin::Address::from_str("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq")
-                .unwrap()
-                .assume_checked(),
-        )
-        .await;
-        let tx = wallet.create_spend(
-            1000,
-            200,
-            &bitcoin::Address::from_str("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq")
-                .unwrap()
-                .assume_checked(),
-        );
-        assert!(tx.is_ok());
-        let (tx, _) = tx.unwrap();
-        println!("tx: {:?}", tx);
-        println!("tx vsize: {:?}", tx.vsize());
-    }
-}

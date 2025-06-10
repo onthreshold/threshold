@@ -61,6 +61,10 @@ impl Oracle for MockOracle {
     }
 
     async fn get_current_fee_per_vb(&self, priority: Option<u16>) -> Result<f64, NodeError> {
-        Ok(1.0)
+        if priority.is_some() {
+            Ok(100.0)
+        } else {
+            Ok(10.0)
+        }
     }
 }

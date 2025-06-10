@@ -23,12 +23,12 @@ mod utxo_spend_test {
 
         let mut wallet = SimpleWallet::new(&address).await;
 
-        let result = wallet.create_spend(1000, &address_to);
+        let result = wallet.create_spend(1000, 100, &address_to);
 
         match result {
             Ok((tx, sighash)) => {
                 let signed_tx = wallet.sign(&tx, &private_key, sighash);
-                node::wallet::broadcast_transaction(&signed_tx)
+                node::wallet::SimpleWallet::broadcast_transaction(&signed_tx)
                     .await
                     .expect("Failed to broadcast transaction");
                 println!("Transaction created and signed successfully");
