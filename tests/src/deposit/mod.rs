@@ -51,7 +51,16 @@ mod deposit_tests {
 
         // parse address and validate
         let addr = Address::from_str(&intent.deposit_address).unwrap();
-        assert!(addr.is_valid_for_network(bitcoin::Network::Signet));
+
+        let is_testnet: bool = std::env::var("IS_TESTNET")
+            .unwrap_or("false".to_string())
+            .parse()
+            .unwrap();
+        assert!(addr.is_valid_for_network(if is_testnet {
+            bitcoin::Network::Testnet
+        } else {
+            bitcoin::Network::Bitcoin
+        }));
     }
 
     #[tokio::test]

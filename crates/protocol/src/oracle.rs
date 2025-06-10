@@ -24,8 +24,16 @@ impl Default for BitcoinOracle {
 
 impl BitcoinOracle {
     pub fn new() -> Self {
-        const BLOCKSTREAM_API_URL: &str = "https://blockstream.info/api";
-        let builder = Builder::new(BLOCKSTREAM_API_URL);
+        dotenvy::dotenv().ok();
+        let is_testnet: bool = std::env::var("IS_TESTNET")
+            .unwrap_or("false".to_string())
+            .parse()
+            .unwrap();
+        let builder = Builder::new(if is_testnet {
+            "https://blockstream.info/testnet/api"
+        } else {
+            "https://blockstream.info/api"
+        });
         let async_client = builder.build_async().unwrap();
 
         Self {

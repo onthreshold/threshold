@@ -59,6 +59,23 @@ impl EsploraApiClient {
             deposit_intent_rx,
         }
     }
+
+    pub fn new_with_network(
+        network: Network,
+        capacity: Option<usize>,
+        deposit_intent_rx: Option<broadcast::Receiver<String>>,
+    ) -> Self {
+        let url = match network {
+            Network::Bitcoin => "https://blockstream.info/api",
+            Network::Testnet => "https://blockstream.info/testnet/api",
+            Network::Signet => "https://blockstream.info/signet/api",
+            Network::Regtest => panic!("Regtest network is not supported by Esplora"),
+            _ => panic!("Unsupported network type"),
+        };
+        let builder = Builder::new(url);
+        let client = builder.build_async().unwrap();
+        Self::new(client, capacity, deposit_intent_rx)
+    }
 }
 
 #[async_trait]

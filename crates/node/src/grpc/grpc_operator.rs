@@ -5,9 +5,9 @@ use crate::grpc::grpc_handler::node_proto::{
     StartSigningResponse,
 };
 use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
-use bitcoin::Address;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Scalar;
+use bitcoin::{Address, Network as BitcoinNetwork};
 use libp2p::gossipsub::IdentTopic;
 use serde_json;
 use std::str::FromStr;
@@ -125,7 +125,21 @@ pub async fn create_deposit_intent(
         .add_tweak(&secp, &tweak_scalar)
         .map_err(|e| Status::internal(format!("Failed to add tweak: {:?}", e)))?;
 
-    let deposit_address = Address::p2tr(&secp, tweaked_key, None, bitcoin::Network::Testnet);
+    let is_testnet: bool = std::env::var("IS_TESTNET")
+        .unwrap_or("false".to_string())
+        .parse()
+        .unwrap();
+
+    let deposit_address = Address::p2tr(
+        &secp,
+        tweaked_key,
+        None,
+        if is_testnet {
+            BitcoinNetwork::Testnet
+        } else {
+            BitcoinNetwork::Bitcoin
+        },
+    );
 
     let deposit_intent = DepositIntent {
         amount_sat,

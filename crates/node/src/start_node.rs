@@ -4,8 +4,8 @@ use crate::{
     NodeConfig, NodeState, db::RocksDb, grpc::grpc_handler::NodeControlService,
     key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm,
 };
+use bitcoin::Network;
 use clients::{EsploraApiClient, WindowedConfirmedTransactionProvider};
-use esplora_client::Builder;
 use std::path::{Path, PathBuf};
 use tokio::sync::broadcast;
 use tonic::transport::Server;
@@ -125,10 +125,16 @@ pub async fn start_node(
     let main_loop_handle = tokio::spawn(async move { node_state.start().await });
 
     let deposit_monitor_handle = tokio::spawn(async move {
-        let mut client = EsploraApiClient::new(
-            Builder::new("https://blockstream.info/testnet/api")
-                .build_async()
-                .unwrap(),
+        let is_testnet = dotenvy::var("IS_TESTNET")
+            .unwrap_or("false".to_string())
+            .parse()
+            .unwrap();
+        let mut client = EsploraApiClient::new_with_network(
+            if is_testnet {
+                Network::Testnet
+            } else {
+                Network::Bitcoin
+            },
             Some(100),
             Some(deposit_intent_rx),
         );

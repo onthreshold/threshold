@@ -1,11 +1,11 @@
 use crate::db::Db;
 use crate::{Network, NodeState};
-use bitcoin::{Address, OutPoint, Txid};
 use bitcoin::absolute::LockTime;
 use bitcoin::hashes::Hash;
 use bitcoin::sighash::{EcdsaSighashType, SighashCache};
 use bitcoin::transaction::Version;
 use bitcoin::witness::Witness;
+use bitcoin::{Address, OutPoint, Txid};
 use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut};
 use clients::{EsploraApiClient, NodeError};
 use esplora_client::AsyncClient;
@@ -29,7 +29,9 @@ pub struct SimpleWallet {
 impl SimpleWallet {
     pub async fn new(address: &bitcoin::Address) -> Self {
         let esplora_client = EsploraApiClient::default();
-        let client_utxos = refresh_utxos(&esplora_client.client, address.clone(), 3, None).await.unwrap();
+        let client_utxos = refresh_utxos(&esplora_client.client, address.clone(), 3, None)
+            .await
+            .unwrap();
 
         let utxos = client_utxos
             .into_iter()
@@ -127,7 +129,6 @@ impl<N: Network, D: Db> NodeState<N, D> {
         })
     }
 }
-
 
 async fn refresh_utxos(
     client: &AsyncClient,

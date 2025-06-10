@@ -13,3 +13,4 @@ tokio = { workspace = true }
 async-trait = { workspace = true }
 esplora-client = { workspace = true }
 types = { path = "../types" }
+dotenvy = { workspace = true }
