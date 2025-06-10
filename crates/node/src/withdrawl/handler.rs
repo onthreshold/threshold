@@ -36,6 +36,11 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for SpendIntentState {
             }) => {
                 self.confirm_withdrawal(node, &challenge, &signature)
                     .await?;
+                if let Some(response_channel) = response_channel {
+                    response_channel
+                        .send(SelfResponse::ConfirmWithdrawalResponse { success: true })
+                        .map_err(|e| NodeError::Error(e.to_string()))?;
+                }
             }
             _ => {}
         }

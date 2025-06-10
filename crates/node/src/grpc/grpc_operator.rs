@@ -6,12 +6,6 @@ use crate::grpc::grpc_handler::node_proto::{
 };
 use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
 use crate::withdrawl::SpendIntent;
-use bitcoin::hashes::Hash;
-use bitcoin::secp256k1::Scalar;
-use bitcoin::{Address, Network as BitcoinNetwork};
-use libp2p::gossipsub::IdentTopic;
-use serde_json;
-use std::str::FromStr;
 use tonic::Status;
 use tracing::{debug, info};
 
@@ -209,8 +203,9 @@ pub async fn confirm_withdrawal(
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
-    Ok(ConfirmWithdrawalResponse {
-        success: true,
-        message: "Withdrawal confirmed".to_string(),
-    })
+    let SelfResponse::ConfirmWithdrawalResponse { success } = response else {
+        return Err(Status::internal("Invalid response from node"));
+    };
+
+    Ok(ConfirmWithdrawalResponse { success })
 }
