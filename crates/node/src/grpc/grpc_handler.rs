@@ -61,6 +61,8 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<CreateDepositIntentRequest>,
     ) -> Result<Response<CreateDepositIntentResponse>, Status> {
-        grpc_operator::create_deposit_intent(&self.network, request).await
+        let request = request.into_inner();
+        let response = grpc_operator::create_deposit_intent(&self.network, request).await?;
+        Ok(Response::new(response))
     }
 }
