@@ -1,3 +1,4 @@
+pub mod config;
 pub mod deposit;
 pub mod dkg;
 pub mod esplora_client;
@@ -5,3 +6,4 @@ pub mod mocks;
 pub mod protocol;
 pub mod signing;
 pub mod util;
+pub mod wallet;

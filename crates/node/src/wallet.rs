@@ -76,12 +76,10 @@ impl SimpleWallet {
             witness: Witness::new(),
         };
 
-        let recipient_output = TxOut {
+        let mut outputs = vec![TxOut {
             value: Amount::from_sat(amount_sat),
             script_pubkey: address.script_pubkey(),
-        };
-
-        let mut outputs = vec![recipient_output];
+        }];
 
         // Add change output if needed (only if change is meaningful, e.g., > dust threshold)
         if change_sat > 546 {
@@ -111,6 +109,57 @@ impl SimpleWallet {
 
         Ok((tx, sighash.to_byte_array()))
     }
+
+    pub fn sign(
+        &mut self,
+        tx: &Transaction,
+        private_key: &bitcoin::PrivateKey,
+        sighash: [u8; 32],
+    ) -> Transaction {
+        // For P2WPKH, we need to create a witness signature
+        let secp = bitcoin::key::Secp256k1::new();
+
+        // Create the signature using the properly calculated sighash
+        let message = bitcoin::secp256k1::Message::from_digest(sighash);
+        let signature = secp.sign_ecdsa(&message, &private_key.inner);
+
+        // Create witness with signature + sighash type (0x01 = SIGHASH_ALL)
+        let mut sig_bytes = signature.serialize_der().to_vec();
+        sig_bytes.push(0x01); // SIGHASH_ALL
+
+        let compressed_pubkey = bitcoin::CompressedPublicKey::from_private_key(&secp, private_key)
+            .expect("Failed to get compressed public key");
+
+        let mut witness = Witness::new();
+        witness.push(sig_bytes);
+        witness.push(compressed_pubkey.to_bytes());
+
+        let mut response_tx = tx.clone();
+        // Add witness to the first (and only) input
+        if let Some(input) = response_tx.input.first_mut() {
+            input.witness = witness;
+        }
+
+        response_tx
+    }
+}
+
+pub async fn broadcast_transaction(tx: &Transaction) -> Result<String, NodeError> {
+    // Create esplora client for testnet4
+    let builder = esplora_client::Builder::new("https://blockstream.info/testnet/api");
+    let client = builder.build_async().unwrap();
+
+    // Serialize the transaction to raw bytes
+    let tx_bytes = bitcoin::consensus::encode::serialize(tx);
+    let tx_hex = hex::encode(&tx_bytes);
+
+    // Broadcast the transaction
+    client
+        .broadcast(tx)
+        .await
+        .map_err(|e| NodeError::Error(format!("Failed to broadcast transaction: {}", e)))?;
+
+    Ok(tx_hex)
 }
 
 #[derive(Debug)]
@@ -138,10 +187,11 @@ async fn refresh_utxos(
 ) -> Result<Vec<Utxo>, NodeError> {
     let mut unspent_txs = Vec::new();
     let mut last_seen_txid = start_transactions;
+    let script = address.script_pubkey();
 
     for _ in 0..number_pages {
         let address_txs = client
-            .scripthash_txs(&address.script_pubkey(), last_seen_txid)
+            .scripthash_txs(&script, last_seen_txid)
             .await
             .map_err(|e| {
                 NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
@@ -152,33 +202,36 @@ async fn refresh_utxos(
         }
 
         last_seen_txid = Some(address_txs.last().unwrap().txid);
-
         for tx in address_txs {
-            if let Ok(Some(full_tx)) = client.get_tx(&tx.txid).await {
-                for (vout, output) in full_tx.output.iter().enumerate() {
-                    if output.script_pubkey == address.script_pubkey() {
-                        let outpoint = OutPoint {
-                            txid: tx.txid,
-                            vout: vout as u32,
-                        };
+            let Some(full_tx) = client.get_tx(&tx.txid).await.ok().flatten() else {
+                continue;
+            };
+            let Ok(tx_status) = client.get_tx_status(&tx.txid).await else {
+                continue;
+            };
+            if !tx_status.confirmed {
+                continue;
+            }
 
-                        if let Ok(tx_status) = client.get_tx_status(&tx.txid).await {
-                            if tx_status.confirmed {
-                                if let Ok(Some(output_status)) =
-                                    client.get_output_status(&tx.txid, vout as u64).await
-                                {
-                                    if !output_status.spent {
-                                        unspent_txs.push(Utxo {
-                                            outpoint,
-                                            value: Amount::from_sat(output.value.to_sat()),
-                                            script_pubkey: address.script_pubkey(),
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    }
+            for (vout, output) in full_tx.output.iter().enumerate() {
+                if output.script_pubkey != script {
+                    continue;
                 }
+                let Ok(Some(output_status)) = client.get_output_status(&tx.txid, vout as u64).await
+                else {
+                    continue;
+                };
+                if output_status.spent {
+                    continue;
+                }
+                unspent_txs.push(Utxo {
+                    outpoint: OutPoint {
+                        txid: tx.txid,
+                        vout: vout as u32,
+                    },
+                    value: Amount::from_sat(output.value.to_sat()),
+                    script_pubkey: script.clone(),
+                });
             }
         }
 

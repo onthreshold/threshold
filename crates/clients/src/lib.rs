@@ -41,7 +41,7 @@ pub struct Utxo {
 
 impl Default for EsploraApiClient {
     fn default() -> Self {
-        let builder = Builder::new("https://blockstream.info/api");
+        let builder = Builder::new("https://blockstream.info/testnet/api");
         let client = builder.build_async().unwrap();
         Self::new(client, None, None)
     }
@@ -193,7 +193,6 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
                         };
 
                         for tx in new_txs {
-                            println!("Found new confirmed transaction: {}", tx.compute_txid());
                             match self.tx_channel.as_ref().unwrap().send(tx) {
                                 Ok(_) => (),
                                 Err(e) => {
