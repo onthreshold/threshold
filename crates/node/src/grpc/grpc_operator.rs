@@ -1,12 +1,8 @@
 use crate::deposit_intents::DepositIntent;
 use crate::grpc::grpc_handler::node_proto::{
     self, CreateDepositIntentRequest, CreateDepositIntentResponse,
-    GetPendingDepositIntentsResponse, SendDirectMessageRequest, SendDirectMessageResponse,
-    SpendFundsRequest, SpendFundsResponse, StartDkgRequest, StartDkgResponse, StartSigningRequest,
+    GetPendingDepositIntentsResponse, SpendFundsRequest, SpendFundsResponse, StartSigningRequest,
     StartSigningResponse,
-};
-use crate::swarm_manager::{
-    DirectMessage, Network, NetworkHandle, PingBody, SelfRequest, SelfResponse,
 };
 use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
 use bitcoin::Address;
@@ -132,7 +128,6 @@ pub async fn create_deposit_intent(
     let deposit_address = Address::p2tr(&secp, tweaked_key, None, bitcoin::Network::Testnet);
 
     let deposit_intent = DepositIntent {
-        user_id: user_id.to_string(),
         amount_sat,
         deposit_tracking_id: deposit_tracking_id.clone(),
         deposit_address: deposit_address.to_string(),
@@ -199,7 +194,6 @@ pub async fn get_pending_deposit_intents(
         intents: intents
             .iter()
             .map(|intent| node_proto::DepositIntent {
-                user_id: intent.user_id.clone(),
                 amount_satoshis: intent.amount_sat,
                 deposit_tracking_id: intent.deposit_tracking_id.clone(),
                 deposit_address: intent.deposit_address.clone(),

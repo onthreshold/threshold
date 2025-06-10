@@ -65,7 +65,7 @@ pub enum SelfRequest {
     CreateDeposit { deposit_intent: DepositIntent },
     GetPendingDepositIntents,
     StartSigningSession { hex_message: String },
-    Spend { amount_sat: u64 },
+    Spend { amount_sat: u64, address_to: String },
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
