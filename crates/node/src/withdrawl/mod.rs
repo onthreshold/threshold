@@ -16,3 +16,17 @@ pub struct SpendIntent {
 pub struct SpendIntentState {
     pub pending_intents: HashMap<String, SpendIntent>,
 }
+
+impl Default for SpendIntentState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SpendIntentState {
+    pub fn new() -> Self {
+        Self {
+            pending_intents: HashMap::new(),
+        }
+    }
+}

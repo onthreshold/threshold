@@ -1,20 +1,20 @@
 {
   "key_data": {
-    "public_key_b58": "12D3KooWR6oorsZ5e1RgzzGTEfP59oGQxeGxM5Jix4sGqvmVNaMj",
-    "encrypted_private_key_b64": "4a2DEG+xo91ljBS0ODEZEQ7o7CxOSlbLUUk2N8/ZCvNXomC/S1kFfJCPF5HFrMPgubNHigG5JRNoOCW38LyzUmuVufS+rTPGtY+ZlxAe4vpvjaqm",
+    "public_key_b58": "12D3KooWCsoHd5ArVJQ3mC589GJRGKRsEwY3r2tCGjuMMCFbrkoL",
+    "encrypted_private_key_b64": "WZuwaXBdNnq+67bLiw6KVtkb99+/AuvylW23sJdryznm8MxcDA7PBJ7PMlzJ6W2q09tG/Plx6lQ2n5gMlU3dSeyHRUxFAX2PFA3ltU/hR0CnvF4n",
     "encryption_params": {
       "kdf": "argon2id",
-      "salt_b64": "n5Td+SnOMubFyX9ywYcvTQ",
-      "iv_b64": "tDlwIro3ulTwPANU"
+      "salt_b64": "U03eD+BOENnN0o7ReMCqwg",
+      "iv_b64": "9zkuxnt1mEK1sYPZ"
     }
   },
   "dkg_keys": {
-    "encrypted_private_key_package_b64": "Sc+sJxlnLuL9bSMDd6bZIe3vR9j4ZLykZ/ppsozLyxH5aOZPBISP6disuHhmRio6ZT8u7CIHl1eDc7lo50AEM48L6wDdaQVWhCinOEgx4Mu3nQMPmR0XONKk2LAmF8l/pgbmeVxGe+8Hvv4qJfP3L0rgQCLtbIyWVZdZOZ5fiohROh6F7UX6y+eriisl/KRzVB+blHiqAwE=",
+    "encrypted_private_key_package_b64": "kymIdcfXXye/x9EQXbgXvIpBTqd2GCJnVYMmPmhJll0Sj3XI27NiA/PM9iIK9yZXthJvKlUjj++76I6No9I2dN5qkU+vm4M/0JZ0+tqdn8BEGic72+2jdSiA4FeFZunQTL+5w39CGs9sKT8aQoxWwHMntbYX9pEQHVwUobbgaGzd1u1AR8BRxljrCwHLSZ6T0NSddvcIML8=",
     "dkg_encryption_params": {
       "kdf": "argon2id",
-      "salt_b64": "n5Td+SnOMubFyX9ywYcvTQ",
-      "iv_b64": "X4zSa5xxFO9q1pl+"
+      "salt_b64": "U03eD+BOENnN0o7ReMCqwg",
+      "iv_b64": "mjmIZG9ia7jLDdq8"
     },
-    "pubkey_package_b64": "AO7WsbEDZSbVGg1JY0R9U+77Ki7S9eHQdHgI2nBCQslVv1H+u/oDJ9T/++IvBtdTTiigmHNfEkbmmMNMDZIH7BD+GUMuzy2bH5JtU1fxPOM7LHOtvyhh30CoTU/BVIDOZiAS6IGddgJF5vdMXkRzwvoKIyQlbGD3tszxYj2xrFX3xx3ti3LFPqr7qwWqP8I+TRqugkHk/rVkTUulWc3mEPJ0CQHK4fJUA0+oNMY9dPZaT2awUHKNTIhCJooQ/ZGdWotVSDQ9LQtVAuEGl3lFoBX6974gpSxo7grEo1H8ENkr0jeWdlvP/BD+"
+    "pubkey_package_b64": "AO7WsbEDAG7ADt/uoxntQD4mltvuXi05mpuFHmHw+tINm5mZeCgCWM8NuP137uejgKVp+7F46oofkymgpwkAoPyO5dhe5klQLZcW1LIuGR5Ba0YulXPr33DdAQvBtTzyv3R2cteAogMDvuVMndpmGkrZo+Jbpib791rxcf6OrqMGFN1mDb01dne+92uo3/qpojcymQ8PAdDRzp5ra51SWXV9FAro0o5QA+seLOiTOsKYFTEYwalq3Iv3/YrIzqSYf2rbqZe3xpLnAppwqc6MRY91eTX/p1X6h+o/EXwaZWRAld+GYpDk3xpW"
   }
 }

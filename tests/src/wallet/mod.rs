@@ -23,7 +23,7 @@ mod utxo_spend_test {
 
         let mut wallet = SimpleWallet::new(&address).await;
 
-        let result = wallet.create_spend(1000, 100, &address_to);
+        let result = wallet.create_spend(1000, 200, &address_to);
 
         match result {
             Ok((tx, sighash)) => {
