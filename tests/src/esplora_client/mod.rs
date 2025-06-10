@@ -2,18 +2,11 @@
 mod esplora_client_test {
     use bitcoin::{Address, Network};
     use clients::{EsploraApiClient, WindowedConfirmedTransactionProvider};
-    use esplora_client::Builder;
     use std::str::FromStr;
 
     #[tokio::test]
     async fn test_get_confirmed_transactions() {
-        let client = EsploraApiClient::new(
-            Builder::new("https://blockstream.info/api")
-                .build_async()
-                .unwrap(),
-            Some(100),
-            None,
-        );
+        let client = EsploraApiClient::new_with_network(Network::Bitcoin, Some(100), None);
         let address = Address::from_str("bc1qezwz3yt46nsgzcwlg0dsw680nryjpq5u8pvzts")
             .unwrap()
             .require_network(Network::Bitcoin)

@@ -1,20 +1,20 @@
 {
   "key_data": {
-    "public_key_b58": "12D3KooWA3VU9X7veJo5beBTG5srwshhAMJDRALatht3tTFBhG4Z",
-    "encrypted_private_key_b64": "mPzupjoQ3+aj1X3q9CWi/zoR7YPxTCpPXSABMOeZbqxdFsAhLw5IIE8ErzXWmqhMpYCUD0wDisp/khtg0baQB1SImKP21Hele35yQbF4oaJD5dw7",
+    "public_key_b58": "12D3KooWEVWm5YDbLNPmJ6yfczHZ7fXXFN6Q5UvRd5zyNFLwLuRJ",
+    "encrypted_private_key_b64": "OPJOfCOIZIsFIGnvKZOhM5uNtdZETZGT6LH3WlXWnBeu5HM2PBjrEmOFJWCMDUbeY5q6swASvPHTJAuAX4ADjCdZlotvF2rm0sVsv/CRgkn2Xbfp",
     "encryption_params": {
       "kdf": "argon2id",
-      "salt_b64": "nmaa7m45Jc+l3mN6lG+5ig",
-      "iv_b64": "gyJOLlfy/iYeyz21"
+      "salt_b64": "KLAjN3/JiOTMsHLtzJRIDA",
+      "iv_b64": "OxFQomVaEvjbK76d"
     }
   },
   "dkg_keys": {
-    "encrypted_private_key_package_b64": "dIeqsOCxnvesS59M5dLTnNV1sellvhDgMXHzK2wLlBS7BjCujSfQQQkn25NnQeyOQi0yO4rYJcil8ZIRUZCTDB+gw6VF5pDFb9trSD8/w1Pk4If/C+JNYi8KGmiqg9+NLtVMc3P9sJ9QwuRZpsUNu6W4+QLIYx3+CsrDurAzDCAXBjBxedNQi90VQA1tIJxL3hKxzf7bl8w=",
+    "encrypted_private_key_package_b64": "qYp2q6z6xQtUIhWEzsvZb6S+ZAfM+GxqJkz01Od18x15UuXIsCRqU1dp8fYtaNxCM5+fukoS70cRO2ZMJraXGcNKhSA/Zem6IO4lTIoEtNXzlT/ufujFOHqyFI/eXRC3Vi10AcUoKyYr6jiQ0hSBwAkGPS7alJqntJvAPJoQGWyX12+IuSPy/0Ki0eQfHVp+i2VPR7YHctY=",
     "dkg_encryption_params": {
       "kdf": "argon2id",
-      "salt_b64": "nmaa7m45Jc+l3mN6lG+5ig",
-      "iv_b64": "ixsCddoQumev/3L0"
+      "salt_b64": "KLAjN3/JiOTMsHLtzJRIDA",
+      "iv_b64": "AaZvfPQCIr7pUVPL"
     },
-    "pubkey_package_b64": "AO7WsbEDIrszyT6nWW7Psi/kCnzFbb66jbaC2C3aO8ty3IhhXLQCZ60g7UgTB55o9GbGRcPjW/3O3PGGrIMnv/V8hmTRu6F/bPTBmhCFIXOMneRWfsp10L1UtZ1bySrH7XgkNbHhTwIZQtM1RAXP56GMd1CLvrkD4byKT23InMR0qvqYFloyhqZPMMXWBpKszNDzoQI2DoyRMoe0vnyxl6LCCbB3QS25A7qA6Nfo97qtpVGFv0oDYnB34b7jCMCHECUyo/Bdf6VRAsw6f331yPhzqYWkLmG6iPqq8JDgwzb7/2Cr6kA/6saj"
+    "pubkey_package_b64": "AO7WsbEDKT45XJHWFz3jHQaLJtzQPIjnIXThALvlf6QRb4AqqawDbi0trvoiYK6i8IE4eYx+kNkJZhL/dJJyVO9ROgMbl0bFJ8lVmFHBgy4q+xr4EadmvTkfdpqDAoxHm8skKDs19wOi39UWNv/r+lfVKSi1B9pG2bJNQUCuLaMyJvWjGPFOXNMFgG+LtVCoRy3jlLFjXxYIxHsciAH/bJyif2fmNBu5AgzCtgD45RQnbOfkH6/3qn8UOOVfS03DiJGi8TdJyua1A3w+5ddW5HYSDJ0/8wv16o8nOvbVfSfyeTDmgBtBGcvW"
   }
 }

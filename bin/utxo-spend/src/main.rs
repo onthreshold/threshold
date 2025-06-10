@@ -65,8 +65,18 @@ fn sign_transaction(tx: &mut Transaction, private_key: &PrivateKey, sighash: &[u
 }
 
 async fn broadcast_transaction(tx: &Transaction) {
+    dotenvy::dotenv().ok();
+    let is_testnet: bool = std::env::var("IS_TESTNET")
+        .unwrap_or("false".to_string())
+        .parse()
+        .unwrap();
+
     // Create esplora client for testnet4
-    let builder = Builder::new("https://blockstream.info/testnet/api");
+    let builder = Builder::new(if is_testnet {
+        "https://blockstream.info/testnet/api"
+    } else {
+        "https://blockstream.info/api"
+    });
     let client = builder.build_async().unwrap();
 
     // Serialize the transaction to raw bytes
@@ -102,6 +112,8 @@ pub fn get_utxos_for_address(address: &Address) -> Vec<node::wallet::Utxo> {
 
 #[allow(deprecated)]
 pub fn generate_from_mnemonic(mnemonic: &str) -> (Address, PrivateKey) {
+    dotenvy::dotenv().ok();
+
     // Generate a new mnemonic (12 words)
     let mnemonic = Mnemonic::parse_in_normalized(Language::English, mnemonic).unwrap();
     println!("Mnemonic: {}", mnemonic);
@@ -109,20 +121,32 @@ pub fn generate_from_mnemonic(mnemonic: &str) -> (Address, PrivateKey) {
     // Convert to seed
     let seed = mnemonic.to_seed(""); // Empty passphrase
 
+    let is_testnet: bool = std::env::var("IS_TESTNET")
+        .unwrap_or("false".to_string())
+        .parse()
+        .unwrap();
+
+    let network = if is_testnet {
+        Network::Testnet
+    } else {
+        Network::Bitcoin
+    };
+
     // Create extended private key
     let secp = Secp256k1::new();
-    let xprv = ExtendedPrivKey::new_master(Network::Testnet, &seed).unwrap();
+
+    let xprv = ExtendedPrivKey::new_master(network, &seed).unwrap();
 
     // Derive key at standard path (m/84'/1'/0'/0/0 for signet P2WPKH)
     let derivation_path = DerivationPath::from_str("m/84'/1'/0'/0/0").unwrap();
     let derived_xprv = xprv.derive_priv(&secp, &derivation_path).unwrap();
 
     // Get the private key
-    let private_key = PrivateKey::new(derived_xprv.private_key, Network::Testnet);
+    let private_key = PrivateKey::new(derived_xprv.private_key, network);
     let compressed_public_key: CompressedPublicKey =
         CompressedPublicKey::from_private_key(&secp, &private_key)
             .expect("Failed to convert public key to compressed public key");
-    let address = Address::p2wpkh(&compressed_public_key, Network::Testnet);
+    let address = Address::p2wpkh(&compressed_public_key, network);
 
     println!("Extended Private Key: {}", xprv);
     println!("Derived Private Key (WIF): {}", private_key.to_wif());
