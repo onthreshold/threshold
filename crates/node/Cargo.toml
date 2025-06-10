@@ -51,6 +51,7 @@ types = { path = "../types" }
 serde_yaml = "0.9.34"
 clients = { path = "../clients" }
 dotenvy = { workspace = true }
+bip39 = "2.1.0"
 
 [dev-dependencies]
 tempfile = "3.8"
