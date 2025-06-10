@@ -1,4 +1,7 @@
-use crate::{db::Db, dkg::DkgState, handler::Handler, signing::SigningState};
+use crate::{
+    db::Db, deposit_intents::DepositIntentState, dkg::DkgState, handler::Handler,
+    signing::SigningState,
+};
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{
     Argon2,
@@ -18,6 +21,7 @@ use tracing::error;
 use types::errors::NodeError;
 
 pub mod db;
+pub mod deposit_intents;
 pub mod dkg;
 pub mod grpc;
 pub mod handler;
@@ -201,10 +205,7 @@ pub struct NodeState<N: Network, D: Db> {
     pub network_handle: N,
 
     pub network_events_stream: broadcast::Receiver<NetworkEvent>,
-
     // track deposits and then send new addresses over a channel to the polling thread
-    pub deposit_addresses: HashSet<String>,
-    pub deposit_intent_tx: broadcast::Sender<String>,
 }
 
 impl<N: Network, D: Db> NodeState<N, D> {
@@ -221,6 +222,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
         let dkg_state = DkgState::new()?;
         let signing_state = SigningState::new()?;
+        let deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
 
         let mut node_state = NodeState {
             network_handle: network_handle.clone(),
@@ -233,11 +235,13 @@ impl<N: Network, D: Db> NodeState<N, D> {
             rng: frost::rand_core::OsRng,
             wallet: crate::wallet::SimpleWallet::default(),
             config,
-            handlers: vec![Box::new(dkg_state), Box::new(signing_state)],
+            handlers: vec![
+                Box::new(dkg_state),
+                Box::new(signing_state),
+                Box::new(deposit_intent_state),
+            ],
             pubkey_package: None,
             private_key_package: None,
-            deposit_addresses: HashSet::new(),
-            deposit_intent_tx,
         };
 
         if let Some((private_key, pubkey)) = keys {
@@ -246,27 +250,6 @@ impl<N: Network, D: Db> NodeState<N, D> {
         }
 
         Ok(node_state)
-    }
-
-    pub async fn create_deposit(
-        &mut self,
-        deposit_intent: crate::db::DepositIntent,
-    ) -> Result<(), NodeError> {
-        self.db.insert_deposit_intent(deposit_intent.clone())?;
-
-        if self
-            .deposit_addresses
-            .insert(deposit_intent.deposit_address.clone())
-        {
-            if let Err(e) = self
-                .deposit_intent_tx
-                .send(deposit_intent.deposit_address.clone())
-            {
-                error!("Failed to notify deposit monitor of new address: {}", e);
-            }
-        }
-
-        Ok(())
     }
 }
 
