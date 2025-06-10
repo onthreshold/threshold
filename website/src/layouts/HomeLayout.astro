@@ -1,0 +1,100 @@
+---
+import "../styles/global.css";
+import { ClientRouter } from "astro:transitions";
+import { SiteName } from "../theme.config";
+import { Font } from "astro:assets";
+
+const {
+  title = "Default Title",
+  type,
+  imageUrl,
+  description,
+  publishedTime,
+  modifiedTime,
+  author,
+  primaryCategory,
+}: {
+  title?: string;
+  type?: string;
+  imageUrl?: string;
+  description?: string;
+  publishedTime?: string;
+  modifiedTime?: string;
+  author?: string;
+  primaryCategory?: string;
+} = Astro.props;
+const currentPath = Astro.url.pathname;
+---
+
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="language" content="en" />
+    <meta name="site-name" content={SiteName} />
+    <meta name="author" content={author} />
+    <meta name="description" content={description} />
+
+    <meta name="og:site_name" content={SiteName} />
+    <meta property="og:title" content={title} />
+    {description && <meta property="og:description" content={description} />}
+    {type && <meta property="og:type" content={type} />}
+    {imageUrl && <meta property="og:image" content={imageUrl} />}
+
+    {
+      publishedTime && (
+        <meta property="article:published_time" content={publishedTime} />
+      )
+    }
+    {
+      modifiedTime && (
+        <meta property="article:modified_time" content={modifiedTime} />
+      )
+    }
+    {author && <meta property="article:author" content={author} />}
+    {
+      primaryCategory && (
+        <meta property="article:section" content={primaryCategory} />
+      )
+    }
+
+    <title>{title}</title>
+
+    <Font cssVariable="--font-lora" preload />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+
+    <script
+      defer
+      data-domain="skeptrune.com"
+      src="https://plausible.trieve.ai/js/script.js"></script>
+  </head>
+  <body>
+    <header>
+      <nav class=""></nav>
+
+      <main>
+        <slot />
+      </main>
+      <footer></footer>
+    </header>
+  </body>
+</html>
+
+<ClientRouter />
+
+<style>
+  html {
+    font-family: var(--font-lora);
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-family: var(--font-lora);
+    }
+  }
+</style>
