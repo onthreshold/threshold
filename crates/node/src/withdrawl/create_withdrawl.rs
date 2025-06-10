@@ -4,6 +4,7 @@ use crate::{
     NodeState,
     db::Db,
     swarm_manager::Network,
+    wallet::SimpleWallet,
     withdrawl::{SpendIntent, SpendIntentState},
 };
 use bitcoin::{
@@ -11,7 +12,7 @@ use bitcoin::{
     secp256k1::{Message, PublicKey, ecdsa::Signature},
 };
 use protocol::oracle::Oracle;
-use sha2::{Digest, Sha256, digest};
+use sha2::{Digest, Sha256};
 use types::errors::NodeError;
 
 impl SpendIntentState {
@@ -47,7 +48,7 @@ impl SpendIntentState {
         let total_amount = withdrawal_intent.amount_sat + fee;
 
         let nonce: [u8; 16] = rand::random();
-        let challenge = Sha256::digest(&nonce).to_vec();
+        let challenge = Sha256::digest(nonce).to_vec();
         let challenge_hex = hex::encode(challenge);
 
         self.pending_intents
@@ -99,7 +100,7 @@ impl SpendIntentState {
             return Err(NodeError::Error("Invalid signature".to_string()));
         }
 
-        let tx = node.wallet.create_spend(
+        let (tx, _) = node.wallet.create_spend(
             withdrawal_intent.amount_sat,
             200,
             &bitcoin::Address::from_str(&withdrawal_intent.address_to)
@@ -107,7 +108,7 @@ impl SpendIntentState {
                 .assume_checked(),
         )?;
 
-        node.wallet.broadcast_transaction(&tx)?;
+        SimpleWallet::broadcast_transaction(&tx).await?;
 
         Ok(())
     }

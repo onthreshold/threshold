@@ -63,7 +63,7 @@ impl SigningState {
                 }
             }
             Err(e) => {
-                error!("❌ Failed to create spend transaction: {}", e);
+                error!("❌ Failed to create spend transaction: {:?}", e);
                 None
             }
         }

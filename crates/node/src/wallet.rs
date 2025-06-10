@@ -5,8 +5,9 @@ use bitcoin::transaction::Version;
 use bitcoin::witness::Witness;
 use bitcoin::{Address, OutPoint, Txid};
 use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut};
-use clients::{EsploraApiClient, NodeError};
+use clients::EsploraApiClient;
 use esplora_client::AsyncClient;
+use types::errors::NodeError;
 
 /// Very simple demonstration UTXO representation (key-path Taproot assumed)
 #[derive(Debug, Clone)]
@@ -28,7 +29,7 @@ pub struct SimpleWallet {
 impl SimpleWallet {
     pub async fn new(address: &bitcoin::Address) -> Self {
         let esplora_client = EsploraApiClient::default();
-        let client_utxos = refresh_utxos(&esplora_client.client, address.clone(), 3, None)
+        let client_utxos = Self::refresh_utxos(&esplora_client.client, address.clone(), 3, None)
             .await
             .unwrap();
 
@@ -140,24 +141,89 @@ impl SimpleWallet {
 
         response_tx
     }
-}
 
-pub async fn broadcast_transaction(tx: &Transaction) -> Result<String, NodeError> {
-    // Create esplora client for testnet4
-    let builder = esplora_client::Builder::new("https://blockstream.info/testnet/api");
-    let client = builder.build_async().unwrap();
+    pub async fn broadcast_transaction(tx: &Transaction) -> Result<String, NodeError> {
+        // Create esplora client for testnet4
+        let builder = esplora_client::Builder::new("https://blockstream.info/testnet/api");
+        let client = builder.build_async().unwrap();
 
-    // Serialize the transaction to raw bytes
-    let tx_bytes = bitcoin::consensus::encode::serialize(tx);
-    let tx_hex = hex::encode(&tx_bytes);
+        // Serialize the transaction to raw bytes
+        let tx_bytes = bitcoin::consensus::encode::serialize(tx);
+        let tx_hex = hex::encode(&tx_bytes);
 
-    // Broadcast the transaction
-    client
-        .broadcast(tx)
-        .await
-        .map_err(|e| NodeError::Error(format!("Failed to broadcast transaction: {}", e)))?;
+        // Broadcast the transaction
+        client
+            .broadcast(tx)
+            .await
+            .map_err(|e| NodeError::Error(format!("Failed to broadcast transaction: {}", e)))?;
 
-    Ok(tx_hex)
+        Ok(tx_hex)
+    }
+
+    pub async fn refresh_utxos(
+        client: &AsyncClient,
+        address: Address,
+        number_pages: u32,
+        start_transactions: Option<Txid>,
+    ) -> Result<Vec<Utxo>, NodeError> {
+        let mut unspent_txs = Vec::new();
+        let mut last_seen_txid = start_transactions;
+        let script = address.script_pubkey();
+
+        for _ in 0..number_pages {
+            let address_txs = client
+                .scripthash_txs(&script, last_seen_txid)
+                .await
+                .map_err(|e| {
+                    NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
+                })?;
+
+            if address_txs.is_empty() {
+                break;
+            }
+
+            last_seen_txid = Some(address_txs.last().unwrap().txid);
+            for tx in address_txs {
+                let Some(full_tx) = client.get_tx(&tx.txid).await.ok().flatten() else {
+                    continue;
+                };
+                let Ok(tx_status) = client.get_tx_status(&tx.txid).await else {
+                    continue;
+                };
+                if !tx_status.confirmed {
+                    continue;
+                }
+
+                for (vout, output) in full_tx.output.iter().enumerate() {
+                    if output.script_pubkey != script {
+                        continue;
+                    }
+                    let Ok(Some(output_status)) =
+                        client.get_output_status(&tx.txid, vout as u64).await
+                    else {
+                        continue;
+                    };
+                    if output_status.spent {
+                        continue;
+                    }
+                    unspent_txs.push(Utxo {
+                        outpoint: OutPoint {
+                            txid: tx.txid,
+                            vout: vout as u32,
+                        },
+                        value: Amount::from_sat(output.value.to_sat()),
+                        script_pubkey: script.clone(),
+                    });
+                }
+            }
+
+            if last_seen_txid.is_none() {
+                break;
+            }
+        }
+
+        Ok(unspent_txs)
+    }
 }
 
 #[derive(Debug)]
@@ -191,68 +257,4 @@ mod tests {
         println!("tx: {:?}", tx);
         println!("tx vsize: {:?}", tx.vsize());
     }
-}
-
-async fn refresh_utxos(
-    client: &AsyncClient,
-    address: Address,
-    number_pages: u32,
-    start_transactions: Option<Txid>,
-) -> Result<Vec<Utxo>, NodeError> {
-    let mut unspent_txs = Vec::new();
-    let mut last_seen_txid = start_transactions;
-    let script = address.script_pubkey();
-
-    for _ in 0..number_pages {
-        let address_txs = client
-            .scripthash_txs(&script, last_seen_txid)
-            .await
-            .map_err(|e| {
-                NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
-            })?;
-
-        if address_txs.is_empty() {
-            break;
-        }
-
-        last_seen_txid = Some(address_txs.last().unwrap().txid);
-        for tx in address_txs {
-            let Some(full_tx) = client.get_tx(&tx.txid).await.ok().flatten() else {
-                continue;
-            };
-            let Ok(tx_status) = client.get_tx_status(&tx.txid).await else {
-                continue;
-            };
-            if !tx_status.confirmed {
-                continue;
-            }
-
-            for (vout, output) in full_tx.output.iter().enumerate() {
-                if output.script_pubkey != script {
-                    continue;
-                }
-                let Ok(Some(output_status)) = client.get_output_status(&tx.txid, vout as u64).await
-                else {
-                    continue;
-                };
-                if output_status.spent {
-                    continue;
-                }
-                unspent_txs.push(Utxo {
-                    outpoint: OutPoint {
-                        txid: tx.txid,
-                        vout: vout as u32,
-                    },
-                    value: Amount::from_sat(output.value.to_sat()),
-                    script_pubkey: script.clone(),
-                });
-            }
-        }
-
-        if last_seen_txid.is_none() {
-            break;
-        }
-    }
-
-    Ok(unspent_txs)
 }

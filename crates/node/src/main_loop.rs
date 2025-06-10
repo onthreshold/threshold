@@ -38,13 +38,10 @@ impl<N: Network + 'static, D: Db + 'static, O: Oracle + 'static> NodeState<N, D,
         }
 
         self.handlers = handlers;
-        match send_message {
-            Some(NetworkEvent::PeersConnected(list)) => {
-                for (peer_id, _multiaddr) in list {
-                    self.peers.insert(peer_id);
-                }
+        if let Some(NetworkEvent::PeersConnected(list)) = send_message {
+            for (peer_id, _multiaddr) in list {
+                self.peers.insert(peer_id);
             }
-            _ => {}
         }
         Ok(())
     }

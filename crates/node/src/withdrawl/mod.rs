@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+pub mod create_withdrawl;
 pub mod handler;
-pub mod withdrawl;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpendIntent {
