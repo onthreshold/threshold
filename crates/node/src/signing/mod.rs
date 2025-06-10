@@ -1,6 +1,6 @@
 pub mod create_signature;
+pub mod handler;
 pub mod utils;
-
 use std::collections::BTreeMap;
 
 use frost_secp256k1::{self as frost, Identifier};

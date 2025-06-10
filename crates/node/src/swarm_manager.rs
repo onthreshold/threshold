@@ -28,7 +28,7 @@ use tokio::{
     },
 };
 
-use crate::PeerData;
+use crate::{PeerData, deposit_intents::DepositIntent};
 use types::errors::{NetworkError, NodeError};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -62,22 +62,17 @@ pub enum DirectMessage {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SelfRequest {
     GetFrostPublicKey,
-    CreateDeposit {
-        deposit_intent: crate::db::DepositIntent,
-    },
-    StartSigningSession {
-        hex_message: String,
-    },
-    Spend {
-        amount_sat: u64,
-        address_to: String,
-    },
+    CreateDeposit { deposit_intent: DepositIntent },
+    GetPendingDepositIntents,
+    StartSigningSession { hex_message: String },
+    Spend { amount_sat: u64 },
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SelfResponse {
     GetFrostPublicKeyResponse { public_key: Option<String> },
     CreateDepositResponse { success: bool },
+    GetPendingDepositIntentsResponse { intents: Vec<DepositIntent> },
     StartSigningSessionResponse { sign_id: u64 },
     SpendRequestSent { sighash: String },
 }

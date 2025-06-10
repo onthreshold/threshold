@@ -1,6 +1,12 @@
+use crate::deposit_intents::DepositIntent;
 use crate::grpc::grpc_handler::node_proto::{
-    CreateDepositIntentRequest, CreateDepositIntentResponse, SpendFundsRequest, SpendFundsResponse,
-    StartSigningRequest, StartSigningResponse,
+    self, CreateDepositIntentRequest, CreateDepositIntentResponse,
+    GetPendingDepositIntentsResponse, SendDirectMessageRequest, SendDirectMessageResponse,
+    SpendFundsRequest, SpendFundsResponse, StartDkgRequest, StartDkgResponse, StartSigningRequest,
+    StartSigningResponse,
+};
+use crate::swarm_manager::{
+    DirectMessage, Network, NetworkHandle, PingBody, SelfRequest, SelfResponse,
 };
 use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
 use bitcoin::Address;
@@ -125,7 +131,8 @@ pub async fn create_deposit_intent(
 
     let deposit_address = Address::p2tr(&secp, tweaked_key, None, bitcoin::Network::Testnet);
 
-    let deposit_intent = crate::db::DepositIntent {
+    let deposit_intent = DepositIntent {
+        user_id: user_id.to_string(),
         amount_sat,
         deposit_tracking_id: deposit_tracking_id.clone(),
         deposit_address: deposit_address.to_string(),
@@ -171,5 +178,33 @@ pub async fn create_deposit_intent(
         message: "Deposit intent created".to_string(),
         deposit_tracking_id,
         deposit_address: deposit_address.to_string(),
+    })
+}
+
+pub async fn get_pending_deposit_intents(
+    network: &impl Network,
+) -> Result<GetPendingDepositIntentsResponse, Status> {
+    let intents = network
+        .send_self_request(SelfRequest::GetPendingDepositIntents, true)
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .ok_or(Status::internal("No response from node"))?
+        .await
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+
+    let SelfResponse::GetPendingDepositIntentsResponse { intents } = intents else {
+        return Err(Status::internal("Invalid response from node"));
+    };
+
+    Ok(GetPendingDepositIntentsResponse {
+        intents: intents
+            .iter()
+            .map(|intent| node_proto::DepositIntent {
+                user_id: intent.user_id.clone(),
+                amount_satoshis: intent.amount_sat,
+                deposit_tracking_id: intent.deposit_tracking_id.clone(),
+                deposit_address: intent.deposit_address.clone(),
+                timestamp: intent.timestamp,
+            })
+            .collect(),
     })
 }

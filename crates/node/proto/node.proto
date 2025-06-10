@@ -12,6 +12,9 @@ service NodeControl {
 
     // Create a deposit intent
     rpc CreateDepositIntent(CreateDepositIntentRequest) returns (CreateDepositIntentResponse);
+
+    // Get pending deposit intents
+    rpc GetPendingDepositIntents(GetPendingDepositIntentsRequest) returns (GetPendingDepositIntentsResponse);
 }
 
 message SpendFundsRequest {
@@ -23,6 +26,20 @@ message SpendFundsResponse {
     bool success = 1;
     string message = 2;
     string sighash = 3;
+}
+
+message GetPendingDepositIntentsRequest {}
+
+message GetPendingDepositIntentsResponse {
+    repeated DepositIntent intents = 1;
+}
+
+message DepositIntent {
+    string user_id = 1;
+    uint64 amount_satoshis = 2;
+    string deposit_tracking_id = 3;
+    string deposit_address = 4;
+    uint64 timestamp = 5;
 }
 
 message CreateDepositIntentRequest {
