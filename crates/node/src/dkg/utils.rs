@@ -3,7 +3,10 @@ use std::collections::{BTreeMap, HashSet};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use frost_secp256k1::{self as frost};
 use libp2p::gossipsub;
-use protocol::block::{ChainConfig, GenesisBlock, ValidatorInfo};
+use protocol::{
+    block::{ChainConfig, GenesisBlock, ValidatorInfo},
+    oracle::Oracle,
+};
 
 use crate::{
     DkgKeys, EncryptionParams, NodeConfig, NodeState,
@@ -57,9 +60,9 @@ impl DkgState {
         }
     }
 
-    pub fn save_dkg_keys<N: Network, D: Db>(
+    pub fn save_dkg_keys<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         private_key: &frost::keys::KeyPackage,
         pubkey: &frost::keys::PublicKeyPackage,
     ) -> Result<(), NodeError> {

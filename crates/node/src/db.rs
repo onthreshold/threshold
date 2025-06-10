@@ -6,7 +6,7 @@ use protocol::{
 };
 use types::errors::NodeError;
 
-use crate::deposit_intents::DepositIntent;
+use crate::deposit::DepositIntent;
 
 pub trait Db: Send {
     fn get_block_by_height(&self, height: u64) -> Result<Option<Block>, NodeError>;

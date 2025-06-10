@@ -1,10 +1,11 @@
-use crate::deposit_intents::DepositIntent;
 use crate::grpc::grpc_handler::node_proto::{
-    self, CreateDepositIntentRequest, CreateDepositIntentResponse,
-    GetPendingDepositIntentsResponse, SpendFundsRequest, SpendFundsResponse, StartSigningRequest,
+    self, ConfirmWithdrawalRequest, ConfirmWithdrawalResponse, CreateDepositIntentRequest,
+    CreateDepositIntentResponse, GetPendingDepositIntentsResponse, ProposeWithdrawalRequest,
+    ProposeWithdrawalResponse, SpendFundsRequest, SpendFundsResponse, StartSigningRequest,
     StartSigningResponse,
 };
 use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
+use crate::withdrawl::SpendIntent;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Scalar;
 use bitcoin::{Address, Network as BitcoinNetwork};
@@ -13,7 +14,6 @@ use serde_json;
 use std::str::FromStr;
 use tonic::Status;
 use tracing::{debug, info};
-use uuid::Uuid;
 
 pub async fn spend_funds(
     network: &NetworkHandle,
@@ -92,88 +92,20 @@ pub async fn create_deposit_intent(
         ));
     };
 
-    let deposit_tracking_id = Uuid::new_v4().to_string();
-    let frost_pubkey_hex = network
-        .send_self_request(SelfRequest::GetFrostPublicKey, true)
+    let response = network
+        .send_self_request(SelfRequest::CreateDeposit { amount_sat }, true)
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
         .ok_or(Status::internal("No response from node"))?
         .await
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
 
-    let SelfResponse::GetFrostPublicKeyResponse {
-        public_key: Some(public_key),
-    } = frost_pubkey_hex
+    let SelfResponse::CreateDepositResponse {
+        deposit_tracking_id,
+        deposit_address,
+    } = response
     else {
-        return Err(Status::internal(
-            "Invalid response from node. No public key found.",
-        ));
+        return Err(Status::internal("Invalid response from node"));
     };
-
-    let public_key = bitcoin::PublicKey::from_str(&public_key)
-        .map_err(|e| Status::internal(format!("Failed to parse public key: {}", e)))?;
-
-    let secp = bitcoin::secp256k1::Secp256k1::new();
-
-    let internal_key = public_key.inner.x_only_public_key().0;
-
-    let tweak_scalar = Scalar::from_be_bytes(
-        bitcoin::hashes::sha256::Hash::hash(deposit_tracking_id.as_bytes()).to_byte_array(),
-    )
-    .expect("32 bytes, should not fail");
-
-    let (tweaked_key, _) = internal_key
-        .add_tweak(&secp, &tweak_scalar)
-        .map_err(|e| Status::internal(format!("Failed to add tweak: {:?}", e)))?;
-
-    let is_testnet: bool = std::env::var("IS_TESTNET")
-        .unwrap_or("false".to_string())
-        .parse()
-        .unwrap();
-
-    let deposit_address = Address::p2tr(
-        &secp,
-        tweaked_key,
-        None,
-        if is_testnet {
-            BitcoinNetwork::Testnet
-        } else {
-            BitcoinNetwork::Bitcoin
-        },
-    );
-
-    let deposit_intent = DepositIntent {
-        amount_sat,
-        deposit_tracking_id: deposit_tracking_id.clone(),
-        deposit_address: deposit_address.to_string(),
-        timestamp: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
-    };
-
-    let _ = network
-        .send_self_request(SelfRequest::CreateDeposit { deposit_intent }, true)
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
-        .ok_or(Status::internal("No response from node"))?
-        .await
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
-
-    let broadcast_message = serde_json::json!({
-        "deposit_address": deposit_address.to_string(),
-        "amount_sat": amount_sat,
-        "deposit_tracking_id": deposit_tracking_id,
-        "timestamp": std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-    });
-
-    if let Err(e) = network.send_broadcast(
-        IdentTopic::new("deposit-intents"),
-        broadcast_message.to_string().as_bytes().to_vec(),
-    ) {
-        info!("Failed to broadcast new deposit address: {:?}", e);
-    }
 
     info!(
         "Received request to create deposit intent with amount {}. Tracking ID: {}. Deposit Address: {}",
@@ -214,5 +146,71 @@ pub async fn get_pending_deposit_intents(
                 timestamp: intent.timestamp,
             })
             .collect(),
+    })
+}
+
+pub async fn propose_withdrawal(
+    network: &impl Network,
+    request: ProposeWithdrawalRequest,
+) -> Result<ProposeWithdrawalResponse, Status> {
+    let amount_sat = if request.amount_satoshis > 0 {
+        request.amount_satoshis
+    } else {
+        return Err(Status::invalid_argument(
+            "Amount to withdraw must be greater than 0",
+        ));
+    };
+
+    let withdrawal_intent = SpendIntent {
+        amount_sat,
+        address_to: request.address_to,
+        public_key: request.public_key,
+        blocks_to_confirm: request.blocks_to_confirm,
+    };
+
+    let response = network
+        .send_self_request(SelfRequest::ProposeWithdrawal { withdrawal_intent }, true)
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .ok_or(Status::internal("No response from node"))?
+        .await
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+
+    let SelfResponse::ProposeWithdrawalResponse {
+        quote_satoshis,
+        challenge,
+    } = response
+    else {
+        return Err(Status::internal("Invalid response from node"));
+    };
+
+    Ok(ProposeWithdrawalResponse {
+        quote_satoshis,
+        challenge,
+    })
+}
+
+pub async fn confirm_withdrawal(
+    network: &impl Network,
+    request: ConfirmWithdrawalRequest,
+) -> Result<ConfirmWithdrawalResponse, Status> {
+    let challenge = request.challenge;
+    let signature = request.signature;
+
+    let response = network
+        .send_self_request(
+            SelfRequest::ConfirmWithdrawal {
+                challenge,
+                signature,
+            },
+            true,
+        )
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .ok_or(Status::internal("No response from node"))?
+        .await
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+
+    Ok(ConfirmWithdrawalResponse {
+        success: true,
+        message: "Withdrawal confirmed".to_string(),
     })
 }

@@ -15,6 +15,7 @@ use types::errors::{self, NetworkError};
 
 // Import MockDb from our mocks module
 use crate::mocks::db::MockDb;
+use crate::mocks::oracle::MockOracle;
 
 use crate::util::local_dkg::perform_distributed_key_generation;
 
@@ -479,6 +480,7 @@ pub fn create_node_network(
     };
 
     let mock_db = MockDb::new();
+    let oracle = MockOracle::new();
 
     let nodes_state = NodeState::new_from_config(
         network.clone(),
@@ -488,6 +490,7 @@ pub fn create_node_network(
         mock_db,
         events_emitter_tx,
         deposit_intent_tx,
+        oracle,
     )?;
 
     Ok((nodes_state, network))

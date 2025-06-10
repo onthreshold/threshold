@@ -1,5 +1,3 @@
-use crate::db::Db;
-use crate::{Network, NodeState};
 use bitcoin::absolute::LockTime;
 use bitcoin::hashes::Hash;
 use bitcoin::sighash::{EcdsaSighashType, SighashCache};
@@ -10,6 +8,7 @@ use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut};
 use clients::{EsploraApiClient, NodeError};
 use esplora_client::AsyncClient;
 
+/// Very simple demonstration UTXO representation (key-path Taproot assumed)
 #[derive(Debug, Clone)]
 pub struct Utxo {
     pub outpoint: OutPoint,
@@ -51,10 +50,9 @@ impl SimpleWallet {
     pub fn create_spend(
         &mut self,
         amount_sat: u64,
+        estimated_fee_sat: u64,
         address: &bitcoin::Address,
-    ) -> Result<(Transaction, [u8; 32]), String> {
-        let estimated_fee_sat = 200u64;
-
+    ) -> Result<(Transaction, [u8; 32]), NodeError> {
         let total_needed = amount_sat + estimated_fee_sat;
 
         let pos = self
@@ -64,7 +62,7 @@ impl SimpleWallet {
             .ok_or_else(|| {
                 format!("No single UTXO large enough – need {} sats (amount: {} + fee: {}), coin selection not implemented", 
                         total_needed, amount_sat, estimated_fee_sat)
-            })?;
+            }).map_err(|e| NodeError::Error(e.to_string()))?;
 
         let utxo = self.utxos.remove(pos);
         let change_sat = utxo.value.to_sat() - amount_sat - estimated_fee_sat;
@@ -105,7 +103,7 @@ impl SimpleWallet {
                 utxo.value,
                 EcdsaSighashType::All,
             )
-            .map_err(|e| format!("Failed to calculate sighash: {}", e))?;
+            .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {}", e)))?;
 
         Ok((tx, sighash.to_byte_array()))
     }
@@ -167,15 +165,31 @@ pub struct PendingSpend {
     pub tx: Transaction,
 }
 
-impl<N: Network, D: Db> NodeState<N, D> {
-    pub fn get_frost_public_key(&self) -> Option<String> {
-        self.pubkey_package.as_ref().map(|p| {
-            format!("{:?}", p.verifying_key())
-                .replace("VerifyingKey(", "")
-                .replace(")", "")
-                .replace("\\", "")
-                .replace("\"", "")
-        })
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn create_spend_test() {
+        let mut wallet = SimpleWallet::new(
+            &bitcoin::Address::from_str("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq")
+                .unwrap()
+                .assume_checked(),
+        )
+        .await;
+        let tx = wallet.create_spend(
+            1000,
+            200,
+            &bitcoin::Address::from_str("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq")
+                .unwrap()
+                .assume_checked(),
+        );
+        assert!(tx.is_ok());
+        let (tx, _) = tx.unwrap();
+        println!("tx: {:?}", tx);
+        println!("tx vsize: {:?}", tx.vsize());
     }
 }
 

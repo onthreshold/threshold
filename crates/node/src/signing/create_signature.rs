@@ -12,12 +12,13 @@ use crate::db::Db;
 use crate::signing::ActiveSigning;
 use crate::swarm_manager::{DirectMessage, Network};
 use crate::{peer_id_to_identifier, signing::SigningState};
+use protocol::oracle::Oracle;
 use types::errors::NodeError;
 
 impl SigningState {
-    pub fn start_signing_session<N: Network, D: Db>(
+    pub fn start_signing_session<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         message_hex: &str,
     ) -> Result<Option<u64>, NodeError> {
         if node.private_key_package.is_none() || node.pubkey_package.is_none() {
@@ -111,9 +112,9 @@ impl SigningState {
     }
 
     /// Handle incoming SignRequest (participant side)
-    pub fn handle_sign_request<N: Network, D: Db>(
+    pub fn handle_sign_request<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         peer: PeerId,
         sign_id: u64,
         message: Vec<u8>,
@@ -170,9 +171,9 @@ impl SigningState {
     }
 
     /// Coordinator receives commitments responses
-    pub fn handle_commitments_response<N: Network, D: Db>(
+    pub fn handle_commitments_response<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         peer: PeerId,
         sign_id: u64,
         commitments_bytes: Vec<u8>,
@@ -250,9 +251,9 @@ impl SigningState {
     }
 
     /// Participant handles SignPackage request
-    pub fn handle_sign_package<N: Network, D: Db>(
+    pub fn handle_sign_package<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         peer: PeerId,
         sign_id: u64,
         package_bytes: Vec<u8>,
@@ -307,9 +308,9 @@ impl SigningState {
     }
 
     /// Coordinator handles incoming signature share
-    pub fn handle_signature_share<N: Network, D: Db>(
+    pub fn handle_signature_share<N: Network, D: Db, O: Oracle>(
         &mut self,
-        node: &mut NodeState<N, D>,
+        node: &mut NodeState<N, D, O>,
         peer: PeerId,
         sign_id: u64,
         sig_bytes: Vec<u8>,

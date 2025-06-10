@@ -15,6 +15,12 @@ service NodeControl {
 
     // Get pending deposit intents
     rpc GetPendingDepositIntents(GetPendingDepositIntentsRequest) returns (GetPendingDepositIntentsResponse);
+
+    // Propose a withdrawal
+    rpc ProposeWithdrawal(ProposeWithdrawalRequest) returns (ProposeWithdrawalResponse);
+
+    // Confirm a withdrawal
+    rpc ConfirmWithdrawal(ConfirmWithdrawalRequest) returns (ConfirmWithdrawalResponse);
 }
 
 message SpendFundsRequest {
@@ -60,4 +66,26 @@ message StartSigningResponse {
     bool success = 1;
     string message = 2;
     uint64 sign_id = 3;
+}
+
+message ProposeWithdrawalRequest {
+    uint64 amount_satoshis = 1;
+    string address_to = 2;
+    string public_key = 3;
+    optional uint32 blocks_to_confirm = 4;
+}
+
+message ProposeWithdrawalResponse {
+    uint64 quote_satoshis = 1;
+    string challenge = 2;
+}
+
+message ConfirmWithdrawalRequest {
+    string challenge = 1;
+    string signature = 2;
+}
+
+message ConfirmWithdrawalResponse {
+    bool success = 1;
+    string message = 2;
 }

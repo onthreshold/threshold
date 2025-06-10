@@ -28,7 +28,7 @@ use tokio::{
     },
 };
 
-use crate::{PeerData, deposit_intents::DepositIntent};
+use crate::{PeerData, deposit::DepositIntent, withdrawl::SpendIntent};
 use types::errors::{NetworkError, NodeError};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -61,20 +61,51 @@ pub enum DirectMessage {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SelfRequest {
-    GetFrostPublicKey,
-    CreateDeposit { deposit_intent: DepositIntent },
+    CreateDeposit {
+        amount_sat: u64,
+    },
     GetPendingDepositIntents,
-    StartSigningSession { hex_message: String },
-    Spend { amount_sat: u64, address_to: String },
+    StartSigningSession {
+        hex_message: String,
+    },
+    Spend {
+        amount_sat: u64,
+        address_to: String,
+    },
+    ProposeWithdrawal {
+        withdrawal_intent: SpendIntent,
+    },
+    ConfirmWithdrawal {
+        challenge: String,
+        signature: String,
+    },
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SelfResponse {
-    GetFrostPublicKeyResponse { public_key: Option<String> },
-    CreateDepositResponse { success: bool },
-    GetPendingDepositIntentsResponse { intents: Vec<DepositIntent> },
-    StartSigningSessionResponse { sign_id: u64 },
-    SpendRequestSent { sighash: String },
+    GetFrostPublicKeyResponse {
+        public_key: Option<String>,
+    },
+    CreateDepositResponse {
+        deposit_tracking_id: String,
+        deposit_address: String,
+    },
+    GetPendingDepositIntentsResponse {
+        intents: Vec<DepositIntent>,
+    },
+    StartSigningSessionResponse {
+        sign_id: u64,
+    },
+    SpendRequestSent {
+        sighash: String,
+    },
+    ProposeWithdrawalResponse {
+        quote_satoshis: u64,
+        challenge: String,
+    },
+    ConfirmWithdrawalResponse {
+        success: bool,
+    },
 }
 
 #[derive(NetworkBehaviour)]

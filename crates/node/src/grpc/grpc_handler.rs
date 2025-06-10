@@ -66,4 +66,22 @@ impl NodeControl for NodeControlService {
         let response = grpc_operator::get_pending_deposit_intents(&self.network).await?;
         Ok(Response::new(response))
     }
+
+    async fn propose_withdrawal(
+        &self,
+        request: Request<ProposeWithdrawalRequest>,
+    ) -> Result<Response<ProposeWithdrawalResponse>, Status> {
+        let request = request.into_inner();
+        let response = grpc_operator::propose_withdrawal(&self.network, request).await?;
+        Ok(Response::new(response))
+    }
+
+    async fn confirm_withdrawal(
+        &self,
+        request: Request<ConfirmWithdrawalRequest>,
+    ) -> Result<Response<ConfirmWithdrawalResponse>, Status> {
+        let request = request.into_inner();
+        let response = grpc_operator::confirm_withdrawal(&self.network, request).await?;
+        Ok(Response::new(response))
+    }
 }

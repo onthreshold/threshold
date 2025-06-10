@@ -1,11 +1,12 @@
 use tracing::info;
 
 use crate::db::Db;
-use crate::swarm_manager::{NetworkEvent, SelfRequest, SelfResponse};
+use crate::swarm_manager::NetworkEvent;
 use crate::{Network, NodeState};
+use protocol::oracle::Oracle;
 use types::errors::NodeError;
 
-impl<N: Network + 'static, D: Db + 'static> NodeState<N, D> {
+impl<N: Network + 'static, D: Db + 'static, O: Oracle + 'static> NodeState<N, D, O> {
     pub async fn try_poll(&mut self) -> Result<bool, NodeError> {
         let send_message = self.network_events_stream.try_recv().ok();
         if let Some(event) = send_message {
@@ -38,19 +39,6 @@ impl<N: Network + 'static, D: Db + 'static> NodeState<N, D> {
 
         self.handlers = handlers;
         match send_message {
-            Some(NetworkEvent::SelfRequest {
-                request: SelfRequest::GetFrostPublicKey,
-                response_channel,
-            }) => {
-                let response = self.get_frost_public_key();
-                if let Some(response_channel) = response_channel {
-                    response_channel
-                        .send(SelfResponse::GetFrostPublicKeyResponse {
-                            public_key: response,
-                        })
-                        .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
-                }
-            }
             Some(NetworkEvent::PeersConnected(list)) => {
                 for (peer_id, _multiaddr) in list {
                     self.peers.insert(peer_id);
