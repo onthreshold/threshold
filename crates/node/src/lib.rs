@@ -1,5 +1,6 @@
 use crate::{
     db::Db, deposit::DepositIntentState, dkg::DkgState, handler::Handler, signing::SigningState,
+    withdrawl::SpendIntentState,
 };
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{
@@ -225,6 +226,7 @@ impl<N: Network, D: Db, O: Oracle> NodeState<N, D, O> {
         let dkg_state = DkgState::new()?;
         let signing_state = SigningState::new()?;
         let deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
+        let withdrawl_intent_state = SpendIntentState::new();
 
         let mut node_state = NodeState {
             network_handle: network_handle.clone(),
@@ -241,6 +243,7 @@ impl<N: Network, D: Db, O: Oracle> NodeState<N, D, O> {
                 Box::new(dkg_state),
                 Box::new(signing_state),
                 Box::new(deposit_intent_state),
+                Box::new(withdrawl_intent_state),
             ],
             pubkey_package: None,
             private_key_package: None,
