@@ -30,10 +30,14 @@ impl<N: Network, D: Db> Handler<N, D> for SigningState {
                 let _ = self.start_signing_session(node, &hex_message)?;
             }
             Some(NetworkEvent::SelfRequest {
-                request: SelfRequest::Spend { amount_sat },
+                request:
+                    SelfRequest::Spend {
+                        amount_sat,
+                        address_to,
+                    },
                 response_channel,
             }) => {
-                let response = self.start_spend_request(node, amount_sat);
+                let response = self.start_spend_request(node, amount_sat, &address_to);
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::SpendRequestSent {

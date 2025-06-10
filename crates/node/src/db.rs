@@ -10,7 +10,6 @@ use types::errors::NodeError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct DepositIntent {
-    pub user_id: String,
     pub amount_sat: u64,
     pub deposit_tracking_id: String,
     pub deposit_address: String,

@@ -7,6 +7,7 @@ use tonic::Status;
 pub async fn rpc_spend(
     endpoint: Option<String>,
     amount: u64,
+    address_to: String,
 ) -> Result<SpendFundsResponse, Status> {
     println!("Spending {} satoshis", amount);
 
@@ -18,6 +19,7 @@ pub async fn rpc_spend(
     let spendfunds_response = client
         .spend_funds(tonic::Request::new(node_proto::SpendFundsRequest {
             amount_satoshis: amount,
+            address_to,
         }))
         .await?;
 
@@ -70,10 +72,9 @@ pub async fn rpc_send_direct_message(
 
 pub async fn rpc_create_deposit_intent(
     endpoint: Option<String>,
-    peer_id: String,
     amount: u64,
 ) -> Result<CreateDepositIntentResponse, Status> {
-    println!("Creating deposit intent for user {}: {}", peer_id, amount);
+    println!("Creating deposit intent: {}", amount);
 
     let mut client =
         NodeControlClient::connect(endpoint.unwrap_or("http://[::1]:50051".to_string()))
@@ -83,7 +84,6 @@ pub async fn rpc_create_deposit_intent(
     let create_deposit_intent_response = client
         .create_deposit_intent(tonic::Request::new(
             node_proto::CreateDepositIntentRequest {
-                user_id: peer_id,
                 amount_satoshis: amount,
             },
         ))

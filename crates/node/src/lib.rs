@@ -231,7 +231,7 @@ impl<N: Network, D: Db> NodeState<N, D> {
             db: storage_db,
             peers: HashSet::new(),
             rng: frost::rand_core::OsRng,
-            wallet: crate::wallet::SimpleWallet::new(),
+            wallet: crate::wallet::SimpleWallet::default(),
             config,
             handlers: vec![Box::new(dkg_state), Box::new(signing_state)],
             pubkey_package: None,
