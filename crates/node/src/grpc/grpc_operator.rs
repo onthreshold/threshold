@@ -1,48 +1,24 @@
 use crate::grpc::grpc_handler::node_proto::{
-    CreateDepositIntentRequest, CreateDepositIntentResponse, SendDirectMessageRequest,
-    SendDirectMessageResponse, SpendFundsRequest, SpendFundsResponse, StartDkgRequest,
-    StartDkgResponse, StartSigningRequest, StartSigningResponse,
+    CreateDepositIntentRequest, CreateDepositIntentResponse, SpendFundsRequest, SpendFundsResponse,
+    StartSigningRequest, StartSigningResponse,
 };
-use crate::swarm_manager::{
-    DirectMessage, Network, NetworkHandle, PingBody, SelfRequest, SelfResponse,
-};
+use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
 use bitcoin::Address;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Scalar;
-use libp2p::PeerId;
 use libp2p::gossipsub::IdentTopic;
 use serde_json;
 use std::str::FromStr;
-use tonic::{Request, Response, Status};
+use tonic::Status;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-pub async fn start_dkg(
-    network: &NetworkHandle,
-    _request: Request<StartDkgRequest>,
-) -> Result<Response<StartDkgResponse>, Status> {
-    // Create start-dkg topic
-    let start_dkg_topic = IdentTopic::new("start-dkg");
-
-    // Send a message to start DKG
-    let start_message = "START_DKG".to_string();
-
-    match network.send_broadcast(start_dkg_topic.clone(), start_message.as_bytes().to_vec()) {
-        Ok(_) => Ok(Response::new(StartDkgResponse {
-            success: true,
-            message: "DKG process started".to_string(),
-        })),
-        Err(e) => Err(Status::internal(format!("Network error: {:?}", e))),
-    }
-}
-
 pub async fn spend_funds(
     network: &NetworkHandle,
-    request: Request<SpendFundsRequest>,
-) -> Result<Response<SpendFundsResponse>, Status> {
-    let req = request.into_inner();
-    let amount_sat = req.amount_satoshis;
-    let address_to = req.address_to;
+    request: SpendFundsRequest,
+) -> Result<SpendFundsResponse, Status> {
+    let amount_sat = request.amount_satoshis;
+    let address_to = request.address_to;
 
     debug!("Received request to spend {} satoshis", amount_sat);
     let response = network
@@ -62,18 +38,18 @@ pub async fn spend_funds(
         return Err(Status::internal("Invalid response from node"));
     };
 
-    Ok(Response::new(SpendFundsResponse {
+    Ok(SpendFundsResponse {
         success: true,
         message: format!("Spending {} satoshis", amount_sat),
         sighash: sighash.to_string(),
-    }))
+    })
 }
 
 pub async fn start_signing(
     network: &NetworkHandle,
-    request: Request<StartSigningRequest>,
-) -> Result<Response<StartSigningResponse>, Status> {
-    let hex_msg = request.into_inner().hex_message;
+    request: StartSigningRequest,
+) -> Result<StartSigningResponse, Status> {
+    let hex_msg = request.hex_message;
 
     let network_request = SelfRequest::StartSigningSession {
         hex_message: hex_msg.clone(),
@@ -93,38 +69,11 @@ pub async fn start_signing(
         )));
     };
 
-    Ok(Response::new(StartSigningResponse {
+    Ok(StartSigningResponse {
         success: true,
         message: "Signing session started".to_string(),
         sign_id,
-    }))
-}
-
-pub async fn send_direct_message(
-    network: &NetworkHandle,
-    request: Request<SendDirectMessageRequest>,
-) -> Result<Response<SendDirectMessageResponse>, Status> {
-    let req = request.into_inner();
-
-    let target_peer_id = req
-        .peer_id
-        .parse::<PeerId>()
-        .map_err(|e| Status::invalid_argument(format!("Invalid peer ID: {}", e)))?;
-
-    let direct_message = format!("From: {}", req.message);
-
-    match network.send_private_message(
-        target_peer_id,
-        DirectMessage::Ping(PingBody {
-            message: direct_message,
-        }),
-    ) {
-        Ok(_) => Ok(Response::new(SendDirectMessageResponse {
-            success: true,
-            message: format!("Message sent to {}", target_peer_id),
-        })),
-        Err(e) => Err(Status::internal(format!("Network error: {:?}", e))),
-    }
+    })
 }
 
 pub async fn create_deposit_intent(

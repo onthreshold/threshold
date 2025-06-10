@@ -16,9 +16,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use libp2p::identity::Keypair;
-use rpc_client::{
-    rpc_create_deposit_intent, rpc_send_direct_message, rpc_spend, rpc_start_signing,
-};
+use rpc_client::{rpc_create_deposit_intent, rpc_spend, rpc_start_signing};
 use std::{fs, path::PathBuf};
 
 use crate::errors::{CliError, KeygenError};
@@ -153,12 +151,6 @@ enum Commands {
         #[arg(short, long)]
         endpoint: Option<String>,
     },
-    SendDirectMessage {
-        peer_id: String,
-        message: String,
-        #[arg(short, long)]
-        endpoint: Option<String>,
-    },
     Deposit {
         amount: u64,
         #[arg(short, long)]
@@ -214,15 +206,6 @@ async fn main() -> Result<(), CliError> {
             endpoint,
         } => {
             rpc_start_signing(endpoint, hex_message)
-                .await
-                .map_err(CliError::RpcError)?;
-        }
-        Commands::SendDirectMessage {
-            peer_id,
-            message,
-            endpoint,
-        } => {
-            rpc_send_direct_message(endpoint, peer_id, message)
                 .await
                 .map_err(CliError::RpcError)?;
         }
