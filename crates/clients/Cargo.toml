@@ -8,3 +8,4 @@ bitcoin = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 esplora-client = { workspace = true }
 async-trait = "0.1.88"
+tracing = "0.1"
