@@ -120,11 +120,9 @@ pub async fn send_direct_message(
 }
 
 pub async fn create_deposit_intent(
-    network: &NetworkHandle,
-    request: Request<CreateDepositIntentRequest>,
-) -> Result<Response<CreateDepositIntentResponse>, Status> {
-    let req = request.into_inner();
-
+    network: &impl Network,
+    req: CreateDepositIntentRequest,
+) -> Result<CreateDepositIntentResponse, Status> {
     let user_id = req
         .user_id
         .parse::<PeerId>()
@@ -139,7 +137,6 @@ pub async fn create_deposit_intent(
     };
 
     let deposit_tracking_id = Uuid::new_v4().to_string();
-
     let frost_pubkey_hex = network
         .send_self_request(SelfRequest::GetFrostPublicKey, true)
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
@@ -172,7 +169,7 @@ pub async fn create_deposit_intent(
         .add_tweak(&secp, &tweak_scalar)
         .map_err(|e| Status::internal(format!("Failed to add tweak: {:?}", e)))?;
 
-    let deposit_address = Address::p2tr(&secp, tweaked_key, None, bitcoin::Network::Bitcoin);
+    let deposit_address = Address::p2tr(&secp, tweaked_key, None, bitcoin::Network::Signet);
 
     let deposit_intent = crate::db::DepositIntent {
         user_id: user_id.to_string(),
@@ -218,10 +215,10 @@ pub async fn create_deposit_intent(
         deposit_address.clone().to_string()
     );
 
-    Ok(Response::new(CreateDepositIntentResponse {
+    Ok(CreateDepositIntentResponse {
         success: true,
         message: format!("Deposit intent created for user {}", user_id),
         deposit_tracking_id,
         deposit_address: deposit_address.to_string(),
-    }))
+    })
 }

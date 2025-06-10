@@ -1,3 +1,4 @@
+use libp2p::gossipsub::{IdentTopic, Message};
 use tracing::info;
 
 use crate::db::Db;
@@ -37,7 +38,6 @@ impl<N: Network + 'static, D: Db + 'static> NodeState<N, D> {
         }
 
         self.handlers = handlers;
-
         match send_message {
             Some(NetworkEvent::SelfRequest {
                 request: SelfRequest::GetFrostPublicKey,
@@ -65,10 +65,16 @@ impl<N: Network + 'static, D: Db + 'static> NodeState<N, D> {
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
                 }
             }
-            Some(NetworkEvent::DepositIntent(deposit_intent)) => {
-                info!("Deposit intent received: {:?}", deposit_intent);
-                if let Err(e) = self.create_deposit(deposit_intent).await {
-                    info!("Failed to store deposit intent: {}", e);
+            Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {
+                if topic == IdentTopic::new("deposit-intents").hash() {
+                    let deposit_intent = serde_json::from_slice::<crate::db::DepositIntent>(&data)
+                        .map_err(|e| {
+                            NodeError::Error(format!("Failed to parse deposit intent: {}", e))
+                        })?;
+
+                    if let Err(e) = self.create_deposit(deposit_intent).await {
+                        info!("Failed to store deposit intent: {}", e);
+                    }
                 }
             }
             Some(NetworkEvent::PeersConnected(list)) => {

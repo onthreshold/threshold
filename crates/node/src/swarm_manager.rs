@@ -28,7 +28,7 @@ use tokio::{
     },
 };
 
-use crate::{PeerData, db::DepositIntent};
+use crate::PeerData;
 use types::errors::{NetworkError, NodeError};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -205,7 +205,6 @@ pub enum NetworkEvent {
     MessageEvent((PeerId, DirectMessage)),
     PeersConnected(Vec<(PeerId, Multiaddr)>),
     PeersDisconnected(Vec<(PeerId, Multiaddr)>),
-    DepositIntent(DepositIntent),
     Unknown,
 }
 
@@ -345,11 +344,6 @@ impl SwarmManager {
                             message,
                             ..
                         })) => {
-                            if message.topic == self.deposit_intents_topic.hash() {
-                                if let Ok(deposit_intent) = serde_json::from_slice::<DepositIntent>(&message.data) {
-                                    self.network_events.send(NetworkEvent::DepositIntent(deposit_intent)).unwrap();
-                                }
-                            }
                             self.network_events.send(NetworkEvent::GossipsubMessage(message.clone())).unwrap();
                         },
                         SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(Event::Message {

@@ -38,7 +38,7 @@ impl RocksDb {
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
 
-        let cfs = vec!["deposit_intents"];
+        let cfs = vec!["deposit_intents", "blocks", "chain_state"];
         let db = DB::open_cf(&opts, path, cfs).unwrap();
 
         Self { db }
@@ -47,9 +47,15 @@ impl RocksDb {
 
 impl Db for RocksDb {
     fn get_block_by_height(&self, height: u64) -> Result<Option<Block>, NodeError> {
-        let block_hash = self.db.get(format!("h:{}", height))?;
+        let block_hash = self.db.get_cf(
+            self.db.cf_handle("blocks").unwrap(),
+            format!("h:{}", height),
+        )?;
         if let Some(block_hash) = block_hash {
-            let block = self.db.get(format!("b:{}", hex::encode(block_hash)))?;
+            let block = self.db.get_cf(
+                self.db.cf_handle("blocks").unwrap(),
+                format!("b:{}", hex::encode(block_hash)),
+            )?;
             Ok(block.and_then(|b| Block::deserialize(&b).ok()))
         } else {
             Ok(None)
@@ -57,36 +63,56 @@ impl Db for RocksDb {
     }
 
     fn get_block_by_hash(&self, hash: BlockHash) -> Result<Option<Block>, NodeError> {
-        let block = self.db.get(format!("b:{}", hex::encode(hash)))?;
+        let block = self.db.get_cf(
+            self.db.cf_handle("blocks").unwrap(),
+            format!("b:{}", hex::encode(hash)),
+        )?;
         Ok(block.and_then(|b| Block::deserialize(&b).ok()))
     }
 
     fn get_tip_block_hash(&self) -> Result<Option<BlockHash>, NodeError> {
-        let tip = self.db.get("h:tip")?;
+        let tip = self
+            .db
+            .get_cf(self.db.cf_handle("blocks").unwrap(), "h:tip")?;
         Ok(tip.and_then(|b| b.as_slice().try_into().ok()))
     }
 
     fn insert_chain_state(&mut self, chain_state: ChainState) -> Result<(), NodeError> {
-        self.db.put("c:state", chain_state.serialize()?)?;
+        self.db.put_cf(
+            self.db.cf_handle("chain_state").unwrap(),
+            "c:state",
+            chain_state.serialize()?,
+        )?;
         Ok(())
     }
 
     fn get_chain_state(&self) -> Result<Option<ChainState>, NodeError> {
-        let chain_state = self.db.get("c:state")?;
+        let chain_state = self
+            .db
+            .get_cf(self.db.cf_handle("chain_state").unwrap(), "c:state")?;
         Ok(chain_state.and_then(|b| ChainState::deserialize(&b).ok()))
     }
 
     fn insert_block(&mut self, block: Block) -> Result<(), NodeError> {
         let block_hash = block.hash();
         self.db
-            .put(format!("b:{}", hex::encode(block_hash)), block.serialize()?)
+            .put_cf(
+                self.db.cf_handle("blocks").unwrap(),
+                format!("b:{}", hex::encode(block_hash)),
+                block.serialize()?,
+            )
             .map_err(|e| NodeError::Error(format!("Failed to insert block: {}", e)))?;
 
         self.db
-            .put(format!("h:{}", block.header.height), block_hash)
+            .put_cf(
+                self.db.cf_handle("blocks").unwrap(),
+                format!("h:{}", block.header.height),
+                block_hash,
+            )
             .map_err(|e| NodeError::Error(format!("Failed to insert block: {}", e)))?;
 
-        self.db.put("h:tip", block_hash)?;
+        self.db
+            .put_cf(self.db.cf_handle("blocks").unwrap(), "h:tip", block_hash)?;
 
         Ok(())
     }

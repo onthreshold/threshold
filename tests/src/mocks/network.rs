@@ -2,15 +2,16 @@ use std::{
     collections::BTreeMap,
     path::PathBuf,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use frost_secp256k1::Identifier;
 use node::{
     NodeState,
-    swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture},
+    swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture, SelfResponse},
 };
-use tokio::sync::broadcast;
-use types::errors;
+use tokio::sync::{broadcast, mpsc::unbounded_channel};
+use types::errors::{self, NetworkError};
 
 // Import MockDb from our mocks module
 use crate::mocks::db::MockDb;
@@ -91,6 +92,8 @@ impl Network for MockNetwork {
             target_peers: Vec::new(), // Empty means broadcast to all
         };
 
+        println!("Queuing broadcast event: {:?}", pending_event);
+
         self.pending_events.lock().unwrap().push(pending_event);
         Ok(())
     }
@@ -118,14 +121,33 @@ impl Network for MockNetwork {
         request: node::swarm_manager::SelfRequest,
         sync: bool,
     ) -> Result<Option<NetworkResponseFuture>, errors::NetworkError> {
-        println!("sent self request");
-        // For self requests, send immediately to own node
-        let self_request_event = NetworkEvent::SelfRequest {
-            request,
-            response_channel: None,
-        };
-        let _ = self.events_emitter_tx.send(self_request_event);
-        Ok(None)
+        if sync {
+            let (tx, mut rx) = unbounded_channel::<SelfResponse>();
+
+            let network_message = NetworkEvent::SelfRequest {
+                request,
+                response_channel: Some(tx),
+            };
+
+            self.events_emitter_tx
+                .send(network_message)
+                .map_err(|e| NetworkError::SendError(e.to_string()))?;
+
+            Ok(Some(Box::pin(async move {
+                rx.recv().await.ok_or(NetworkError::RecvError)
+            })))
+        } else {
+            let network_message = NetworkEvent::SelfRequest {
+                request,
+                response_channel: None,
+            };
+
+            self.events_emitter_tx
+                .send(network_message)
+                .map_err(|e| NetworkError::SendError(e.to_string()))?;
+
+            Ok(None)
+        }
     }
 }
 
@@ -232,6 +254,7 @@ impl MockNodeCluster {
 
             // Process any network events generated during polling
             self.process_network_events().await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
 
