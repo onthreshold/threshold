@@ -169,7 +169,7 @@ pub async fn create_deposit_intent(
         .add_tweak(&secp, &tweak_scalar)
         .map_err(|e| Status::internal(format!("Failed to add tweak: {:?}", e)))?;
 
-    let deposit_address = Address::p2tr(&secp, tweaked_key, None, bitcoin::Network::Signet);
+    let deposit_address = Address::p2tr(&secp, tweaked_key, None, bitcoin::Network::Testnet);
 
     let deposit_intent = crate::db::DepositIntent {
         user_id: user_id.to_string(),
