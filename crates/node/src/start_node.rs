@@ -126,7 +126,7 @@ pub async fn start_node(
 
     let deposit_monitor_handle = tokio::spawn(async move {
         let mut client = EsploraApiClient::new(
-            Builder::new("https://blockstream.info/api")
+            Builder::new("https://blockstream.info/testnet/api")
                 .build_async()
                 .unwrap(),
             100,

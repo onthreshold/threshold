@@ -19,7 +19,6 @@ mod deposit_tests {
         cluster.setup().await;
 
         let node_peer = *cluster.nodes.keys().next().unwrap();
-        let user_id = node_peer.to_string();
         let amount_sat = 50_000;
         let (tx, mut rx) = unbounded_channel::<CreateDepositIntentResponse>();
         let network = cluster.networks.get(&node_peer).unwrap().clone();
@@ -28,7 +27,6 @@ mod deposit_tests {
             let response = grpc_operator::create_deposit_intent(
                 &network,
                 CreateDepositIntentRequest {
-                    user_id: user_id.clone(),
                     amount_satoshis: amount_sat,
                 },
             )
@@ -62,7 +60,6 @@ mod deposit_tests {
         cluster.setup().await;
 
         let node_peer = *cluster.nodes.keys().next().unwrap();
-        let user_id = node_peer.to_string();
         let amount_sat = 50_000;
         let network = cluster.networks.get(&node_peer).unwrap().clone();
         let (tx, mut rx) = unbounded_channel::<CreateDepositIntentResponse>();
@@ -71,7 +68,6 @@ mod deposit_tests {
             let response = grpc_operator::create_deposit_intent(
                 &network,
                 CreateDepositIntentRequest {
-                    user_id: user_id.clone(),
                     amount_satoshis: amount_sat,
                 },
             )
