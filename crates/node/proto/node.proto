@@ -4,27 +4,14 @@ package node;
 
 // The node control service
 service NodeControl {
-    // Start DKG process
-    rpc StartDkg(StartDkgRequest) returns (StartDkgResponse);
-    
     // Create a spending transaction
     rpc SpendFunds(SpendFundsRequest) returns (SpendFundsResponse);
     
     // Start a signing session
     rpc StartSigning(StartSigningRequest) returns (StartSigningResponse);
-    
-    // Send a direct message to a peer
-    rpc SendDirectMessage(SendDirectMessageRequest) returns (SendDirectMessageResponse);
 
     // Create a deposit intent
     rpc CreateDepositIntent(CreateDepositIntentRequest) returns (CreateDepositIntentResponse);
-}
-
-message StartDkgRequest {}
-
-message StartDkgResponse {
-    bool success = 1;
-    string message = 2;
 }
 
 message SpendFundsRequest {
@@ -57,14 +44,4 @@ message StartSigningResponse {
     bool success = 1;
     string message = 2;
     uint64 sign_id = 3;
-}
-
-message SendDirectMessageRequest {
-    string peer_id = 1;
-    string message = 2;
-}
-
-message SendDirectMessageResponse {
-    bool success = 1;
-    string message = 2;
 }
