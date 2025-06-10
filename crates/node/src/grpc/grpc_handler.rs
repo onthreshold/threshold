@@ -58,4 +58,12 @@ impl NodeControl for NodeControlService {
 
         Ok(Response::new(response))
     }
+
+    async fn get_pending_deposit_intents(
+        &self,
+        _request: Request<GetPendingDepositIntentsRequest>,
+    ) -> Result<Response<GetPendingDepositIntentsResponse>, Status> {
+        let response = grpc_operator::get_pending_deposit_intents(&self.network).await?;
+        Ok(Response::new(response))
+    }
 }

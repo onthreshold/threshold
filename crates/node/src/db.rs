@@ -1,6 +1,4 @@
-use bincode::{Decode, Encode};
 use rocksdb::DB;
-use serde::{Deserialize, Serialize};
 
 use protocol::{
     block::{Block, BlockHash},
@@ -8,13 +6,7 @@ use protocol::{
 };
 use types::errors::NodeError;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
-pub struct DepositIntent {
-    pub amount_sat: u64,
-    pub deposit_tracking_id: String,
-    pub deposit_address: String,
-    pub timestamp: u64,
-}
+use crate::deposit_intents::DepositIntent;
 
 pub trait Db: Send {
     fn get_block_by_height(&self, height: u64) -> Result<Option<Block>, NodeError>;
