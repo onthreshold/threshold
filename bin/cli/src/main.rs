@@ -99,6 +99,10 @@ fn encrypt_private_key(
 }
 
 fn get_password() -> Result<String, KeygenError> {
+    if let Ok(pw) = std::env::var("KEY_PASSWORD") {
+        return Ok(pw);
+    } // JUST FOR BOOTSTRAP.SH
+
     let password = rpassword::prompt_password("Enter password: ").map_err(KeygenError::Io)?;
 
     let confirm = rpassword::prompt_password("Confirm password: ").map_err(KeygenError::Io)?;
