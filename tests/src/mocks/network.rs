@@ -1,15 +1,14 @@
-use std::{
-    collections::BTreeMap,
-    path::PathBuf,
-    time::Duration,
-};
+use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
 use frost_secp256k1::Identifier;
 use node::{
     NodeState,
     swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture, SelfResponse},
 };
-use tokio::sync::{broadcast, mpsc::{self, unbounded_channel}};
+use tokio::sync::{
+    broadcast,
+    mpsc::{self, unbounded_channel},
+};
 use types::errors::{self, NetworkError};
 
 // Import MockDb from our mocks module
@@ -59,7 +58,7 @@ pub struct MockNetwork {
 
 impl MockNetwork {
     pub fn new(
-        events_emitter_tx: broadcast::Sender<NetworkEvent>, 
+        events_emitter_tx: broadcast::Sender<NetworkEvent>,
         peer: libp2p::PeerId,
         pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
     ) -> Self {
@@ -97,7 +96,8 @@ impl Network for MockNetwork {
 
         println!("Queuing broadcast event: {:?}", pending_event);
 
-        self.pending_events_tx.send(pending_event)
+        self.pending_events_tx
+            .send(pending_event)
             .map_err(|_| NetworkError::SendError("Failed to send pending event".to_string()))?;
         Ok(())
     }
@@ -115,7 +115,8 @@ impl Network for MockNetwork {
             target_peers: vec![peer_id],
         };
 
-        self.pending_events_tx.send(pending_event)
+        self.pending_events_tx
+            .send(pending_event)
             .map_err(|_| NetworkError::SendError("Failed to send pending event".to_string()))?;
         Ok(())
     }
@@ -182,9 +183,13 @@ impl MockNodeCluster {
 
         for _i in 0..peers {
             let peer_id = libp2p::PeerId::random();
-            let Ok((node, network)) =
-                create_node_network(peer_id, node_config.clone(), min_signers, max_signers, pending_events_tx.clone())
-            else {
+            let Ok((node, network)) = create_node_network(
+                peer_id,
+                node_config.clone(),
+                min_signers,
+                max_signers,
+                pending_events_tx.clone(),
+            ) else {
                 panic!("Failed to create node network");
             };
 
