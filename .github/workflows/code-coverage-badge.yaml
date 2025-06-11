@@ -30,6 +30,7 @@ jobs:
           mv ./tarpaulin-report.json target/tarpaulin/coverage.json
         env:
           MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
+          MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
           IS_TESTNET: "true"
       - name: Show coverage report for debugging
         if: always()

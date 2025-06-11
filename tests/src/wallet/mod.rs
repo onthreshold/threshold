@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod utxo_spend_test {
     use node::key_manager::generate_keys_from_mnemonic;
-    use protocol::oracle::Oracle;
     use node::wallet::SimpleWallet;
     use protocol::oracle::EsploraOracle;
+    use protocol::oracle::Oracle;
 
     #[tokio::test]
     pub async fn test_utxo_spend() {
@@ -32,7 +32,8 @@ mod utxo_spend_test {
         match result {
             Ok((tx, sighash)) => {
                 let signed_tx = wallet_one.sign(&tx, &private_key, sighash);
-                oracle.broadcast_transaction(&signed_tx)
+                oracle
+                    .broadcast_transaction(&signed_tx)
                     .await
                     .expect("Failed to broadcast transaction");
                 println!("Transaction created and signed successfully");
@@ -45,11 +46,10 @@ mod utxo_spend_test {
                 match result {
                     Ok((tx, sighash)) => {
                         let signed_tx = wallet_two.sign(&tx, &private_key_to, sighash);
-                        oracle.broadcast_transaction(
-                            &signed_tx,
-                        )
-                        .await
-                        .expect("Failed to broadcast transaction");
+                        oracle
+                            .broadcast_transaction(&signed_tx)
+                            .await
+                            .expect("Failed to broadcast transaction");
                         println!("Transaction created and signed successfully");
                     }
                     Err(e) => {
