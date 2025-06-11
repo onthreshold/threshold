@@ -59,4 +59,6 @@ Cargo.lock
 *.sublime-workspace
 *.sublime-project
 .env
-visuals/
+visuals/nodes
+visuals/manim/__pycache__
+visuals/manim/media/
