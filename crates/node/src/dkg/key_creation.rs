@@ -1,5 +1,6 @@
 use frost_secp256k1::{self as frost, keys::dkg::round2};
 use libp2p::PeerId;
+use std::time::Duration;
 use types::errors::NodeError;
 
 use crate::{
@@ -10,6 +11,14 @@ use crate::{
     swarm_manager::{DirectMessage, Network},
 };
 use protocol::oracle::Oracle;
+
+fn dkg_step_delay() -> Duration {
+    std::env::var("DKG_STEP_DELAY_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .map(Duration::from_secs)
+        .unwrap_or_else(|| Duration::ZERO)
+}
 
 impl DkgState {
     pub async fn handle_dkg_start<N: Network, D: Db, O: Oracle>(
@@ -34,9 +43,11 @@ impl DkgState {
             return Ok(());
         }
 
-        tracing::info!("Starting DKG process");
+        tracing::info!("🚀 -------------------- STARTING DKG ---------------------------");
 
         self.dkg_started = true;
+
+        tokio::time::sleep(dkg_step_delay()).await;
 
         // Run the DKG initialization code
         let participant_identifier = peer_id_to_identifier(&node.peer_id);
@@ -188,6 +199,8 @@ impl DkgState {
 
                             tracing::debug!("Sent round2 package to {}", peer_to_send_to);
                         }
+
+                        std::thread::sleep(dkg_step_delay());
                     }
                     Err(e) => {
                         return Err(NodeError::Error(format!("DKG round2 failed: {}", e)));
@@ -232,6 +245,8 @@ impl DkgState {
         if let Some(r2_secret_package) = self.r2_secret_package.as_ref() {
             if self.round2_peer_packages.len() + 1 == node.max_signers as usize {
                 tracing::info!("Received all round2 packages, entering part3");
+                std::thread::sleep(dkg_step_delay());
+
                 let part3_result = frost::keys::dkg::part3(
                     &r2_secret_package.clone(),
                     &self.round1_peer_packages,
@@ -240,6 +255,9 @@ impl DkgState {
 
                 match part3_result {
                     Ok((private_key_package, pubkey_package)) => {
+                        tracing::info!(
+                            "🏁 -------------------- DKG COMPLETED -------------------------"
+                        );
                         tracing::info!(
                             "🎉 DKG finished successfully. Public key: {:?}",
                             pubkey_package.verifying_key()
