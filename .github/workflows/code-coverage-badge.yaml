@@ -28,6 +28,9 @@ jobs:
         run: |
           cargo tarpaulin --all-targets --exclude-files "target/*" --count --out Json
           mv ./tarpaulin-report.json target/tarpaulin/coverage.json
+        env:
+          MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
+          IS_TESTNET: "true"
       - name: Show coverage report for debugging
         if: always()
         run: cat target/tarpaulin/coverage.json
