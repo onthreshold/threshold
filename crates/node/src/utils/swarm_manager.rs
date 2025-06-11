@@ -402,8 +402,8 @@ impl SwarmManager {
 
 pub fn build_swarm(
     keypair: Keypair,
-    libp2p_udp_port: Option<u16>,
-    libp2p_tcp_port: Option<u16>,
+    libp2p_udp_port: u16,
+    libp2p_tcp_port: u16,
     peer_data: Vec<PeerData>,
 ) -> Result<(NetworkHandle, SwarmManager), NodeError> {
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
@@ -464,7 +464,7 @@ pub fn build_swarm(
 
     swarm
         .listen_on(
-            format!("/ip4/0.0.0.0/udp/{}/quic-v1", libp2p_udp_port.unwrap_or(0))
+            format!("/ip4/0.0.0.0/udp/{}/quic-v1", libp2p_udp_port)
                 .parse()
                 .expect("Failed to deserialize message"),
         )
@@ -472,7 +472,7 @@ pub fn build_swarm(
 
     swarm
         .listen_on(
-            format!("/ip4/0.0.0.0/tcp/{}", libp2p_tcp_port.unwrap_or(0))
+            format!("/ip4/0.0.0.0/tcp/{}", libp2p_tcp_port)
                 .parse()
                 .expect("Failed to deserialize message"),
         )

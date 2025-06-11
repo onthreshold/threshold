@@ -62,3 +62,6 @@ Cargo.lock
 visuals/nodes
 visuals/manim/__pycache__
 visuals/manim/media/
+
+tests/config.json
+tests/config.toml

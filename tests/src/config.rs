@@ -19,7 +19,11 @@ mod config_test {
                     "salt_b64": "TnErEFlx9F1BeU8mJcFzKQ",
                     "iv_b64": "hybTge0qoPaxNUhP"
                 }
-            }
+            },
+            "database_directory": "nodedb.db",
+            "grpc_port": 50051,
+            "libp2p_udp_port": 0,
+            "libp2p_tcp_port": 0
         }"#;
 
         let config: NodeConfig = serde_json::from_str(json_str).expect("Failed to deserialize");
@@ -29,5 +33,12 @@ mod config_test {
             "12D3KooWQDHzW448RmDoUz1KbMfuD4XqeojRJDsxqUZSEYo7FSUz"
         );
         assert!(config.dkg_keys.is_none());
+        assert_eq!(
+            config.database_directory,
+            std::path::PathBuf::from("nodedb.db")
+        );
+        assert_eq!(config.grpc_port, 50051);
+        assert_eq!(config.libp2p_udp_port, 0);
+        assert_eq!(config.libp2p_tcp_port, 0);
     }
 }

@@ -138,11 +138,11 @@ enum Commands {
         key_file_path: Option<String>,
         #[arg(short, long)]
         config_file_path: Option<String>,
-        #[arg(short, long)]
+        #[arg(short = 'p', long)]
         grpc_port: Option<u16>,
         #[arg(short = 'u', long)]
         libp2p_udp_port: Option<u16>,
-        #[arg(short, long)]
+        #[arg(short = 't', long)]
         libp2p_tcp_port: Option<u16>,
         #[arg(short, long)]
         database_directory: Option<String>,
@@ -150,7 +150,7 @@ enum Commands {
         log_file: Option<String>,
         #[arg(short = 'n', long)]
         max_signers: Option<u16>,
-        #[arg(short = 't', long)]
+        #[arg(short = 'm', long)]
         min_signers: Option<u16>,
     },
     Spend {
@@ -201,7 +201,7 @@ async fn main() -> Result<(), CliError> {
             max_signers,
             min_signers,
         } => {
-            start_node_cli(
+            start_node_cli(StartNodeConfigParams {
                 key_file_path,
                 config_file_path,
                 grpc_port,
@@ -211,7 +211,7 @@ async fn main() -> Result<(), CliError> {
                 log_file,
                 max_signers,
                 min_signers,
-            )
+            })
             .await
             .map_err(|e| CliError::NodeError(e.to_string()))?;
         }
@@ -295,6 +295,10 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
     .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
     config.set_key_data(key_data);
+    config.set_grpc_port(50051);
+    config.set_libp2p_udp_port(0);
+    config.set_libp2p_tcp_port(0);
+    config.set_database_directory(PathBuf::from("nodedb.db"));
 
     config
         .save_to_file()
@@ -310,7 +314,7 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
     Ok(())
 }
 
-async fn start_node_cli(
+struct StartNodeConfigParams {
     key_file_path: Option<String>,
     config_file_path: Option<String>,
     grpc_port: Option<u16>,
@@ -320,23 +324,41 @@ async fn start_node_cli(
     log_file: Option<String>,
     max_signers: Option<u16>,
     min_signers: Option<u16>,
-) -> Result<(), NodeError> {
-    let config = match get_config(key_file_path.clone(), config_file_path.clone()) {
+}
+
+async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> {
+    let mut config = match get_config(
+        params.key_file_path.clone(),
+        params.config_file_path.clone(),
+    ) {
         Ok(config) => config,
         Err(e) => {
             return Err(NodeError::Error(format!("Failed to get config: {}", e)));
         }
     };
 
+    if let Some(port) = params.grpc_port {
+        config.set_grpc_port(port);
+    }
+
+    if let Some(port) = params.libp2p_udp_port {
+        config.set_libp2p_udp_port(port);
+    }
+
+    if let Some(port) = params.libp2p_tcp_port {
+        config.set_libp2p_tcp_port(port);
+    }
+
+    if let Some(dir) = params.database_directory {
+        config.set_database_directory(PathBuf::from(dir));
+    }
+
     start_node(
-        max_signers,
-        min_signers,
+        params.max_signers,
+        params.min_signers,
         config,
-        grpc_port,
-        log_file.map(PathBuf::from),
-        libp2p_udp_port,
-        libp2p_tcp_port,
-        database_directory.map(PathBuf::from),
+        params.grpc_port,
+        params.log_file.map(PathBuf::from),
     )
     .await?;
     Ok(())
