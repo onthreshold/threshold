@@ -1,3 +1,9 @@
+pub mod balance;
+pub mod deposit;
+pub mod dkg;
+pub mod signing;
+pub mod withdrawl;
+
 use std::any::Any;
 
 use types::errors::NodeError;

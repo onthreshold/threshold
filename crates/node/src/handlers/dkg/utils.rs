@@ -11,7 +11,7 @@ use protocol::{
 use crate::{
     DkgKeys, EncryptionParams, NodeConfig, NodeState,
     db::Db,
-    dkg::DkgState,
+    handlers::dkg::DkgState,
     key_manager::{decrypt_private_key, encrypt_private_key, get_password_from_prompt},
     swarm_manager::Network,
 };

@@ -1,7 +1,7 @@
 use crate::{
     Network, NodeState,
     db::Db,
-    handler::Handler,
+    handlers::Handler,
     swarm_manager::{NetworkEvent, SelfRequest, SelfResponse},
 };
 use protocol::oracle::Oracle;

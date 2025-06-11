@@ -6,7 +6,7 @@ use types::errors::NodeError;
 use crate::{
     NodeState,
     db::Db,
-    dkg::DkgState,
+    handlers::dkg::DkgState,
     peer_id_to_identifier,
     swarm_manager::{DirectMessage, Network},
 };

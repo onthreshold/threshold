@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::{
     NodeState,
     db::Db,
-    deposit::{DepositIntent, DepositIntentState},
+    handlers::deposit::{DepositIntent, DepositIntentState},
     swarm_manager::Network,
 };
 use protocol::oracle::Oracle;

@@ -7,7 +7,7 @@ mod deposit_tests {
     use bitcoin::{Address, CompressedPublicKey, Transaction};
     use node::{
         db::Db,
-        deposit::{DepositIntent, DepositIntentState},
+        handlers::deposit::{DepositIntent, DepositIntentState},
         grpc::{
             grpc_handler::node_proto::{CreateDepositIntentRequest, CreateDepositIntentResponse},
             grpc_operator,

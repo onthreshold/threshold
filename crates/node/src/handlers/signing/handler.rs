@@ -1,7 +1,7 @@
 use crate::NodeState;
 use crate::db::Db;
-use crate::handler::Handler;
-use crate::signing::SigningState;
+use crate::handlers::Handler;
+use crate::handlers::signing::SigningState;
 use crate::swarm_manager::{DirectMessage, Network, NetworkEvent, SelfRequest, SelfResponse};
 use protocol::oracle::Oracle;
 use types::errors::NodeError;
