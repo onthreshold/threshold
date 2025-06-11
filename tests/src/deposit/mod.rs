@@ -7,11 +7,11 @@ mod deposit_tests {
     use bitcoin::{Address, CompressedPublicKey, Transaction};
     use node::{
         db::Db,
-        handlers::deposit::{DepositIntent, DepositIntentState},
         grpc::{
             grpc_handler::node_proto::{CreateDepositIntentRequest, CreateDepositIntentResponse},
             grpc_operator,
         },
+        handlers::deposit::{DepositIntent, DepositIntentState},
     };
     use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;

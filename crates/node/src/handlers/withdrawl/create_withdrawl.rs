@@ -3,8 +3,8 @@ use std::str::FromStr;
 use crate::{
     NodeState,
     db::Db,
-    swarm_manager::Network,
     handlers::withdrawl::{SpendIntent, SpendIntentState},
+    swarm_manager::Network,
 };
 use bitcoin::{
     key::Secp256k1,
