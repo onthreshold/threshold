@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use bitcoin::{consensus, Address, Amount, Network, OutPoint, ScriptBuf, Transaction};
+use bitcoin::{consensus, Address, Network, Transaction};
 use esplora_client::{AsyncClient, Builder};
 use std::{collections::HashSet, str::FromStr};
 use tokio::sync::broadcast;
@@ -29,21 +29,15 @@ pub trait WindowedConfirmedTransactionProvider {
 #[derive(Debug)]
 pub struct EsploraApiClient {
     pub client: AsyncClient,
-    pub tx_channel: Option<broadcast::Sender<Transaction>>,
+    pub tx_channel: broadcast::Sender<Transaction>,
     pub deposit_intent_rx: Option<broadcast::Receiver<String>>,
-}
-
-pub struct Utxo {
-    pub outpoint: OutPoint,
-    pub value: Amount,
-    pub script_pubkey: ScriptBuf,
 }
 
 impl Default for EsploraApiClient {
     fn default() -> Self {
         let builder = Builder::new("https://blockstream.info/testnet/api");
         let client = builder.build_async().unwrap();
-        Self::new(client, None, None)
+        Self::new(client, None, None, None)
     }
 }
 
@@ -51,11 +45,12 @@ impl EsploraApiClient {
     pub fn new(
         client: AsyncClient,
         capacity: Option<usize>,
+        tx_channel: Option<broadcast::Sender<Transaction>>,
         deposit_intent_rx: Option<broadcast::Receiver<String>>,
     ) -> Self {
         Self {
             client,
-            tx_channel: capacity.map(|c| broadcast::channel(c).0),
+            tx_channel: tx_channel.unwrap_or(broadcast::channel(capacity.unwrap_or(1000)).0),
             deposit_intent_rx,
         }
     }
@@ -63,6 +58,7 @@ impl EsploraApiClient {
     pub fn new_with_network(
         network: Network,
         capacity: Option<usize>,
+        tx_channel: Option<broadcast::Sender<Transaction>>,
         deposit_intent_rx: Option<broadcast::Receiver<String>>,
     ) -> Self {
         let url = match network {
@@ -74,7 +70,7 @@ impl EsploraApiClient {
         };
         let builder = Builder::new(url);
         let client = builder.build_async().unwrap();
-        Self::new(client, capacity, deposit_intent_rx)
+        Self::new(client, capacity, tx_channel, deposit_intent_rx)
     }
 }
 
@@ -193,7 +189,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
                         };
 
                         for tx in new_txs {
-                            match self.tx_channel.as_ref().unwrap().send(tx) {
+                            match self.tx_channel.send(tx) {
                                 Ok(_) => (),
                                 Err(e) => {
                                     error!("Error sending transaction to channel: {:?}", e);

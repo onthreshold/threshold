@@ -8,7 +8,7 @@ mod withdrawl_tests {
 
     use crate::mocks::network::MockNodeCluster;
     use node::withdrawl::{SpendIntent, SpendIntentState};
-    use protocol::chain_state::Account;
+    use protocol::{chain_state::Account, oracle::Utxo};
     use std::collections::HashMap;
     use tokio::sync::mpsc::unbounded_channel;
 
@@ -41,7 +41,7 @@ mod withdrawl_tests {
 
         // Add a dummy UTXO so that wallet::create_spend succeeds
         node.wallet.address = Some(address.clone());
-        node.wallet.utxos.push(node::wallet::Utxo {
+        node.wallet.utxos.push(Utxo {
             outpoint: OutPoint {
                 txid: Txid::from_slice(&[1u8; 32]).unwrap(),
                 vout: 0,
@@ -152,7 +152,7 @@ mod withdrawl_tests {
         );
 
         node.wallet.address = Some(address.clone());
-        node.wallet.utxos.push(node::wallet::Utxo {
+        node.wallet.utxos.push(Utxo {
             outpoint: OutPoint {
                 txid: Txid::from_slice(&[2u8; 32]).unwrap(),
                 vout: 0,

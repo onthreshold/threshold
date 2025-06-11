@@ -1,6 +1,6 @@
 use crate::{
-    db::Db, deposit::DepositIntentState, dkg::DkgState, handler::Handler, signing::SigningState,
-    withdrawl::SpendIntentState,
+    balance::BalanceState, db::Db, deposit::DepositIntentState, dkg::DkgState, handler::Handler,
+    signing::SigningState, withdrawl::SpendIntentState,
 };
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{
@@ -11,6 +11,7 @@ use argon2::{
     },
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use bitcoin::Transaction;
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::{PeerId, identity::Keypair};
 use protocol::{chain_state::ChainState, oracle::Oracle};
@@ -21,6 +22,7 @@ use tokio::sync::broadcast;
 use tracing::error;
 use types::errors::NodeError;
 
+pub mod balance;
 pub mod db;
 pub mod deposit;
 pub mod dkg;
@@ -201,7 +203,7 @@ pub struct NodeState<N: Network, D: Db, O: Oracle> {
     pub private_key_package: Option<frost::keys::KeyPackage>,
 
     // FROST signing
-    pub wallet: crate::wallet::SimpleWallet,
+    pub wallet: crate::wallet::SimpleWallet<O>,
     pub config: NodeConfig,
     pub network_handle: N,
     pub network_events_stream: broadcast::Receiver<NetworkEvent>,
@@ -219,14 +221,16 @@ impl<N: Network, D: Db, O: Oracle> NodeState<N, D, O> {
         storage_db: D,
         network_events_sender: broadcast::Sender<NetworkEvent>,
         deposit_intent_tx: broadcast::Sender<String>,
+        transaction_rx: broadcast::Receiver<Transaction>,
         oracle: O,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
         let dkg_state = DkgState::new()?;
         let signing_state = SigningState::new()?;
-        let deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
+        let deposit_intent_state = DepositIntentState::new(deposit_intent_tx, transaction_rx);
         let withdrawl_intent_state = SpendIntentState::new();
+        let balance_state = BalanceState::new();
 
         let mut node_state = NodeState {
             network_handle: network_handle.clone(),
@@ -244,6 +248,7 @@ impl<N: Network, D: Db, O: Oracle> NodeState<N, D, O> {
                 Box::new(signing_state),
                 Box::new(deposit_intent_state),
                 Box::new(withdrawl_intent_state),
+                Box::new(balance_state),
             ],
             pubkey_package: None,
             private_key_package: None,

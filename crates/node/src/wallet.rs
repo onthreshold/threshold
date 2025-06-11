@@ -3,33 +3,21 @@ use bitcoin::hashes::Hash;
 use bitcoin::sighash::{EcdsaSighashType, SighashCache};
 use bitcoin::transaction::Version;
 use bitcoin::witness::Witness;
-use bitcoin::{Address, OutPoint, Txid};
 use bitcoin::{Amount, ScriptBuf, Transaction, TxIn, TxOut};
-use clients::EsploraApiClient;
-use esplora_client::AsyncClient;
+use protocol::oracle::{Oracle, Utxo};
 use types::errors::NodeError;
 
-/// Very simple demonstration UTXO representation (key-path Taproot assumed)
-#[derive(Debug, Clone)]
-pub struct Utxo {
-    pub outpoint: OutPoint,
-    pub value: Amount,
-    pub script_pubkey: ScriptBuf,
-}
-
-/// Wallet that only tracks a list of local UTXOs and is able to construct a
-/// single-input spending transaction that possibly creates a change output. No
-/// fee calculation is performed – this is purely for demonstration purposes.
 #[derive(Debug, Default)]
-pub struct SimpleWallet {
+pub struct SimpleWallet<O: Oracle> {
     pub utxos: Vec<Utxo>,
     pub address: Option<bitcoin::Address>,
+    pub oracle: O,
 }
 
-impl SimpleWallet {
-    pub async fn new(address: &bitcoin::Address) -> Self {
-        let esplora_client = EsploraApiClient::default();
-        let client_utxos = Self::refresh_utxos(&esplora_client.client, address.clone(), 3, None)
+impl<O: Oracle> SimpleWallet<O> {
+    pub async fn new(address: &bitcoin::Address, oracle: O) -> Self {
+        let client_utxos = oracle
+            .refresh_utxos(address.clone(), 3, None)
             .await
             .unwrap();
 
@@ -45,6 +33,7 @@ impl SimpleWallet {
         Self {
             address: Some(address.clone()),
             utxos,
+            oracle,
         }
     }
 
@@ -158,71 +147,6 @@ impl SimpleWallet {
             .map_err(|e| NodeError::Error(format!("Failed to broadcast transaction: {}", e)))?;
 
         Ok(tx_hex)
-    }
-
-    pub async fn refresh_utxos(
-        client: &AsyncClient,
-        address: Address,
-        number_pages: u32,
-        start_transactions: Option<Txid>,
-    ) -> Result<Vec<Utxo>, NodeError> {
-        let mut unspent_txs = Vec::new();
-        let mut last_seen_txid = start_transactions;
-        let script = address.script_pubkey();
-
-        for _ in 0..number_pages {
-            let address_txs = client
-                .scripthash_txs(&script, last_seen_txid)
-                .await
-                .map_err(|e| {
-                    NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
-                })?;
-
-            if address_txs.is_empty() {
-                break;
-            }
-
-            last_seen_txid = Some(address_txs.last().unwrap().txid);
-            for tx in address_txs {
-                let Some(full_tx) = client.get_tx(&tx.txid).await.ok().flatten() else {
-                    continue;
-                };
-                let Ok(tx_status) = client.get_tx_status(&tx.txid).await else {
-                    continue;
-                };
-                if !tx_status.confirmed {
-                    continue;
-                }
-
-                for (vout, output) in full_tx.output.iter().enumerate() {
-                    if output.script_pubkey != script {
-                        continue;
-                    }
-                    let Ok(Some(output_status)) =
-                        client.get_output_status(&tx.txid, vout as u64).await
-                    else {
-                        continue;
-                    };
-                    if output_status.spent {
-                        continue;
-                    }
-                    unspent_txs.push(Utxo {
-                        outpoint: OutPoint {
-                            txid: tx.txid,
-                            vout: vout as u32,
-                        },
-                        value: Amount::from_sat(output.value.to_sat()),
-                        script_pubkey: script.clone(),
-                    });
-                }
-            }
-
-            if last_seen_txid.is_none() {
-                break;
-            }
-        }
-
-        Ok(unspent_txs)
     }
 }
 

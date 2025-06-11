@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use bitcoin::{Address, Network as BitcoinNetwork, hashes::Hash, secp256k1::Scalar};
+use bitcoin::{Address, Network as BitcoinNetwork, Transaction, hashes::Hash, secp256k1::Scalar};
 use libp2p::gossipsub::IdentTopic;
 use tokio::sync::broadcast;
 use tracing::{error, info};
@@ -17,11 +17,16 @@ use crate::{
 use protocol::oracle::Oracle;
 
 impl DepositIntentState {
-    pub fn new(deposit_intent_tx: broadcast::Sender<String>) -> Self {
+    pub fn new(
+        deposit_intent_tx: broadcast::Sender<String>,
+        transaction_rx: broadcast::Receiver<Transaction>,
+    ) -> Self {
         Self {
             pending_intents: vec![],
             deposit_addresses: HashSet::new(),
             deposit_intent_tx,
+            transaction_rx,
+            processed_txids: HashSet::new(),
         }
     }
 
@@ -141,5 +146,53 @@ impl DepositIntentState {
 
     pub fn get_pending_deposit_intents(&self) -> Vec<DepositIntent> {
         self.pending_intents.clone()
+    }
+
+    pub fn update_user_balance<N: Network, D: Db, O: Oracle>(
+        &mut self,
+        node: &mut NodeState<N, D, O>,
+        tx: Transaction,
+    ) -> Result<(), NodeError> {
+        if !self.processed_txids.insert(tx.compute_txid()) {
+            return Ok(());
+        }
+
+        let input_address = tx
+            .input
+            .iter()
+            .filter_map(|input| {
+                Address::from_script(input.witness.witness_script()?, BitcoinNetwork::Testnet).ok()
+            })
+            .collect::<Vec<_>>();
+
+        if input_address.is_empty() {
+            return Err(NodeError::Error("No input address found".to_string()));
+        }
+
+        let deposit_amount = tx
+            .output
+            .iter()
+            .filter_map(|output| {
+                if let Ok(address) =
+                    Address::from_script(&output.script_pubkey, BitcoinNetwork::Testnet)
+                {
+                    if self.deposit_addresses.contains(&address.to_string()) {
+                        return Some(output.value.to_sat());
+                    }
+                }
+                None
+            })
+            .sum::<u64>();
+
+        let user_account = node
+            .chain_state
+            .get_account(&input_address[0].to_string())
+            .ok_or(NodeError::Error("User not found".to_string()))?;
+
+        let updated_account = user_account.update_balance(deposit_amount);
+
+        node.chain_state
+            .upsert_account(&input_address[0].to_string(), updated_account);
+        Ok(())
     }
 }

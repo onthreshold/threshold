@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use bitcoin::Txid;
-use protocol::oracle::Oracle;
+use bitcoin::{Address, Txid};
+use protocol::oracle::{Oracle, Utxo};
 use types::errors::NodeError;
 
 pub struct MockOracle {
@@ -66,5 +66,14 @@ impl Oracle for MockOracle {
         } else {
             Ok(10.0)
         }
+    }
+
+    async fn refresh_utxos(
+        &self,
+        _address: Address,
+        _number_pages: u32,
+        _start_transactions: Option<Txid>,
+    ) -> Result<Vec<Utxo>, NodeError> {
+        Ok(vec![])
     }
 }

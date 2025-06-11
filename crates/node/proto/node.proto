@@ -21,6 +21,9 @@ service NodeControl {
 
     // Confirm a withdrawal
     rpc ConfirmWithdrawal(ConfirmWithdrawalRequest) returns (ConfirmWithdrawalResponse);
+
+    // Check account balance
+    rpc CheckBalance(CheckBalanceRequest) returns (CheckBalanceResponse);
 }
 
 message SpendFundsRequest {
@@ -87,4 +90,12 @@ message ConfirmWithdrawalRequest {
 
 message ConfirmWithdrawalResponse {
     bool success = 1;
+}
+
+message CheckBalanceRequest {
+    string address = 1;
+}
+
+message CheckBalanceResponse {
+    uint64 balance_satoshis = 1;
 }

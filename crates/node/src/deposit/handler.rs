@@ -18,6 +18,12 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for DepositIntentState {
         node: &mut NodeState<N, D, O>,
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
+        if let Ok(tx) = self.transaction_rx.try_recv() {
+            if let Err(e) = self.update_user_balance(node, tx) {
+                info!("Failed to update user balance: {}", e);
+            }
+        }
+
         match message {
             Some(NetworkEvent::SelfRequest {
                 request: SelfRequest::CreateDeposit { amount_sat },

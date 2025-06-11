@@ -79,6 +79,9 @@ pub enum SelfRequest {
         challenge: String,
         signature: String,
     },
+    CheckBalance {
+        address: String,
+    },
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -105,6 +108,9 @@ pub enum SelfResponse {
     },
     ConfirmWithdrawalResponse {
         success: bool,
+    },
+    CheckBalanceResponse {
+        balance_satoshis: u64,
     },
 }
 

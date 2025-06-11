@@ -108,7 +108,7 @@ impl SpendIntentState {
                 .assume_checked(),
         )?;
 
-        SimpleWallet::broadcast_transaction(&tx).await?;
+        SimpleWallet::<O>::broadcast_transaction(&tx).await?;
 
         Ok(())
     }
