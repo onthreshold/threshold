@@ -140,7 +140,13 @@ enum Commands {
         config_file_path: Option<String>,
         #[arg(short, long)]
         grpc_port: Option<u16>,
+        #[arg(short = 'u', long)]
+        libp2p_udp_port: Option<u16>,
         #[arg(short, long)]
+        libp2p_tcp_port: Option<u16>,
+        #[arg(short, long)]
+        database_directory: Option<String>,
+        #[arg(short = 'o', long)]
         log_file: Option<String>,
         #[arg(short = 'n', long)]
         max_signers: Option<u16>,
@@ -188,6 +194,9 @@ async fn main() -> Result<(), CliError> {
             key_file_path,
             config_file_path,
             grpc_port,
+            libp2p_udp_port,
+            libp2p_tcp_port,
+            database_directory,
             log_file,
             max_signers,
             min_signers,
@@ -196,6 +205,9 @@ async fn main() -> Result<(), CliError> {
                 key_file_path,
                 config_file_path,
                 grpc_port,
+                libp2p_udp_port,
+                libp2p_tcp_port,
+                database_directory,
                 log_file,
                 max_signers,
                 min_signers,
@@ -302,6 +314,9 @@ async fn start_node_cli(
     key_file_path: Option<String>,
     config_file_path: Option<String>,
     grpc_port: Option<u16>,
+    libp2p_udp_port: Option<u16>,
+    libp2p_tcp_port: Option<u16>,
+    database_directory: Option<String>,
     log_file: Option<String>,
     max_signers: Option<u16>,
     min_signers: Option<u16>,
@@ -319,6 +334,9 @@ async fn start_node_cli(
         config,
         grpc_port,
         log_file.map(PathBuf::from),
+        libp2p_udp_port,
+        libp2p_tcp_port,
+        database_directory.map(PathBuf::from),
     )
     .await?;
     Ok(())
