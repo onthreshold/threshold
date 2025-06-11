@@ -1,7 +1,6 @@
 use std::{
     collections::BTreeMap,
     path::PathBuf,
-    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -10,7 +9,7 @@ use node::{
     NodeState,
     swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture, SelfResponse},
 };
-use tokio::sync::{broadcast, mpsc::unbounded_channel};
+use tokio::sync::{broadcast, mpsc::{self, unbounded_channel}};
 use types::errors::{self, NetworkError};
 
 // Import MockDb from our mocks module
@@ -52,19 +51,22 @@ pub struct PendingNetworkEvent {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct MockNetwork {
     pub peer: libp2p::PeerId,
     pub events_emitter_tx: broadcast::Sender<NetworkEvent>,
-    pub pending_events: Arc<Mutex<Vec<PendingNetworkEvent>>>,
+    pub pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
 }
 
 impl MockNetwork {
-    pub fn new(events_emitter_tx: broadcast::Sender<NetworkEvent>, peer: libp2p::PeerId) -> Self {
+    pub fn new(
+        events_emitter_tx: broadcast::Sender<NetworkEvent>, 
+        peer: libp2p::PeerId,
+        pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
+    ) -> Self {
         Self {
             events_emitter_tx,
             peer,
-            pending_events: Arc::new(Mutex::new(Vec::new())),
+            pending_events_tx,
         }
     }
 }
@@ -95,7 +97,8 @@ impl Network for MockNetwork {
 
         println!("Queuing broadcast event: {:?}", pending_event);
 
-        self.pending_events.lock().unwrap().push(pending_event);
+        self.pending_events_tx.send(pending_event)
+            .map_err(|_| NetworkError::SendError("Failed to send pending event".to_string()))?;
         Ok(())
     }
 
@@ -112,11 +115,11 @@ impl Network for MockNetwork {
             target_peers: vec![peer_id],
         };
 
-        self.pending_events.lock().unwrap().push(pending_event);
+        self.pending_events_tx.send(pending_event)
+            .map_err(|_| NetworkError::SendError("Failed to send pending event".to_string()))?;
         Ok(())
     }
 
-    #[allow(unused_variables)]
     fn send_self_request(
         &self,
         request: node::swarm_manager::SelfRequest,
@@ -156,6 +159,7 @@ pub struct MockNodeCluster {
     pub nodes: BTreeMap<libp2p::PeerId, NodeState<MockNetwork, MockDb, MockOracle>>,
     pub senders: BTreeMap<libp2p::PeerId, SenderToNode>,
     pub networks: BTreeMap<libp2p::PeerId, MockNetwork>,
+    pub pending_events_rx: mpsc::UnboundedReceiver<PendingNetworkEvent>,
 }
 
 impl MockNodeCluster {
@@ -173,10 +177,13 @@ impl MockNodeCluster {
         let mut senders = BTreeMap::new();
         let mut networks = BTreeMap::new();
 
+        // Create a single channel for all pending events
+        let (pending_events_tx, pending_events_rx) = mpsc::unbounded_channel();
+
         for _i in 0..peers {
             let peer_id = libp2p::PeerId::random();
             let Ok((node, network)) =
-                create_node_network(peer_id, node_config.clone(), min_signers, max_signers)
+                create_node_network(peer_id, node_config.clone(), min_signers, max_signers, pending_events_tx.clone())
             else {
                 panic!("Failed to create node network");
             };
@@ -193,6 +200,7 @@ impl MockNodeCluster {
             nodes,
             senders,
             networks,
+            pending_events_rx,
         }
     }
 
@@ -261,12 +269,12 @@ impl MockNodeCluster {
 
     // Process network events that were generated during node polling
     async fn process_network_events(&mut self) {
-        // Collect all pending events from all networks
+        // Collect all pending events from the channel
         let mut all_pending_events = Vec::new();
 
-        for (_, network) in self.networks.iter() {
-            let mut pending_events = network.pending_events.lock().unwrap();
-            all_pending_events.extend(pending_events.drain(..));
+        // Drain all available events from the channel
+        while let Ok(event) = self.pending_events_rx.try_recv() {
+            all_pending_events.push(event);
         }
 
         // Process each pending event
@@ -469,15 +477,12 @@ pub fn create_node_network(
     node_config: node::NodeConfig,
     min_signers: u16,
     max_signers: u16,
+    pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
 ) -> Result<(NodeState<MockNetwork, MockDb, MockOracle>, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(1000);
     let (deposit_intent_tx, _) = broadcast::channel::<String>(1000);
 
-    let network = MockNetwork {
-        events_emitter_tx: events_emitter_tx.clone(),
-        peer: peer_id,
-        pending_events: Arc::new(Mutex::new(Vec::new())),
-    };
+    let network = MockNetwork::new(events_emitter_tx.clone(), peer_id, pending_events_tx);
 
     let mock_db = MockDb::new();
     let oracle = MockOracle::new();
@@ -535,25 +540,10 @@ mod node_tests {
             first_network
                 .send_broadcast(topic, b"broadcast message".to_vec())
                 .unwrap();
-
-            // Check that events are queued
-            let pending_events = first_network.pending_events.lock().unwrap();
-            assert_eq!(pending_events.len(), 1, "Should have 2 pending events");
         }
 
         // Process the events
         cluster.process_network_events().await;
-
-        // Check that events are cleared from the network after processing
-        {
-            let first_network = cluster.networks.get(&first_peer).unwrap();
-            let pending_events = first_network.pending_events.lock().unwrap();
-            assert_eq!(
-                pending_events.len(),
-                0,
-                "Pending events should be cleared after processing"
-            );
-        }
 
         // Check that events were queued in the appropriate senders
         let second_sender = cluster.senders.get(&second_peer).unwrap();

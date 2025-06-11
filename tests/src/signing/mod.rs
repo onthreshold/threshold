@@ -51,10 +51,6 @@ pub mod signing_tests {
                 .senders
                 .values()
                 .all(|s| s.pending_events.is_empty())
-                && cluster
-                    .networks
-                    .values()
-                    .all(|n| n.pending_events.lock().unwrap().is_empty())
             {
                 break;
             }

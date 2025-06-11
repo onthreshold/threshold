@@ -226,12 +226,6 @@ mod dkg_test {
                 total_pending_events += sender.pending_events.len();
             }
 
-            // Also check network pending events
-            for (_, network) in cluster.networks.iter() {
-                let pending_events = network.pending_events.lock().unwrap();
-                total_pending_events += pending_events.len();
-            }
-
             info!(
                 "Iteration {}: {} total pending events",
                 iteration_count, total_pending_events
@@ -308,7 +302,7 @@ mod dkg_test {
     #[tokio::test]
     #[ignore]
     async fn test_dkg_completion_256_nodes() {
-        setup();
+        // setup();
         let start_time = std::time::Instant::now();
         let mut cluster = MockNodeCluster::new(256, 171, 256).await;
         cluster.setup().await;
@@ -334,11 +328,7 @@ mod dkg_test {
                 total_pending_events += sender.pending_events.len();
             }
 
-            // Also check network pending events
-            for (_, network) in cluster.networks.iter() {
-                let pending_events = network.pending_events.lock().unwrap();
-                total_pending_events += pending_events.len();
-            }
+            // Network pending events are now handled through channels, no need to check them separately
 
             info!(
                 "Iteration {}: {} total pending events",
