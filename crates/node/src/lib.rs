@@ -1,5 +1,6 @@
 use crate::{
-    handlers::balance::BalanceState, db::Db, handlers::deposit::DepositIntentState, handlers::dkg::DkgState, handlers::Handler,
+    db::Db, handlers::Handler, handlers::balance::BalanceState,
+    handlers::deposit::DepositIntentState, handlers::dkg::DkgState,
     handlers::signing::SigningState, handlers::withdrawl::SpendIntentState,
 };
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
@@ -22,14 +23,16 @@ use tokio::sync::broadcast;
 use tracing::error;
 use types::errors::NodeError;
 
-pub mod db;
 pub mod grpc;
 pub mod handlers;
-pub mod key_manager;
 pub mod main_loop;
 pub mod start_node;
-pub mod swarm_manager;
-pub mod wallet;
+
+pub mod utils;
+pub use utils::db;
+pub use utils::key_manager;
+pub use utils::swarm_manager;
+pub use utils::wallet;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct PeerData {
