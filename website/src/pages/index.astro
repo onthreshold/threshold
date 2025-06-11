@@ -2,7 +2,7 @@
 import HomeLayout from "@layouts/HomeLayout.astro";
 import { keystatic } from "@lib/keystatic/client";
 import invariant from "tiny-invariant";
-import { Icon } from "astro-icon/components"; // Assuming astro-icon is installed and Icon can be imported like this
+import { Icon } from "astro-icon/components";
 
 const i18n = await keystatic.singletons.homepage.read({
   resolveLinkedFiles: true,
@@ -52,8 +52,10 @@ invariant(i18n, "No homepage content found");
           id="star-repo-button"
           class="mt-4 flex items-center justify-center bg-white text-btcgray-800 border border-btcgray-800 p-3 rounded hover:bg-btcgray-100 hover:cursor-pointer w-full"
         >
-          <Icon name="simple-icons:github" class="w-5 h-5 mr-2" />
-          <span id="star-repo-text">Star Us | 4</span>
+          <Icon name="simple-icons:github" class="w-4 h-4 mr-2" />
+          <span>star us</span>
+          <span class="mx-1">|</span>
+          <span id="github-star-count">4</span>
         </a>
       </form>
     </section>
@@ -89,7 +91,7 @@ invariant(i18n, "No homepage content found");
   const form = document.querySelector("form");
   const emailInput = document.querySelector('input[type="email"]');
   const submitButton = document.querySelector('button[type="submit"]');
-  const starRepoButtonText = document.getElementById("star-repo-text");
+  const githubStarCountElement = document.getElementById("github-star-count");
   const subscriberCountValue = document.getElementById(
     "subscriber-count-value"
   );
@@ -148,7 +150,6 @@ invariant(i18n, "No homepage content found");
           );
           htmlSubmitButton.classList.add("bg-green-500");
 
-          // incrase the subscriber count by 1
           const currentCount = parseInt(
             subscriberCountValue?.textContent || "0",
             10
@@ -159,7 +160,6 @@ invariant(i18n, "No homepage content found");
             ).toLocaleString();
           }
         } else if (response.status === 409) {
-          // If the email already exists, we can handle it gracefully
           htmlSubmitButton.textContent = "Already Subscribed";
           htmlSubmitButton.disabled = false;
           htmlSubmitButton.classList.remove(
@@ -282,18 +282,18 @@ invariant(i18n, "No homepage content found");
   }
 
   async function fetchGitHubStars() {
-    if (!starRepoButtonText) {
-      console.error("Star repo button text element not found.");
+    if (!githubStarCountElement) {
+      console.error("GitHub star count element not found.");
       return;
     }
     try {
       const response = await fetch(
-        "https://api.github.com/repos/devflowinc/threshold"
+        "https.api.github.com/repos/devflowinc/threshold"
       );
       if (response.ok) {
         const data = await response.json();
         const starCount = data.stargazers_count;
-        starRepoButtonText.textContent = `Star Us | ${starCount}`;
+        githubStarCountElement.textContent = starCount.toLocaleString();
       } else {
         console.error("Failed to fetch GitHub stars:", response.status);
       }
