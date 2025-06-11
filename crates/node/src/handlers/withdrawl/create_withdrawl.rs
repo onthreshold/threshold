@@ -4,7 +4,7 @@ use crate::{
     NodeState,
     db::Db,
     swarm_manager::Network,
-    withdrawl::{SpendIntent, SpendIntentState},
+    handlers::withdrawl::{SpendIntent, SpendIntentState},
 };
 use bitcoin::{
     key::Secp256k1,

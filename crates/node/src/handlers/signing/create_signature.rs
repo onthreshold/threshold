@@ -9,9 +9,9 @@ use tracing::{debug, error, info, warn};
 
 use crate::NodeState;
 use crate::db::Db;
-use crate::signing::ActiveSigning;
+use crate::handlers::signing::ActiveSigning;
 use crate::swarm_manager::{DirectMessage, Network};
-use crate::{peer_id_to_identifier, signing::SigningState};
+use crate::{peer_id_to_identifier, handlers::signing::SigningState};
 use protocol::oracle::Oracle;
 use types::errors::NodeError;
 

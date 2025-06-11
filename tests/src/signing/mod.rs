@@ -67,7 +67,7 @@ pub mod signing_tests {
             let signing_state = node
                 .handlers
                 .iter()
-                .find_map(|h| h.downcast_ref::<node::signing::SigningState>());
+                .find_map(|h| h.downcast_ref::<node::handlers::signing::SigningState>());
             assert!(
                 signing_state.unwrap().active_signing.is_none(),
                 "node still has pending signing {:?}",

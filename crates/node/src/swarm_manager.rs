@@ -28,7 +28,7 @@ use tokio::{
     },
 };
 
-use crate::{PeerData, deposit::DepositIntent, withdrawl::SpendIntent};
+use crate::{PeerData, handlers::deposit::DepositIntent, handlers::withdrawl::SpendIntent};
 use types::errors::{NetworkError, NodeError};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

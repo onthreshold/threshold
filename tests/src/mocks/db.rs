@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use node::db::Db;
-use node::deposit::DepositIntent;
+use node::handlers::deposit::DepositIntent;
 use protocol::{
     block::{Block, BlockHash},
     chain_state::ChainState,

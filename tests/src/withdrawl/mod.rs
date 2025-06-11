@@ -7,7 +7,7 @@ mod withdrawl_tests {
     };
 
     use crate::mocks::network::MockNodeCluster;
-    use node::withdrawl::{SpendIntent, SpendIntentState};
+    use node::handlers::withdrawl::{SpendIntent, SpendIntentState};
     use protocol::{chain_state::Account, oracle::Utxo};
     use std::collections::HashMap;
     use tokio::sync::mpsc::unbounded_channel;

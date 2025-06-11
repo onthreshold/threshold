@@ -1,5 +1,5 @@
 use crate::swarm_manager::{Network, NetworkEvent, SelfRequest, SelfResponse};
-use crate::{NodeState, db::Db, handler::Handler, withdrawl::SpendIntentState};
+use crate::{NodeState, db::Db, handlers::Handler, handlers::withdrawl::SpendIntentState};
 use protocol::oracle::Oracle;
 use types::errors::NodeError;
 

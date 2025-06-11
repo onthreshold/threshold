@@ -4,7 +4,7 @@ use frost_secp256k1::{self as frost};
 use tracing::{error, info};
 use types::errors::NodeError;
 
-use crate::{NodeState, db::Db, signing::SigningState, swarm_manager::Network};
+use crate::{NodeState, db::Db, handlers::signing::SigningState, swarm_manager::Network};
 use protocol::oracle::Oracle;
 
 impl SigningState {
