@@ -1,7 +1,9 @@
 {
-  "name": "",
+  "name": "threshold-security-website",
+  "description": "A website for Threshold Security, built with Astro and React.",
   "type": "module",
   "version": "0.0.1",
+  "license": "MIT",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
