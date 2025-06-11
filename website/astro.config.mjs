@@ -28,5 +28,10 @@ export default defineConfig({
       },
     ],
   },
-  integrations: [mdx(), keystatic(), react(), icon()],
+  integrations: [
+    mdx(),
+    ...(process.env.SKIP_KEYSTATIC ? [] : [keystatic()]),
+    react(),
+    icon(),
+  ],
 });
