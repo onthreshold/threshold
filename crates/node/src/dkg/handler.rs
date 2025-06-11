@@ -1,5 +1,3 @@
-use tracing::{error, info};
-
 use crate::{
     NodeState,
     db::Db,
@@ -20,13 +18,13 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for DkgState {
             Some(NetworkEvent::Subscribed { peer_id, topic }) => {
                 if topic == self.start_dkg_topic.hash() {
                     self.dkg_listeners.insert(peer_id);
-                    info!(
+                    tracing::trace!(
                         "Peer {} subscribed to topic {topic}. Listeners: {}",
                         peer_id,
                         self.dkg_listeners.len()
                     );
                     if let Err(e) = self.handle_dkg_start(node).await {
-                        error!("❌ Failed to handle DKG start: {}", e);
+                        tracing::error!("❌ Failed to handle DKG start: {}", e);
                     }
                 }
             }
