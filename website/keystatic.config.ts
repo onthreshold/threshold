@@ -5,7 +5,7 @@ export default config({
   storage: {
     kind: "local",
   },
-
+  locale: "en-US",
   collections: {
     posts: collection({
       label: "Posts",

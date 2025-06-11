@@ -22,88 +22,52 @@ invariant(i18n, "No homepage content found");
   <div class="flex flex-col md:flex-row gap-16 w-full max-w-4xl">
     <section class="flex-1">
       <h2 class="text-2xl font-semibold mb-4 border-l-4 border-brand-500 pl-4">
-        join waitlist
+        {i18n.waitlist.label}
       </h2>
       <p class="mb-4 text-btcgray-600">
-        Get updates on our progress and be the first to know when we launch.
+        {i18n.waitlist.description}
       </p>
       <form class="flex flex-col">
         <input
           type="email"
-          placeholder="your@email.com"
+          placeholder={i18n.waitlist.inputPlaceholder}
           class="border border-btcgray-300 p-3 rounded mb-4 focus:ring-2 focus:ring-brand-500 outline-none"
         />
         <button
           type="submit"
           class="bg-btcgray-800 text-white p-3 rounded hover:bg-btcgray-700"
-          >join waitlist</button
         >
+          {i18n.waitlist.buttonText}
+        </button>
       </form>
       <p class="mt-2 text-sm text-btcgray-600">
-        &rarr; 1,070 developers waiting
+        &rarr; 1,070 {i18n.waitlist.numberSuffix}
       </p>
     </section>
 
     <section class="flex-1">
       <h2 class="text-2xl font-semibold mb-4 border-l-4 border-brand-500 pl-4">
-        roadmap
+        {i18n.roadmap.label}
       </h2>
       <ul class="space-y-4 w-full">
-        <li class="flex items-start w-full">
-          <span class="bg-brand-500 rounded-full w-3 h-3 mr-3 mt-1.5"></span>
-          <div class="w-[93%]">
-            <h3 class="font-semibold">DKG</h3>
-            <p class="text-sm text-btcgray-600">
-              interactive key generation ceremony for up to 256 participants
-              including integration tests
-            </p>
-            <span class="text-xs text-btcgray-400">in progress</span>
-          </div>
-        </li>
-        <li class="flex items-start">
-          <span class="bg-brand-500 rounded-full w-3 h-3 mr-3 mt-1.5"></span>
-          <div class="w-[93%]">
-            <h3 class="font-semibold">deposits</h3>
-            <p class="text-sm text-btcgray-600">
-              RPC route, rocksdb-backed storage, and business logic for tracking
-              new deposits and increasing balance of the depositor
-            </p>
-            <span class="text-xs text-btcgray-400">in progress</span>
-          </div>
-        </li>
-        <li class="flex items-start">
-          <span class="bg-btcgray-400 rounded-full w-3 h-3 mr-3 mt-1.5"></span>
-          <div class="w-[93%]">
-            <h3 class="font-semibold">withdrawals</h3>
-            <p class="text-sm text-btcgray-600">
-              RPC route, fee calculation, UTXO management, and signature
-              validation for withdrawing from a given account balance
-            </p>
-            <span class="text-xs text-btcgray-400"> not started </span>
-          </div>
-        </li>
-        <li class="flex items-start">
-          <span class="bg-btcgray-400 rounded-full w-3 h-3 mr-3 mt-1.5"></span>
-          <div class="w-[93%]">
-            <h3 class="font-semibold">tendermint</h3>
-            <p class="text-sm text-btcgray-600">
-              business logic for handling staking, slashing, and unbonding of
-              the validator set, including integration tests
-            </p>
-            <span class="text-xs text-btcgray-400">not started</span>
-          </div>
-        </li>
-        <li class="flex items-start">
-          <span class="bg-btcgray-400 rounded-full w-3 h-3 mr-3 mt-1.5"></span>
-          <div class="w-[93%]">
-            <h3 class="font-semibold">member rotation</h3>
-            <p class="text-sm text-btcgray-600">
-              epoch-based member rotation with sweeping of funds from one set of
-              members to another, including integration tests
-            </p>
-            <span class="text-xs text-btcgray-400">not started</span>
-          </div>
-        </li>
+        {
+          i18n.roadmap.items.map((item) => (
+            <li class="flex items-start">
+              <span
+                class={`rounded-full w-3 h-3 mr-3 mt-1.5 ${
+                  item.status === "in progress"
+                    ? "bg-brand-500"
+                    : "bg-btcgray-400"
+                }`}
+              />
+              <div class="w-[93%]">
+                <h3 class="font-semibold">{item.label}</h3>
+                <p class="text-sm text-btcgray-600">{item.description}</p>
+                <span class="text-xs text-btcgray-400">{item.status}</span>
+              </div>
+            </li>
+          ))
+        }
       </ul>
     </section>
   </div>

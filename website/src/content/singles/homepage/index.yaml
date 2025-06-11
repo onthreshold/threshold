@@ -1,8 +1,43 @@
 openGraph:
   title: Threshold Security
+  description: building the best infrastructure for decentralized multisigs
   type: website
   publishedTime: 2025-06-10
   modifiedTime: 2025-06-10
   author: skeptrune
   primaryCategory: about
 actions: []
+waitlist:
+  label: join waitlist
+  description: Get updates on our progress and be the first to know when we launch.
+  inputPlaceholder: your@email.com
+  buttonText: join waitlist
+  numberSuffix: people waiting
+roadmap:
+  label: roadmap
+  items:
+    - label: DKG
+      description: >-
+        interactive key generation ceremony for up to 256 participants including
+        integration tests
+      status: in progress
+    - label: deposits
+      description: >-
+        RPC route, rocksdb-backed storage, and business logic for tracking new
+        deposits and increasing balance of the depositor
+      status: in progress
+    - label: withdrawals
+      description: >-
+        RPC route, fee calculation, UTXO management, and signature validation
+        for withdrawing from a given account balance
+      status: not started
+    - label: tendermint
+      description: >-
+        business logic for handling staking, slashing, and unbonding of the
+        validator set, including integration tests
+      status: not started
+    - label: member rotation
+      description: >-
+        epoch-based member rotation with sweeping of funds from one set of
+        members to another, including integration tests
+      status: not started

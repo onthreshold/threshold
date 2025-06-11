@@ -1,8 +1,9 @@
 ---
 import "../styles/global.css";
 import { ClientRouter } from "astro:transitions";
-import { SiteName } from "../theme.config";
+import { SiteName, SocialLinks } from "../theme.config";
 import { Font } from "astro:assets";
+import { Icon } from "astro-icon/components";
 
 const {
   title = "Default Title",
@@ -78,22 +79,40 @@ const currentPath = Astro.url.pathname;
         <h1
           class="text-4xl md:text-6xl font-bold mb-4 border-b-2 sm:pb-6 pb-3 border-brand-500"
         >
-          Threshold Security
+          {title}
         </h1>
         <p class="text-sm md:text-base text-btcgray-600">
-          infrastructure for decentralized multisigs
+          {description}
         </p>
       </header>
       <main>
         <slot />
       </main>
       <footer
-        class="mt-16 text-center text-sm text-btcgray-600 pt-8 border-t border-btcgray-50 w-full"
+        class="mt-16 text-center text-sm text-btcgray-600 pt-8 border-t border-btcgray-50 w-full flex justify-between"
       >
+        <ul class="flex items-center space-x-4">
+          {
+            SocialLinks.map((link) => (
+              <li>
+                <a
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="icon hover:text-brand-500 transition-colors"
+                  aria-label={link.icon.split(":")[1]}
+                >
+                  <Icon name={link.icon} />
+                </a>
+              </li>
+            ))
+          }
+        </ul>
         <p>
-          &copy; 2025 athas code editor &mdash; <a
-            href="#"
-            class="border-b-2 border-brand-500 font-bold">@athasdev</a
+          email us &mdash; <a
+            href="mailto:team@onthreshold.com"
+            class="border-b-2 border-brand-500 font-bold"
+            >team@onthreshold.com</a
           >
         </p>
       </footer>
