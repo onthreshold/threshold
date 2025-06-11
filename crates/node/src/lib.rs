@@ -71,6 +71,10 @@ pub struct NodeConfig {
     key_file_path: PathBuf,
     #[serde(skip)]
     config_file_path: PathBuf,
+    database_directory: Option<PathBuf>,
+    grpc_port: Option<u16>,
+    libp2p_udp_port: Option<u16>,
+    libp2p_tcp_port: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -84,6 +88,10 @@ pub struct ConfigStore {
     allowed_peers: Vec<PeerData>,
     log_file_path: Option<PathBuf>,
     key_file_path: PathBuf,
+    database_directory: Option<PathBuf>,
+    grpc_port: Option<u16>,
+    libp2p_udp_port: Option<u16>,
+    libp2p_tcp_port: Option<u16>,
 }
 
 impl NodeConfig {
@@ -148,7 +156,11 @@ impl NodeConfig {
             log_file_path,
             key_file_path,
             config_file_path,
-        })
+            database_directory: None,
+            grpc_port: None,
+            libp2p_udp_port: None,
+            libp2p_tcp_port: None,
+            })
     }
 
     pub fn save_to_file(&self) -> Result<(), NodeError> {
@@ -167,6 +179,10 @@ impl NodeConfig {
             allowed_peers: self.allowed_peers.clone(),
             log_file_path: self.log_file_path.clone(),
             key_file_path: self.key_file_path.clone(),
+            database_directory: self.database_directory.clone(),
+            grpc_port: self.grpc_port.clone(),
+            libp2p_udp_port: self.libp2p_udp_port.clone(),
+            libp2p_tcp_port: self.libp2p_tcp_port.clone(),
         };
 
         let config_str: String = serde_yaml::to_string(&config_store).unwrap();

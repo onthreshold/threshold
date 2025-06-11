@@ -149,6 +149,10 @@ pub fn get_config(
         log_file_path: config_store.log_file_path,
         key_file_path,
         config_file_path,
+        database_directory: config_store.database_directory,
+        grpc_port: config_store.grpc_port,
+        libp2p_udp_port: config_store.libp2p_udp_port,
+        libp2p_tcp_port: config_store.libp2p_tcp_port,
     };
 
     debug!("Read config file");
