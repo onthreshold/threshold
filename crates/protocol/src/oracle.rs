@@ -1,9 +1,16 @@
-use bitcoin::Txid;
+use bitcoin::{Address, Amount, OutPoint, ScriptBuf, Txid};
 use esplora_client::{AsyncClient, Builder};
 use types::errors::NodeError;
 
+#[derive(Debug, Clone)]
+pub struct Utxo {
+    pub outpoint: OutPoint,
+    pub value: Amount,
+    pub script_pubkey: ScriptBuf,
+}
+
 #[async_trait::async_trait]
-pub trait Oracle: Send {
+pub trait Oracle: Send + Default {
     async fn validate_transaction(
         &self,
         address: &str,
@@ -12,6 +19,12 @@ pub trait Oracle: Send {
     ) -> Result<bool, NodeError>;
 
     async fn get_current_fee_per_vb(&self, priority: Option<u16>) -> Result<f64, NodeError>;
+    async fn refresh_utxos(
+        &self,
+        address: Address,
+        number_pages: u32,
+        start_transactions: Option<Txid>,
+    ) -> Result<Vec<Utxo>, NodeError>;
 }
 
 pub struct EsploraOracle {
@@ -92,5 +105,74 @@ impl Oracle for EsploraOracle {
             .ok_or(NodeError::Error("Fee not found".to_string()))?;
 
         Ok(*fee)
+    }
+
+    async fn refresh_utxos(
+        &self,
+        address: Address,
+        number_pages: u32,
+        start_transactions: Option<Txid>,
+    ) -> Result<Vec<Utxo>, NodeError> {
+        let mut unspent_txs = Vec::new();
+        let mut last_seen_txid = start_transactions;
+        let script = address.script_pubkey();
+
+        for _ in 0..number_pages {
+            let address_txs = self
+                .esplora_client
+                .scripthash_txs(&script, last_seen_txid)
+                .await
+                .map_err(|e| {
+                    NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
+                })?;
+
+            if address_txs.is_empty() {
+                break;
+            }
+
+            last_seen_txid = Some(address_txs.last().unwrap().txid);
+            for tx in address_txs {
+                let Some(full_tx) = self.esplora_client.get_tx(&tx.txid).await.ok().flatten()
+                else {
+                    continue;
+                };
+                let Ok(tx_status) = self.esplora_client.get_tx_status(&tx.txid).await else {
+                    continue;
+                };
+                if !tx_status.confirmed {
+                    continue;
+                }
+
+                for (vout, output) in full_tx.output.iter().enumerate() {
+                    if output.script_pubkey != script {
+                        continue;
+                    }
+                    let Ok(Some(output_status)) = self
+                        .esplora_client
+                        .get_output_status(&tx.txid, vout as u64)
+                        .await
+                    else {
+                        continue;
+                    };
+                    if output_status.spent {
+                        continue;
+                    }
+                    unspent_txs.push(Utxo {
+                        outpoint: OutPoint {
+                            txid: tx.txid,
+                            vout: vout as u32,
+                        },
+                        value: Amount::from_sat(output.value.to_sat()),
+                        script_pubkey: script.clone(),
+                    });
+                }
+            }
+
+            if last_seen_txid.is_none() {
+                break;
+            }
+        }
+
+        Ok(unspent_txs)
     }
 }

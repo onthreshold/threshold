@@ -3,7 +3,8 @@ mod deposit_tests {
     use std::str::FromStr;
 
     use crate::mocks::network::MockNodeCluster;
-    use bitcoin::Address;
+    use bitcoin::hashes::Hash;
+    use bitcoin::{Address, CompressedPublicKey, Transaction};
     use node::{
         db::Db,
         deposit::{DepositIntent, DepositIntentState},
@@ -115,9 +116,10 @@ mod deposit_tests {
 
         // Create custom broadcast channel to observe deposit notifications
         let (tx, mut rx) = broadcast::channel::<String>(4);
+        let (_, transaction_rx) = broadcast::channel::<Transaction>(4);
 
         // Instantiate fresh DepositIntentState using our tx instead of node default
-        let mut state = DepositIntentState::new(tx.clone());
+        let mut state = DepositIntentState::new(tx.clone(), transaction_rx);
 
         let amount_sat = 42_000;
 
@@ -151,7 +153,8 @@ mod deposit_tests {
 
         // Broadcast channel for notifications
         let (tx, mut rx) = broadcast::channel::<String>(4);
-        let mut state = DepositIntentState::new(tx.clone());
+        let (_, transaction_rx) = broadcast::channel::<Transaction>(4);
+        let mut state = DepositIntentState::new(tx.clone(), transaction_rx);
 
         // Craft DepositIntent manually
         let deposit_tracking_id = Uuid::new_v4().to_string();
@@ -179,5 +182,164 @@ mod deposit_tests {
         // Assert notification via channel
         let notified_addr = rx.recv().await.unwrap();
         assert_eq!(notified_addr, deposit_address);
+    }
+
+    #[tokio::test]
+    async fn update_user_balance_increases_balance_after_confirmation() {
+        // Setup cluster
+        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        cluster.setup().await;
+
+        let node_peer = *cluster.nodes.keys().next().unwrap();
+        let node = cluster.nodes.get_mut(&node_peer).unwrap();
+
+        // Broadcast channels for DepositIntentState constructor
+        let (addr_tx, _addr_rx) = broadcast::channel::<String>(4);
+        let (_tx_chan, tx_rx) = broadcast::channel::<Transaction>(4);
+        let mut state = DepositIntentState::new(addr_tx, tx_rx);
+
+        // ----- Prepare user address and account -----
+        let secp = bitcoin::secp256k1::Secp256k1::new();
+        let (_, user_pubkey) = secp.generate_keypair(&mut bitcoin::secp256k1::rand::thread_rng());
+        let user_compressed_pk = CompressedPublicKey::from_slice(&user_pubkey.serialize()).unwrap();
+        let user_address = Address::p2wpkh(&user_compressed_pk, bitcoin::Network::Testnet);
+
+        // Insert user account with zero balance
+        node.chain_state.upsert_account(
+            &user_address.to_string(),
+            protocol::chain_state::Account::new(user_address.to_string(), 0),
+        );
+
+        // ----- Prepare deposit address affiliated with node pubkey -----
+        let frost_pubkey_bytes = node
+            .pubkey_package
+            .as_ref()
+            .unwrap()
+            .verifying_key()
+            .serialize()
+            .unwrap();
+        let node_pubkey = bitcoin::PublicKey::from_slice(&frost_pubkey_bytes).unwrap();
+        let internal_key = node_pubkey.inner.x_only_public_key().0;
+        let deposit_address = Address::p2tr(&secp, internal_key, None, bitcoin::Network::Testnet);
+
+        state.deposit_addresses.insert(deposit_address.to_string());
+
+        // ----- Craft transaction -----
+        let deposit_amount_sat = 15_000;
+        let tx_in = {
+            let mut witness = bitcoin::witness::Witness::new();
+            witness.push(user_address.script_pubkey().into_bytes());
+
+            bitcoin::TxIn {
+                previous_output: bitcoin::OutPoint {
+                    txid: bitcoin::Txid::from_slice(&[9u8; 32]).unwrap(),
+                    vout: 0,
+                },
+                script_sig: bitcoin::ScriptBuf::new(),
+                sequence: bitcoin::Sequence::ZERO,
+                witness,
+            }
+        };
+
+        let tx_out = bitcoin::TxOut {
+            value: bitcoin::Amount::from_sat(deposit_amount_sat),
+            script_pubkey: deposit_address.script_pubkey(),
+        };
+
+        let tx = bitcoin::Transaction {
+            version: bitcoin::transaction::Version::TWO,
+            lock_time: bitcoin::absolute::LockTime::ZERO,
+            input: vec![tx_in],
+            output: vec![tx_out],
+        };
+
+        // ----- Call update_user_balance -----
+        let balance_before = node
+            .chain_state
+            .get_account(&user_address.to_string())
+            .unwrap()
+            .balance;
+
+        state
+            .update_user_balance(node, tx.clone())
+            .expect("balance update failed");
+
+        let balance_after = node
+            .chain_state
+            .get_account(&user_address.to_string())
+            .unwrap()
+            .balance;
+
+        assert_eq!(balance_after, balance_before + deposit_amount_sat);
+    }
+
+    #[tokio::test]
+    async fn update_user_balance_does_not_increase_balance_for_non_deposit_transactions() {
+        // Setup cluster
+        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        cluster.setup().await;
+
+        let node_peer = *cluster.nodes.keys().next().unwrap();
+        let node = cluster.nodes.get_mut(&node_peer).unwrap();
+
+        // Broadcast channels for DepositIntentState constructor
+        let (addr_tx, _addr_rx) = broadcast::channel::<String>(4);
+        let (_tx_chan, tx_rx) = broadcast::channel::<Transaction>(4);
+        let mut state = DepositIntentState::new(addr_tx, tx_rx);
+
+        // ----- Prepare user address and account -----
+        let secp = bitcoin::secp256k1::Secp256k1::new();
+        let (_, user_pubkey) = secp.generate_keypair(&mut bitcoin::secp256k1::rand::thread_rng());
+        let user_compressed_pk = CompressedPublicKey::from_slice(&user_pubkey.serialize()).unwrap();
+        let user_address = Address::p2wpkh(&user_compressed_pk, bitcoin::Network::Testnet);
+
+        // Insert user account with zero balance
+        node.chain_state.upsert_account(
+            &user_address.to_string(),
+            protocol::chain_state::Account::new(user_address.to_string(), 0),
+        );
+
+        // ----- Craft transaction -----
+        let deposit_amount_sat = 15_000;
+        let tx_in = {
+            let mut witness = bitcoin::witness::Witness::new();
+            witness.push(user_address.script_pubkey().into_bytes());
+
+            bitcoin::TxIn {
+                previous_output: bitcoin::OutPoint {
+                    txid: bitcoin::Txid::from_slice(&[9u8; 32]).unwrap(),
+                    vout: 0,
+                },
+                script_sig: bitcoin::ScriptBuf::new(),
+                sequence: bitcoin::Sequence::ZERO,
+                witness,
+            }
+        };
+
+        let tx_out = bitcoin::TxOut {
+            value: bitcoin::Amount::from_sat(deposit_amount_sat),
+            script_pubkey: user_address.script_pubkey(),
+        };
+
+        let tx = bitcoin::Transaction {
+            version: bitcoin::transaction::Version::TWO,
+            lock_time: bitcoin::absolute::LockTime::ZERO,
+            input: vec![tx_in],
+            output: vec![tx_out],
+        };
+
+        // ----- Call update_user_balance -----
+
+        state
+            .update_user_balance(node, tx.clone())
+            .expect("balance update failed");
+
+        // Assert: balance should not have changed
+        let balance = node
+            .chain_state
+            .get_account(&user_address.to_string())
+            .unwrap()
+            .balance;
+        assert_eq!(balance, 0);
     }
 }

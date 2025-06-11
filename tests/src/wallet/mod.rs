@@ -6,6 +6,8 @@ mod utxo_spend_test {
     use node::key_manager::generate_keys_from_mnemonic;
     use node::wallet::SimpleWallet;
 
+    use crate::mocks::oracle::MockOracle;
+
     #[tokio::test]
     pub async fn test_utxo_spend() {
         dotenvy::dotenv().ok();
@@ -21,14 +23,16 @@ mod utxo_spend_test {
                 .unwrap()
                 .assume_checked();
 
-        let mut wallet = SimpleWallet::new(&address).await;
+        let oracle = MockOracle::new();
+
+        let mut wallet = SimpleWallet::new(&address, oracle).await;
 
         let result = wallet.create_spend(1000, 200, &address_to);
 
         match result {
             Ok((tx, sighash)) => {
                 let signed_tx = wallet.sign(&tx, &private_key, sighash);
-                node::wallet::SimpleWallet::broadcast_transaction(&signed_tx)
+                node::wallet::SimpleWallet::<MockOracle>::broadcast_transaction(&signed_tx)
                     .await
                     .expect("Failed to broadcast transaction");
                 println!("Transaction created and signed successfully");

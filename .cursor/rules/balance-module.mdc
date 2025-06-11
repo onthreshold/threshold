@@ -1,0 +1,24 @@
+---
+description: 
+globs: balance/**
+alwaysApply: false
+---
+# Balance Module & CheckBalance RPC
+
+This rule documents the new balance subsystem introduced to track user account balances and expose them via gRPC.
+
+Key components
+--------------
+1. [crates/node/src/balance/mod.rs](mdc:crates/node/src/balance/mod.rs) – Defines `BalanceState`, a `Handler` that listens for `SelfRequest::CheckBalance` and responds with `SelfResponse::CheckBalanceResponse` containing the current balance for a given address.
+2. [crates/node/src/swarm_manager.rs](mdc:crates/node/src/swarm_manager.rs) – Adds the `CheckBalance` variants to `SelfRequest` and `SelfResponse` so other parts of the system can request / receive balance information.
+3. [crates/node/src/lib.rs](mdc:crates/node/src/lib.rs) – Registers `BalanceState` in the `handlers` vector so it is active at runtime.
+4. [crates/node/proto/node.proto](mdc:crates/node/proto/node.proto) – Declares the `CheckBalance` RPC, plus `CheckBalanceRequest` & `CheckBalanceResponse` messages.
+5. [crates/node/src/grpc/grpc_operator.rs](mdc:crates/node/src/grpc/grpc_operator.rs) and [crates/node/src/grpc/grpc_handler.rs](mdc:crates/node/src/grpc/grpc_handler.rs) – gRPC plumbing to forward the RPC to the node and return the balance to the client.
+
+Usage pattern
+-------------
+• External clients call `CheckBalance` with the desired Bitcoin address.
+• The gRPC layer forwards this to the node via `SelfRequest::CheckBalance`.
+• `BalanceState` reads the balance from `ChainState` and responds.
+
+When extending balance logic (e.g., adding staking or multi-asset support), update these files and append notes here.

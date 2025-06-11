@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Repository Overview & Navigation Guide
+
+> Keep this rule updated whenever the project's high-level structure or core components change.
+
+---
+## 🗺️ Top-Level Layout
+
+• **`crates/`** – Rust workspace crates  
+• `node/` – full-node logic (networking, handlers, wallet, gRPC)  
+• `protocol/` – chain-state structures & oracle trait  
+• `types/` – shared error / util types  
+• `clients/` – external service adapters (Esplora, …)
+
+• **`tests/`** – Separate crate with integration + unit tests powered by mock implementations.
+
+• **`bin/cli/`** – Command-line helpers.
+
+---
+## 🔑 Core Concepts & Where to Look
+
+| Concept | Location | Notes |
+|---------|----------|-------|
+| Node state & glue | [lib.rs](mdc:crates/node/src/lib.rs) | Defines `NodeState<N,D,O>` generics, registers handlers. |
+| Networking | [swarm_manager.rs](mdc:crates/node/src/swarm_manager.rs) | Message enums `SelfRequest` / `SelfResponse`, gossipsub plumbing. |
+| Deposit flow | [deposit/mod.rs](mdc:crates/node/src/deposit/mod.rs) + [create_deposit.rs](mdc:crates/node/src/deposit/create_deposit.rs) | Deposit intents, address derivation, balance credit. |
+| Withdrawal flow | [withdrawl/create_withdrawl.rs](mdc:crates/node/src/withdrawl/create_withdrawl.rs) | Two-phase withdrawal (challenge + confirm). |
+| Wallet | [wallet.rs](mdc:crates/node/src/wallet.rs) | In-memory UTXO wallet, spending, broadcasting. |
+| Mocks & test harness | [mocks/network.rs](mdc:tests/src/mocks/network.rs) | `MockNodeCluster`, `MockDb`, `MockOracle`. |
+| Example tests | [deposit tests](mdc:tests/src/deposit/mod.rs), [withdrawal tests](mdc:tests/src/withdrawl/mod.rs) | Good starting point to see usage.
+
+---
+## 🧪 Testing Conventions
+
+1. **gRPC-level integration** via `grpc_operator` helpers.  
+2. **Direct state unit tests** for edge-cases (`DepositIntentState`, `SpendIntentState`).  
+3. **Idempotence**: functions like `update_user_balance` track processed txids to avoid double credit.
+
+---
+## ✍️ Editing Guidelines
+
+1. Keep code generic over trait types (`Network`, `Db`, `Oracle`).
+2. Tests must remain isolated – each creates its own `MockNodeCluster`.
+3. Maintain idempotent handler behaviour.
+4. External calls should stay behind trait abstractions to ease mocking.
+5. **Update this file** when adding a major module or reshaping the project.

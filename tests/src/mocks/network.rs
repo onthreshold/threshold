@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
+use bitcoin::Transaction;
 use frost_secp256k1::Identifier;
 use node::{
     NodeState,
@@ -484,8 +485,9 @@ pub fn create_node_network(
     max_signers: u16,
     pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
 ) -> Result<(NodeState<MockNetwork, MockDb, MockOracle>, MockNetwork), errors::NodeError> {
-    let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(1000);
-    let (deposit_intent_tx, _) = broadcast::channel::<String>(1000);
+    let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(256);
+    let (deposit_intent_tx, _) = broadcast::channel::<String>(100);
+    let (_, transaction_rx) = broadcast::channel::<Transaction>(100);
 
     let network = MockNetwork::new(events_emitter_tx.clone(), peer_id, pending_events_tx);
 
@@ -500,6 +502,7 @@ pub fn create_node_network(
         mock_db,
         events_emitter_tx,
         deposit_intent_tx,
+        transaction_rx,
         oracle,
     )?;
 

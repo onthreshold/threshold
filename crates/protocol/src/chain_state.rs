@@ -10,6 +10,19 @@ pub struct Account {
     pub balance: u64,
 }
 
+impl Account {
+    pub fn new(address: String, balance: u64) -> Self {
+        Self { address, balance }
+    }
+
+    pub fn update_balance(&self, amount: u64) -> Self {
+        Self {
+            address: self.address.clone(),
+            balance: self.balance + amount,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct ChainState {
     // address -> account

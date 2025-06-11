@@ -84,4 +84,13 @@ impl NodeControl for NodeControlService {
         let response = grpc_operator::confirm_withdrawal(&self.network, request).await?;
         Ok(Response::new(response))
     }
+
+    async fn check_balance(
+        &self,
+        request: Request<CheckBalanceRequest>,
+    ) -> Result<Response<CheckBalanceResponse>, Status> {
+        let request = request.into_inner();
+        let response = grpc_operator::check_balance(&self.network, request).await?;
+        Ok(Response::new(response))
+    }
 }

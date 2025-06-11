@@ -1,8 +1,8 @@
 use crate::grpc::grpc_handler::node_proto::{
-    self, ConfirmWithdrawalRequest, ConfirmWithdrawalResponse, CreateDepositIntentRequest,
-    CreateDepositIntentResponse, GetPendingDepositIntentsResponse, ProposeWithdrawalRequest,
-    ProposeWithdrawalResponse, SpendFundsRequest, SpendFundsResponse, StartSigningRequest,
-    StartSigningResponse,
+    self, CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest,
+    ConfirmWithdrawalResponse, CreateDepositIntentRequest, CreateDepositIntentResponse,
+    GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
+    SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
 };
 use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
 use crate::withdrawl::SpendIntent;
@@ -208,4 +208,24 @@ pub async fn confirm_withdrawal(
     };
 
     Ok(ConfirmWithdrawalResponse { success })
+}
+
+pub async fn check_balance(
+    network: &impl Network,
+    request: CheckBalanceRequest,
+) -> Result<CheckBalanceResponse, Status> {
+    let address = request.address;
+
+    let response = network
+        .send_self_request(SelfRequest::CheckBalance { address }, true)
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .ok_or(Status::internal("No response from node"))?
+        .await
+        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+
+    let SelfResponse::CheckBalanceResponse { balance_satoshis } = response else {
+        return Err(Status::internal("Invalid response from node"));
+    };
+
+    Ok(CheckBalanceResponse { balance_satoshis })
 }

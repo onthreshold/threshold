@@ -86,6 +86,7 @@ pub async fn start_node(
         build_swarm(keypair.clone(), allowed_peers.clone()).expect("Failed to build swarm");
 
     let (deposit_intent_tx, deposit_intent_rx) = broadcast::channel(100);
+    let (transaction_tx, transaction_rx) = broadcast::channel(1000);
 
     let mut node_state = NodeState::new_from_config(
         network_handle,
@@ -95,6 +96,7 @@ pub async fn start_node(
         RocksDb::new("nodedb.db"),
         swarm.network_events.clone(),
         deposit_intent_tx,
+        transaction_rx,
         EsploraOracle::default(),
     )
     .expect("Failed to create node");
@@ -135,6 +137,7 @@ pub async fn start_node(
                 Network::Bitcoin
             },
             Some(100),
+            Some(transaction_tx),
             Some(deposit_intent_rx),
         );
 
