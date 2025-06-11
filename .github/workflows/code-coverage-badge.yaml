@@ -21,7 +21,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: rustup update 1.87
       - run: rustup default 1.87
-      # - run: cargo install cargo-tarpaulin
+      - run: cargo install cargo-tarpaulin
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
       - name: Run Code Coverage
