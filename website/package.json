@@ -6,8 +6,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
+    "check": "astro check",
+    "build": "SKIP_KEYSTATIC=true astro build",
+    "preview": "SKIP_KEYSTATIC=true astro preview",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "astro": "astro"
   },
   "dependencies": {

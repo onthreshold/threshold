@@ -3,26 +3,36 @@ import { defineConfig, fontProviders } from "astro/config";
 import tailwindcss from "@tailwindcss/vite";
 import mdx from "@astrojs/mdx";
 import keystatic from "@keystatic/astro";
-
 import react from "@astrojs/react";
-
 import icon from "astro-icon";
+import { SiteUrl } from "./src/theme.config";
 
 // https://astro.build/config
 export default defineConfig({
+  site: SiteUrl,
+  base: "/",
   output: "static",
+  outDir: "./dist",
   devToolbar: {
     enabled: false,
   },
+  image: {
+    domains: ["127.0.0.1"],
+  },
   vite: {
-    plugins: [tailwindcss()],
     resolve: {
       alias: {
         "@": "/src",
       },
     },
-    optimizeDeps: {},
+    plugins: [tailwindcss()],
   },
+  integrations: [
+    mdx(),
+    ...(process.env.SKIP_KEYSTATIC ? [] : [keystatic()]),
+    react(),
+    icon(),
+  ],
   experimental: {
     fonts: [
       {
@@ -32,10 +42,4 @@ export default defineConfig({
       },
     ],
   },
-  integrations: [
-    mdx(),
-    ...(process.env.SKIP_KEYSTATIC ? [] : [keystatic()]),
-    react(),
-    icon(),
-  ],
 });
