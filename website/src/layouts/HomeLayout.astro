@@ -71,14 +71,33 @@ const currentPath = Astro.url.pathname;
       src="https://plausible.trieve.ai/js/script.js"></script>
   </head>
   <body>
-    <header>
-      <nav class=""></nav>
-
+    <article
+      class="flex flex-col items-center justify-center min-h-screen bg-white text-btcgray-800 px-6 py-12 max-w-4xl mx-auto"
+    >
+      <header class="text-center mb-16">
+        <h1
+          class="text-4xl md:text-6xl font-bold mb-4 border-b-2 sm:pb-6 pb-3 border-brand-500"
+        >
+          Threshold Security
+        </h1>
+        <p class="text-sm md:text-base text-btcgray-600">
+          infrastructure for decentralized multisigs
+        </p>
+      </header>
       <main>
         <slot />
       </main>
-      <footer></footer>
-    </header>
+      <footer
+        class="mt-16 text-center text-sm text-btcgray-600 pt-8 border-t border-btcgray-50 w-full"
+      >
+        <p>
+          &copy; 2025 athas code editor &mdash; <a
+            href="#"
+            class="border-b-2 border-brand-500 font-bold">@athasdev</a
+          >
+        </p>
+      </footer>
+    </article>
   </body>
 </html>
 
