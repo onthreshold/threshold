@@ -15,9 +15,13 @@ pub struct SimpleWallet<O: Oracle> {
 }
 
 impl<O: Oracle> SimpleWallet<O> {
-    pub async fn new(address: &bitcoin::Address, oracle: O) -> Self {
+    pub async fn new(
+        address: &bitcoin::Address,
+        oracle: O,
+        allow_unconfirmed: Option<bool>,
+    ) -> Self {
         let client_utxos = oracle
-            .refresh_utxos(address.clone(), 3, None)
+            .refresh_utxos(address.clone(), 3, None, allow_unconfirmed.unwrap_or(false))
             .await
             .unwrap();
 
@@ -129,24 +133,6 @@ impl<O: Oracle> SimpleWallet<O> {
         }
 
         response_tx
-    }
-
-    pub async fn broadcast_transaction(tx: &Transaction) -> Result<String, NodeError> {
-        // Create esplora client for testnet4
-        let builder = esplora_client::Builder::new("https://blockstream.info/testnet/api");
-        let client = builder.build_async().unwrap();
-
-        // Serialize the transaction to raw bytes
-        let tx_bytes = bitcoin::consensus::encode::serialize(tx);
-        let tx_hex = hex::encode(&tx_bytes);
-
-        // Broadcast the transaction
-        client
-            .broadcast(tx)
-            .await
-            .map_err(|e| NodeError::Error(format!("Failed to broadcast transaction: {}", e)))?;
-
-        Ok(tx_hex)
     }
 }
 

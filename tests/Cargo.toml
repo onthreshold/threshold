@@ -24,3 +24,4 @@ dotenvy = "0.15.7"
 serde_json = { workspace = true }
 uuid = "1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+bip39 = { workspace = true, features = ["rand_core"] }

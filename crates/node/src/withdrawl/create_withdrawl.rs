@@ -4,7 +4,6 @@ use crate::{
     NodeState,
     db::Db,
     swarm_manager::Network,
-    wallet::SimpleWallet,
     withdrawl::{SpendIntent, SpendIntentState},
 };
 use bitcoin::{
@@ -108,7 +107,7 @@ impl SpendIntentState {
                 .assume_checked(),
         )?;
 
-        SimpleWallet::<O>::broadcast_transaction(&tx).await?;
+        node.oracle.broadcast_transaction(&tx).await?;
 
         Ok(())
     }

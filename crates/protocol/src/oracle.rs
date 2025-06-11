@@ -1,3 +1,4 @@
+use bitcoin::Transaction;
 use bitcoin::{Address, Amount, OutPoint, ScriptBuf, Txid};
 use esplora_client::{AsyncClient, Builder};
 use types::errors::NodeError;
@@ -24,26 +25,25 @@ pub trait Oracle: Send + Default {
         address: Address,
         number_pages: u32,
         start_transactions: Option<Txid>,
+        allow_unconfirmed: bool,
     ) -> Result<Vec<Utxo>, NodeError>;
+
+    async fn broadcast_transaction(&self, tx: &bitcoin::Transaction) -> Result<String, NodeError>;
 }
 
+#[derive(Clone)]
 pub struct EsploraOracle {
     pub esplora_client: AsyncClient,
 }
 
 impl Default for EsploraOracle {
     fn default() -> Self {
-        Self::new()
+        Self::new(false)
     }
 }
 
 impl EsploraOracle {
-    pub fn new() -> Self {
-        dotenvy::dotenv().ok();
-        let is_testnet: bool = std::env::var("IS_TESTNET")
-            .unwrap_or("false".to_string())
-            .parse()
-            .unwrap();
+    pub fn new(is_testnet: bool) -> Self {
         let builder = Builder::new(if is_testnet {
             "https://blockstream.info/testnet/api"
         } else {
@@ -112,6 +112,7 @@ impl Oracle for EsploraOracle {
         address: Address,
         number_pages: u32,
         start_transactions: Option<Txid>,
+        allow_unconfirmed: bool,
     ) -> Result<Vec<Utxo>, NodeError> {
         let mut unspent_txs = Vec::new();
         let mut last_seen_txid = start_transactions;
@@ -139,7 +140,7 @@ impl Oracle for EsploraOracle {
                 let Ok(tx_status) = self.esplora_client.get_tx_status(&tx.txid).await else {
                     continue;
                 };
-                if !tx_status.confirmed {
+                if !allow_unconfirmed && !tx_status.confirmed {
                     continue;
                 }
 
@@ -174,5 +175,19 @@ impl Oracle for EsploraOracle {
         }
 
         Ok(unspent_txs)
+    }
+
+    async fn broadcast_transaction(&self, tx: &Transaction) -> Result<String, NodeError> {
+        // Serialize the transaction to raw bytes
+        let tx_bytes = bitcoin::consensus::encode::serialize(tx);
+        let tx_hex = hex::encode(&tx_bytes);
+
+        // Broadcast the transaction
+        self.esplora_client
+            .broadcast(tx)
+            .await
+            .map_err(|e| NodeError::Error(format!("Failed to broadcast transaction: {}", e)))?;
+
+        Ok(tx_hex)
     }
 }

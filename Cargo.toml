@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "bin/cli",
+    "bin/utxo-spend",
     "tests",
     "crates/node",
     "crates/protocol",
@@ -41,3 +42,4 @@ sha2 = "0.10.9"
 rocksdb = "0.23.0"
 async-trait = "0.1.88"
 dotenvy = "0.15"
+bip39 = "2.1.0"
