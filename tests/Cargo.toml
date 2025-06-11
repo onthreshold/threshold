@@ -17,10 +17,10 @@ clients = { path = "../crates/clients" }
 sha2 = { workspace = true }
 bincode = { workspace = true }
 log = "0.4.27"
-env_logger = "0.11.8"
 rand = { workspace = true }
 hex = { workspace = true }
 frost-secp256k1 = { workspace = true }
 dotenvy = "0.15.7"
 serde_json = { workspace = true }
 uuid = "1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }

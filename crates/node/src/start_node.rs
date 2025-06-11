@@ -10,7 +10,6 @@ use clients::{EsploraApiClient, WindowedConfirmedTransactionProvider};
 use std::path::{Path, PathBuf};
 use tokio::sync::broadcast;
 use tonic::transport::Server;
-use tracing::{error, info};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -27,13 +26,12 @@ pub async fn start_node(
     let registry = tracing_subscriber::registry().with(env_filter);
 
     if let Some(log_path) = config.log_file_path.clone().or(log_file) {
-        // File logging
         let log_dir = Path::new(&log_path);
 
         if !log_dir.exists() {
-            info!("Creating log directory: {:?}", log_dir);
+            tracing::info!("Creating log directory: {:?}", log_dir);
             if let Err(e) = std::fs::create_dir_all(log_dir) {
-                error!(
+                tracing::error!(
                     "Failed to create log directory {}: {}",
                     log_dir.display(),
                     e
@@ -57,25 +55,24 @@ pub async fn start_node(
             .with_target(false);
 
         registry.with(file_layer).with(console_layer).init();
-        info!(
+        tracing::info!(
             "Logging initialized with file output: {}",
             log_path.display()
         );
     } else {
-        // Console-only logging
         let console_layer = fmt::layer()
             .with_writer(std::io::stdout)
             .with_ansi(true)
             .with_target(false);
 
         registry.with(console_layer).init();
-        info!("Logging initialized with console output only");
+        tracing::info!("Logging initialized with console output only");
     }
 
     let keypair = match load_and_decrypt_keypair(&config) {
         Ok(kp) => kp,
         Err(e) => {
-            error!("Failed to decrypt key: {}", e);
+            tracing::error!("Failed to decrypt key: {}", e);
             return Err(e);
         }
     };
@@ -115,7 +112,7 @@ pub async fn start_node(
 
         let node_control_service = NodeControlService::new(network_handle);
 
-        info!("gRPC server listening on {}", addr);
+        tracing::info!("gRPC server listening on {}", addr);
 
         Server::builder()
             .add_service(node_control_service.into_server())
@@ -148,27 +145,27 @@ pub async fn start_node(
     tokio::select! {
         result = grpc_handle => {
             match result {
-                Ok(_) => info!("gRPC server stopped"),
-                Err(e) => error!("gRPC server error: {}", e),
+                Ok(_) => tracing::info!("gRPC server stopped"),
+                Err(e) => tracing::error!("gRPC server error: {}", e),
             }
         }
         result = swarm_handle => {
             match result {
-                Ok(_) => info!("Swarm stopped"),
-                Err(e) => error!("Swarm error: {}", e),
+                Ok(_) => tracing::info!("Swarm stopped"),
+                Err(e) => tracing::error!("Swarm error: {}", e),
             }
         }
         result = main_loop_handle => {
             match result {
-                Ok(Ok(_)) => info!("Main loop stopped"),
-                Ok(Err(e)) => error!("Main loop error: {}", e),
-                Err(e) => error!("Main loop task error: {}", e),
+                Ok(Ok(_)) => tracing::info!("Main loop stopped"),
+                Ok(Err(e)) => tracing::error!("Main loop error: {}", e),
+                Err(e) => tracing::error!("Main loop task error: {}", e),
             }
         }
         result = deposit_monitor_handle => {
             match result {
-                Ok(_) => info!("Deposit monitor stopped"),
-                Err(e) => error!("Deposit monitor error: {}", e),
+                Ok(_) => tracing::info!("Deposit monitor stopped"),
+                Err(e) => tracing::error!("Deposit monitor error: {}", e),
             }
         }
     }

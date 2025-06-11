@@ -1,17 +1,30 @@
 #[cfg(test)]
 mod dkg_test {
+
     use crate::mocks::network::MockNodeCluster;
     use bincode;
-    use env_logger;
     use log::info;
     use node::db::Db;
     use node::swarm_manager::DirectMessage;
     use node::swarm_manager::NetworkEvent;
     use protocol::block::{ChainConfig, ValidatorInfo};
     use sha2::{Digest, Sha256};
+    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
 
     fn setup() {
-        let _ = env_logger::builder().is_test(true).try_init();
+        let env_filter =
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+        let registry = tracing_subscriber::registry().with(env_filter);
+        let console_layer = tracing_subscriber::fmt::layer()
+            .with_writer(std::io::stdout)
+            .with_ansi(true)
+            .with_target(false);
+
+        let _ = registry.with(console_layer).try_init();
+        info!("Logging initialized with console output only");
     }
 
     #[tokio::test]
@@ -293,7 +306,7 @@ mod dkg_test {
     }
 
     #[tokio::test]
-    #[ignore] // ignoring because it takes a long time to run
+    #[ignore]
     async fn test_dkg_completion_256_nodes() {
         setup();
         let start_time = std::time::Instant::now();

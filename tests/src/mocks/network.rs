@@ -470,8 +470,8 @@ pub fn create_node_network(
     min_signers: u16,
     max_signers: u16,
 ) -> Result<(NodeState<MockNetwork, MockDb, MockOracle>, MockNetwork), errors::NodeError> {
-    let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(256);
-    let (deposit_intent_tx, _) = broadcast::channel::<String>(100);
+    let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(1000);
+    let (deposit_intent_tx, _) = broadcast::channel::<String>(1000);
 
     let network = MockNetwork {
         events_emitter_tx: events_emitter_tx.clone(),

@@ -23,6 +23,10 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
       - name: Run Code Coverage
+        env:
+          MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
+          IS_TESTNET: "true"
+        run: cargo test --all
         run: |
           cargo tarpaulin --all-targets --exclude-files "target/*" --count --out xml
       - name: Post Coverage Comment on PR
