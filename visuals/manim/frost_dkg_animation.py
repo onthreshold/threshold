@@ -7,7 +7,7 @@ NODE_COLOR_ACTIVE = GREEN_E
 ARROW_COLOR = BLACK
 BROADCAST_COLOR = BLUE_D
 SHARE_COLOR = GREEN_B
-STAGE3_ARROW_COLOR = BLUE_D
+STAGE3_ARROW_COLOR = GREEN_E
 TICK_COLOR = GREEN_E
 STAGE_LABEL_PAD = 0.6
 
@@ -18,18 +18,15 @@ class NodeBox(VGroup):
     def __init__(self, label: str, **kwargs):
         super().__init__(**kwargs)
         self.label = label
-        # rectangle
         self.rect = RoundedRectangle(
             corner_radius=0.2, width=2.0, height=1.0, color=NODE_COLOR_INACTIVE
         )
         self.rect.set_fill(NODE_COLOR_INACTIVE, opacity=0.4)
-        # text label
         self.text = Text(label, font_size=28)
         self.text.move_to(self.rect.get_center())
 
         self.add(self.rect, self.text)
 
-    # visual helpers
     def activate(self):
         return AnimationGroup(
             self.rect.animate.set_fill(NODE_COLOR_ACTIVE, opacity=0.8).set_color(
@@ -53,7 +50,6 @@ class NodeBox(VGroup):
         if direction_norm == 0:
             return self.get_center()
         unit = direction / direction_norm
-        # Use max(width, height) / 2 to step outside the rectangle.
         border = max(self.rect.width, self.rect.height) / 2
         return self.get_center() + unit * (border + margin)
 
@@ -63,26 +59,21 @@ class FrostDKGScene(Scene):
 
     def construct(self):
         # ----- Layout helpers ------------------------------------------------
-        # triangle coordinates for the three nodes (lowered to avoid text overlap)
         p1_pos = LEFT * 3 + UP * 0.5
         p2_pos = RIGHT * 3 + UP * 0.5
         p3_pos = DOWN * 2
 
-        # create node boxes
         p1 = NodeBox("P1").move_to(p1_pos)
         p2 = NodeBox("P2").move_to(p2_pos)
         p3 = NodeBox("P3").move_to(p3_pos)
 
         nodes = [p1, p2, p3]
 
-        # initial node fade-in
         self.play(*[FadeIn(node, shift=DOWN, scale=0.8) for node in nodes])
-        # ensure group is centred
         nodes_group = VGroup(*nodes)
         self.play(nodes_group.animate.move_to(ORIGIN))
         self.wait(0.5)
 
-        # ------------------------------------------------- helper for brief text
         def brief(txt: str):
             info = Text(txt, font_size=28)
             info.to_edge(DOWN, buff=0.6)
@@ -98,10 +89,8 @@ class FrostDKGScene(Scene):
         self.play(FadeIn(stage1_label, shift=DOWN))
         self.wait(0.3)
 
-        # quick explainer text
         brief("Each node chooses a secret curve & broadcasts commitments")
 
-        # helper function for broadcasting arrows
         def arrow_between(a: NodeBox, b: NodeBox, color: str, width: int = 4):
             return Arrow(
                 start=a.edge_point(b.get_center()),
@@ -130,14 +119,11 @@ class FrostDKGScene(Scene):
                 ]
             )
 
-        # animate each node broadcasting commitments
         for active, others in ((p1, [p2, p3]), (p2, [p1, p3]), (p3, [p1, p2])):
-            # highlight active node
             self.play(
                 active.activate(), *[n.deactivate() for n in nodes if n != active]
             )
 
-            # show simple polynomial representation above active node
             poly = Tex(r"$f(x)=a_0+a_1x$", font_size=26, color=WHITE)
             poly.next_to(active, UP, buff=0.4)
             self.play(FadeIn(poly))
@@ -205,6 +191,11 @@ class FrostDKGScene(Scene):
 
         top_y = 1.3
         self.play(
+            p1.activate(),
+            p2.activate(),
+            p3.activate(),
+        )
+        self.play(
             p1.animate.move_to(LEFT * 4 + UP * top_y),
             p2.animate.move_to(RIGHT * 4 + UP * top_y),
             p3.animate.move_to(UP * top_y),
@@ -226,7 +217,6 @@ class FrostDKGScene(Scene):
         secret_group = VGroup(secret_text, priv_eq)
         secret_group.next_to(pub_group, DOWN, buff=0.4)
 
-        # downward arrows into the text with smaller arrow heads
         arrow1 = Arrow(
             start=p1.get_bottom(),
             end=pub_group.get_top(),
@@ -252,7 +242,6 @@ class FrostDKGScene(Scene):
             max_tip_length_to_length_ratio=0.1,  # smaller arrow head
         )
 
-        # label the secret pieces with subscript
         s0 = Tex(r"$s_{0}$", font_size=24, color=STAGE3_ARROW_COLOR).next_to(
             arrow1, LEFT, buff=0.01
         )
@@ -271,4 +260,3 @@ class FrostDKGScene(Scene):
         self.play(FadeIn(pub_group))
         self.play(FadeIn(secret_group))
         self.wait(2)
-        brief("Threshold signing possible – any 2 of 3 shares can sign")
