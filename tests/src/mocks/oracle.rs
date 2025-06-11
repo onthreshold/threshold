@@ -73,7 +73,12 @@ impl Oracle for MockOracle {
         _address: Address,
         _number_pages: u32,
         _start_transactions: Option<Txid>,
+        _allow_unconfirmed: bool,
     ) -> Result<Vec<Utxo>, NodeError> {
         Ok(vec![])
+    }
+
+    async fn broadcast_transaction(&self, _tx: &bitcoin::Transaction) -> Result<String, NodeError> {
+        Ok(String::new())
     }
 }
