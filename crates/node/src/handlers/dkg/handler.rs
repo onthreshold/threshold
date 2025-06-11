@@ -1,8 +1,8 @@
 use crate::{
     NodeState,
     db::Db,
-    handlers::dkg::DkgState,
     handlers::Handler,
+    handlers::dkg::DkgState,
     swarm_manager::{DirectMessage, Network, NetworkEvent},
 };
 use protocol::oracle::Oracle;

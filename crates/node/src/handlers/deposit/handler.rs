@@ -5,8 +5,8 @@ use types::errors::NodeError;
 use crate::{
     NodeState,
     db::Db,
-    handlers::deposit::{DepositIntent, DepositIntentState},
     handlers::Handler,
+    handlers::deposit::{DepositIntent, DepositIntentState},
     swarm_manager::{Network, NetworkEvent, SelfRequest, SelfResponse},
 };
 use protocol::oracle::Oracle;

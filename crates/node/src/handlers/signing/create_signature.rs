@@ -11,7 +11,7 @@ use crate::NodeState;
 use crate::db::Db;
 use crate::handlers::signing::ActiveSigning;
 use crate::swarm_manager::{DirectMessage, Network};
-use crate::{peer_id_to_identifier, handlers::signing::SigningState};
+use crate::{handlers::signing::SigningState, peer_id_to_identifier};
 use protocol::oracle::Oracle;
 use types::errors::NodeError;
 

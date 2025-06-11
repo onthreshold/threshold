@@ -4,8 +4,8 @@ use crate::grpc::grpc_handler::node_proto::{
     GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
     SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
 };
-use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
 use crate::handlers::withdrawl::SpendIntent;
+use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
 use tonic::Status;
 use tracing::{debug, info};
 
