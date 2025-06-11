@@ -19,16 +19,12 @@ pub async fn start_node(
     config: NodeConfig,
     grpc_port: Option<u16>,
     log_file: Option<PathBuf>,
-    libp2p_udp_port: Option<u16>,
-    libp2p_tcp_port: Option<u16>,
-    database_directory: Option<PathBuf>,
 ) -> Result<(), NodeError> {
     // Initialize logging
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
     let config_database_path = config.database_directory.clone();
-    let config_grpc_port = config.grpc_port.clone();
-    let config_libp2p_udp_port = config.libp2p_tcp_port.clone();
-    let config_libp2p_tcp_port = config.libp2p_tcp_port.clone();
+    let config_grpc_port = config.grpc_port;
 
     let registry = tracing_subscriber::registry().with(env_filter);
 
@@ -91,8 +87,8 @@ pub async fn start_node(
 
     let (network_handle, mut swarm) = build_swarm(
         keypair.clone(),
-        libp2p_udp_port.or(config_libp2p_udp_port),
-        libp2p_tcp_port.or(config_libp2p_tcp_port),
+        config.libp2p_udp_port,
+        config.libp2p_tcp_port,
         allowed_peers.clone(),
     )
     .expect("Failed to build swarm");
@@ -105,11 +101,7 @@ pub async fn start_node(
         min_signers,
         max_signers,
         config,
-        RocksDb::new(
-            database_directory.or(config_database_path).unwrap_or(PathBuf::from("nodedb.db"))
-                .to_str()
-                .unwrap(),
-        ),
+        RocksDb::new(config_database_path.to_str().unwrap()),
         swarm.network_events.clone(),
         deposit_intent_tx,
         transaction_rx,
@@ -124,7 +116,7 @@ pub async fn start_node(
     });
 
     let grpc_handle = tokio::spawn(async move {
-        let addr = format!("0.0.0.0:{}", grpc_port.or(config_grpc_port).unwrap_or(50051))
+        let addr = format!("0.0.0.0:{}", grpc_port.unwrap_or(config_grpc_port))
             .parse()
             .unwrap();
 

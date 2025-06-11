@@ -68,13 +68,13 @@ pub struct NodeConfig {
     pub dkg_keys: Option<DkgKeys>,
     pub log_file_path: Option<PathBuf>,
     #[serde(skip)]
-    key_file_path: PathBuf,
+    pub key_file_path: PathBuf,
     #[serde(skip)]
-    config_file_path: PathBuf,
-    database_directory: Option<PathBuf>,
-    grpc_port: Option<u16>,
-    libp2p_udp_port: Option<u16>,
-    libp2p_tcp_port: Option<u16>,
+    pub config_file_path: PathBuf,
+    pub database_directory: PathBuf,
+    pub grpc_port: u16,
+    pub libp2p_udp_port: u16,
+    pub libp2p_tcp_port: u16,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -88,10 +88,10 @@ pub struct ConfigStore {
     allowed_peers: Vec<PeerData>,
     log_file_path: Option<PathBuf>,
     key_file_path: PathBuf,
-    database_directory: Option<PathBuf>,
-    grpc_port: Option<u16>,
-    libp2p_udp_port: Option<u16>,
-    libp2p_tcp_port: Option<u16>,
+    database_directory: PathBuf,
+    grpc_port: u16,
+    libp2p_udp_port: u16,
+    libp2p_tcp_port: u16,
 }
 
 impl NodeConfig {
@@ -156,11 +156,26 @@ impl NodeConfig {
             log_file_path,
             key_file_path,
             config_file_path,
-            database_directory: None,
-            grpc_port: None,
-            libp2p_udp_port: None,
-            libp2p_tcp_port: None,
-            })
+            database_directory: PathBuf::from("nodedb.db"),
+            grpc_port: 50051,
+            libp2p_udp_port: 0,
+            libp2p_tcp_port: 0,
+        })
+    }
+
+    pub fn save_to_keys_file(&self) -> Result<(), NodeError> {
+        let key_store = KeyStore {
+            key_data: self.key_data.clone(),
+            dkg_keys: self.dkg_keys.clone(),
+        };
+
+        let key_info_str = serde_json::to_string_pretty(&key_store)
+            .map_err(|e| NodeError::Error(format!("Failed to serialize key data: {}", e)))?;
+
+        fs::write(&self.key_file_path, key_info_str)
+            .map_err(|e| NodeError::Error(format!("Failed to write key data: {}", e)))?;
+
+        Ok(())
     }
 
     pub fn save_to_file(&self) -> Result<(), NodeError> {
@@ -180,9 +195,9 @@ impl NodeConfig {
             log_file_path: self.log_file_path.clone(),
             key_file_path: self.key_file_path.clone(),
             database_directory: self.database_directory.clone(),
-            grpc_port: self.grpc_port.clone(),
-            libp2p_udp_port: self.libp2p_udp_port.clone(),
-            libp2p_tcp_port: self.libp2p_tcp_port.clone(),
+            grpc_port: self.grpc_port,
+            libp2p_udp_port: self.libp2p_udp_port,
+            libp2p_tcp_port: self.libp2p_tcp_port,
         };
 
         let config_str: String = serde_yaml::to_string(&config_store).unwrap();
@@ -199,6 +214,22 @@ impl NodeConfig {
 
     pub fn set_key_data(&mut self, key_data: KeyData) {
         self.key_data = key_data;
+    }
+
+    pub fn set_grpc_port(&mut self, port: u16) {
+        self.grpc_port = port;
+    }
+
+    pub fn set_libp2p_udp_port(&mut self, port: u16) {
+        self.libp2p_udp_port = port;
+    }
+
+    pub fn set_libp2p_tcp_port(&mut self, port: u16) {
+        self.libp2p_tcp_port = port;
+    }
+
+    pub fn set_database_directory(&mut self, dir: PathBuf) {
+        self.database_directory = dir;
     }
 }
 

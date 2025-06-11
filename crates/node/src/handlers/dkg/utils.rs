@@ -140,7 +140,7 @@ impl DkgState {
 
         node.db.insert_block(genesis_block.to_block())?;
 
-        node.config.save_to_file()?;
+        node.config.save_to_keys_file()?;
         Ok(())
     }
 }
