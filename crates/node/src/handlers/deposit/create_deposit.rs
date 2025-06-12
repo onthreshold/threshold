@@ -166,11 +166,9 @@ impl DepositIntentState {
             return Ok(());
         }
 
-        let user_pub_key = tx.input[0]
-            .script_sig
-            .as_script()
-            .p2pk_public_key()
-            .ok_or(NodeError::Error("No input address found".to_string()))?;
+        // Extract the user's address from the script_sig which is a P2PKH scriptPubKey
+        let user_address = Address::from_script(&tx.input[0].script_sig, BitcoinNetwork::Testnet)
+            .map_err(|_| NodeError::Error("No input address found".to_string()))?;
 
         println!("tx.output: {:?}", tx.output);
         let deposit_amount = tx
@@ -191,7 +189,7 @@ impl DepositIntentState {
         println!("deposit_amount: {:?}", deposit_amount);
         let user_account = node
             .chain_state
-            .get_account(&user_pub_key.to_string())
+            .get_account(&user_address.to_string())
             .ok_or(NodeError::Error("User not found".to_string()))?;
 
         println!("user_account: {:?}", user_account);
@@ -199,7 +197,7 @@ impl DepositIntentState {
 
         println!("updated_account: {:?}", updated_account.clone());
         node.chain_state
-            .upsert_account(&user_pub_key.to_string(), updated_account);
+            .upsert_account(&user_address.to_string(), updated_account);
 
         Ok(())
     }
