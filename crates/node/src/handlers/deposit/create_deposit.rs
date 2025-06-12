@@ -189,7 +189,7 @@ impl DepositIntentState {
             .get_account(&input_address[0].to_string())
             .ok_or(NodeError::Error("User not found".to_string()))?;
 
-        let updated_account = user_account.update_balance(deposit_amount);
+        let updated_account = user_account.update_balance(deposit_amount as i64);
 
         node.chain_state
             .upsert_account(&input_address[0].to_string(), updated_account);

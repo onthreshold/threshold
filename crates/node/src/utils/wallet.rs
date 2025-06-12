@@ -1,3 +1,4 @@
+use bincode::{Decode, Encode};
 use bitcoin::absolute::LockTime;
 use bitcoin::hashes::Hash;
 use bitcoin::sighash::{EcdsaSighashType, SighashCache};
@@ -139,4 +140,32 @@ impl<O: Oracle> SimpleWallet<O> {
 #[derive(Debug)]
 pub struct PendingSpend {
     pub tx: Transaction,
+    pub user_pubkey: String,
+}
+
+impl Encode for PendingSpend {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
+        let raw_tx = bitcoin::consensus::encode::serialize(&self.tx);
+        bincode::Encode::encode(&raw_tx, encoder)?;
+        bincode::Encode::encode(&self.user_pubkey, encoder)?;
+        Ok(())
+    }
+}
+
+impl<Context> Decode<Context> for PendingSpend {
+    fn decode<D: bincode::de::Decoder<Context = Context>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let raw_tx_bytes: Vec<u8> = bincode::Decode::decode(decoder)?;
+        let raw_tx: Transaction = bitcoin::consensus::encode::deserialize(&raw_tx_bytes)
+            .map_err(|_| bincode::error::DecodeError::Other("Failed to deserialize transaction"))?;
+        let user_pubkey = bincode::Decode::decode(decoder)?;
+        Ok(PendingSpend {
+            tx: raw_tx,
+            user_pubkey,
+        })
+    }
 }

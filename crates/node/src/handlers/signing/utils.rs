@@ -36,11 +36,13 @@ impl SigningState {
         &mut self,
         node: &mut NodeState<N, D, O>,
         amount_sat: u64,
+        fee: u64,
         address: &str,
+        user_pubkey: String,
     ) -> Option<String> {
         info!("🚀 Creating spend request for {} sat", amount_sat);
         let address = bitcoin::Address::from_str(address).ok()?.assume_checked();
-        match node.wallet.create_spend(amount_sat, 200, &address) {
+        match node.wallet.create_spend(amount_sat, fee, &address) {
             Ok((tx, sighash)) => {
                 let sighash_hex = hex::encode(sighash);
                 match self.start_signing_session(node, &sighash_hex) {
@@ -52,8 +54,10 @@ impl SigningState {
                 }
 
                 if let Some(active) = &self.active_signing {
-                    self.pending_spends
-                        .insert(active.sign_id, crate::wallet::PendingSpend { tx });
+                    self.pending_spends.insert(
+                        active.sign_id,
+                        crate::wallet::PendingSpend { tx, user_pubkey },
+                    );
                     info!("🚀 Spend request prepared (session id {})", active.sign_id);
 
                     Some(hex::encode(sighash))

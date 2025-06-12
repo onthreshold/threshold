@@ -24,11 +24,14 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for SigningState {
                 request:
                     SelfRequest::Spend {
                         amount_sat,
+                        fee,
                         address_to,
+                        user_pubkey,
                     },
                 response_channel,
             }) => {
-                let response = self.start_spend_request(node, amount_sat, &address_to);
+                let response =
+                    self.start_spend_request(node, amount_sat, fee, &address_to, user_pubkey);
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::SpendRequestSent {
@@ -58,7 +61,10 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for SigningState {
                     sign_id,
                     signature_share,
                 },
-            ))) => self.handle_signature_share(node, peer, sign_id, signature_share)?,
+            ))) => {
+                self.handle_signature_share(node, peer, sign_id, signature_share)
+                    .await?
+            }
             _ => (),
         }
 

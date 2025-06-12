@@ -4,12 +4,15 @@ use crate::{
     NodeState,
     db::Db,
     handlers::withdrawl::{SpendIntent, SpendIntentState},
-    swarm_manager::Network,
+    swarm_manager::{Network, SelfRequest},
+    wallet::PendingSpend,
 };
 use bitcoin::{
+    Transaction,
     key::Secp256k1,
     secp256k1::{Message, PublicKey, ecdsa::Signature},
 };
+use libp2p::gossipsub;
 use protocol::oracle::Oracle;
 use sha2::{Digest, Sha256};
 use types::errors::NodeError;
@@ -51,7 +54,7 @@ impl SpendIntentState {
         let challenge_hex = hex::encode(challenge);
 
         self.pending_intents
-            .insert(challenge_hex.clone(), withdrawal_intent.clone());
+            .insert(challenge_hex.clone(), (withdrawal_intent.clone(), fee));
 
         Ok((total_amount, challenge_hex))
     }
@@ -90,7 +93,7 @@ impl SpendIntentState {
         challenge: &str,
         signature: &str,
     ) -> Result<(), NodeError> {
-        let Some(withdrawal_intent) = self.pending_intents.remove(challenge) else {
+        let Some((withdrawal_intent, fee)) = self.pending_intents.remove(challenge) else {
             return Err(NodeError::Error("Challenge not found".to_string()));
         };
 
@@ -99,15 +102,69 @@ impl SpendIntentState {
             return Err(NodeError::Error("Invalid signature".to_string()));
         }
 
-        let (tx, _) = node.wallet.create_spend(
-            withdrawal_intent.amount_sat,
-            200,
-            &bitcoin::Address::from_str(&withdrawal_intent.address_to)
-                .unwrap()
-                .assume_checked(),
-        )?;
+        node.network_handle
+            .send_self_request(
+                SelfRequest::Spend {
+                    amount_sat: withdrawal_intent.amount_sat,
+                    fee,
+                    address_to: withdrawal_intent.address_to.clone(),
+                    user_pubkey: withdrawal_intent.public_key.clone(),
+                },
+                false,
+            )
+            .map_err(|e| NodeError::Error(format!("Failed to send spend request: {:?}", e)))?;
 
-        node.oracle.broadcast_transaction(&tx).await?;
+        Ok(())
+    }
+
+    pub async fn handle_signed_withdrawal<N: Network, D: Db, O: Oracle>(
+        node: &mut NodeState<N, D, O>,
+        tx: &Transaction,
+        user_pubkey: String,
+    ) -> Result<(), NodeError> {
+        node.oracle.broadcast_transaction(tx).await?;
+        let user_account = node
+            .chain_state
+            .get_account(&user_pubkey)
+            .ok_or(NodeError::Error("User not found".to_string()))?;
+
+        let updated_account = user_account.update_balance(-(tx.output[0].value.to_sat() as i64));
+
+        node.chain_state
+            .upsert_account(&user_pubkey, updated_account);
+
+        let spend_intent = PendingSpend {
+            tx: tx.clone(),
+            user_pubkey: user_pubkey.clone(),
+        };
+
+        node.network_handle
+            .send_broadcast(
+                gossipsub::IdentTopic::new("withdrawls"),
+                bincode::encode_to_vec(&spend_intent, bincode::config::standard())
+                    .map_err(|x| NodeError::Error(x.to_string()))?,
+            )
+            .map_err(|x| NodeError::Error(format!("Failed to send broadcast: {:?}", x)))?;
+
+        Ok(())
+    }
+
+    pub async fn handle_withdrawl_message<N: Network, D: Db, O: Oracle>(
+        &self,
+        node: &mut NodeState<N, D, O>,
+        pending_spend: PendingSpend,
+    ) -> Result<(), NodeError> {
+        node.oracle.broadcast_transaction(&pending_spend.tx).await?;
+        let user_account = node
+            .chain_state
+            .get_account(&pending_spend.user_pubkey)
+            .ok_or(NodeError::Error("User not found".to_string()))?;
+
+        let updated_account =
+            user_account.update_balance(-(pending_spend.tx.output[0].value.to_sat() as i64));
+
+        node.chain_state
+            .upsert_account(&pending_spend.user_pubkey, updated_account);
 
         Ok(())
     }
