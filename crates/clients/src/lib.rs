@@ -14,7 +14,7 @@ pub enum NodeError {
 #[async_trait]
 pub trait WindowedConfirmedTransactionProvider {
     // Must only return transactions that are confirmed in the given range [min_height, max_height].
-    // All returned transactions must have at least six confirmations (< current_chain_tip_height - 6).
+    // All returned transactions must have at least `confirmation_depth` confirmations (< current_chain_tip_height - confirmation_depth).
     async fn get_confirmed_transactions(
         &self,
         addresses: Vec<Address>,
@@ -31,13 +31,14 @@ pub struct EsploraApiClient {
     pub client: AsyncClient,
     pub tx_channel: broadcast::Sender<Transaction>,
     pub deposit_intent_rx: Option<broadcast::Receiver<String>>,
+    pub cofirmation_depth: u32,
 }
 
 impl Default for EsploraApiClient {
     fn default() -> Self {
         let builder = Builder::new("https://blockstream.info/testnet/api");
         let client = builder.build_async().unwrap();
-        Self::new(client, None, None, None)
+        Self::new(client, None, None, None, 6)
     }
 }
 
@@ -47,11 +48,13 @@ impl EsploraApiClient {
         capacity: Option<usize>,
         tx_channel: Option<broadcast::Sender<Transaction>>,
         deposit_intent_rx: Option<broadcast::Receiver<String>>,
+        cofirmation_depth: u32,
     ) -> Self {
         Self {
             client,
             tx_channel: tx_channel.unwrap_or(broadcast::channel(capacity.unwrap_or(1000)).0),
             deposit_intent_rx,
+            cofirmation_depth,
         }
     }
 
@@ -60,6 +63,7 @@ impl EsploraApiClient {
         capacity: Option<usize>,
         tx_channel: Option<broadcast::Sender<Transaction>>,
         deposit_intent_rx: Option<broadcast::Receiver<String>>,
+        cofirmation_depth: u32,
     ) -> Self {
         let url = match network {
             Network::Bitcoin => "https://blockstream.info/api",
@@ -70,7 +74,13 @@ impl EsploraApiClient {
         };
         let builder = Builder::new(url);
         let client = builder.build_async().unwrap();
-        Self::new(client, capacity, tx_channel, deposit_intent_rx)
+        Self::new(
+            client,
+            capacity,
+            tx_channel,
+            deposit_intent_rx,
+            cofirmation_depth,
+        )
     }
 }
 
@@ -86,7 +96,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
             NodeError::Error(format!("Cannot retrieve height of blockchain: {}", e))
         })?;
 
-        let new_max_height = max_height.min(blockchain_height - 6);
+        let new_max_height = max_height.min(blockchain_height - self.cofirmation_depth);
         let mut confirmed_txs = Vec::new();
 
         for address in &addresses {
@@ -137,8 +147,10 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
     }
 
     async fn poll_new_transactions(&mut self, addresses: Vec<Address>) {
+        let cofirmation_depth = self.cofirmation_depth;
+
         let mut last_confirmed_height = match self.client.get_height().await {
-            Ok(height) => height - 6,
+            Ok(height) => height - cofirmation_depth,
             Err(e) => {
                 error!("Cannot retrieve height of blockchain: {}", e);
                 return;
@@ -165,7 +177,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
                     };
                     tracing::info!("Current height: {}", current_height);
 
-                    let new_confirmed_height = current_height - 6;
+                    let new_confirmed_height = current_height - cofirmation_depth;
 
                     if new_confirmed_height > last_confirmed_height {
                         info!(

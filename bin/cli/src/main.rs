@@ -134,9 +134,9 @@ enum Commands {
     },
     /// Run the node and connect to the network
     Run {
-        #[arg(short, long)]
+        #[arg(short = 'k', long)]
         key_file_path: Option<String>,
-        #[arg(short, long)]
+        #[arg(short = 'c', long)]
         config_file_path: Option<String>,
         #[arg(short = 'p', long)]
         grpc_port: Option<u16>,
@@ -144,7 +144,7 @@ enum Commands {
         libp2p_udp_port: Option<u16>,
         #[arg(short = 't', long)]
         libp2p_tcp_port: Option<u16>,
-        #[arg(short, long)]
+        #[arg(short = 'd', long)]
         database_directory: Option<String>,
         #[arg(short = 'o', long)]
         log_file: Option<String>,
@@ -152,6 +152,8 @@ enum Commands {
         max_signers: Option<u16>,
         #[arg(short = 'm', long)]
         min_signers: Option<u16>,
+        #[arg(short = 'f', long)]
+        confirmation_depth: Option<u32>,
     },
     Spend {
         amount: u64,
@@ -205,6 +207,7 @@ async fn main() -> Result<(), CliError> {
             log_file,
             max_signers,
             min_signers,
+            confirmation_depth,
         } => {
             start_node_cli(StartNodeConfigParams {
                 key_file_path,
@@ -216,6 +219,7 @@ async fn main() -> Result<(), CliError> {
                 log_file,
                 max_signers,
                 min_signers,
+                confirmation_depth,
             })
             .await
             .map_err(|e| CliError::NodeError(e.to_string()))?;
@@ -334,6 +338,7 @@ struct StartNodeConfigParams {
     log_file: Option<String>,
     max_signers: Option<u16>,
     min_signers: Option<u16>,
+    confirmation_depth: Option<u32>,
 }
 
 async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> {
@@ -361,6 +366,10 @@ async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> 
 
     if let Some(dir) = params.database_directory {
         config.set_database_directory(PathBuf::from(dir));
+    }
+
+    if let Some(depth) = params.confirmation_depth {
+        config.set_confirmation_depth(depth);
     }
 
     start_node(

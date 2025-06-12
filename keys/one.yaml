@@ -9,7 +9,8 @@ allowed_peers:
     public_key: 12D3KooWSrmxv2o9abButFRPYnidATKyYF5unJPHC9ZgQYedViZp
 log_file_path: /home/vidyootsenthil/.config/thevault/node.log
 key_file_path: one.json
-database_directory: nodedb.db
-grpc_port: 50053
+database_directory: ./nodedb.db
+grpc_port: 50051
 libp2p_udp_port: 0
 libp2p_tcp_port: 0
+confirmation_depth: 0

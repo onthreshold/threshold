@@ -75,6 +75,7 @@ pub struct NodeConfig {
     pub grpc_port: u16,
     pub libp2p_udp_port: u16,
     pub libp2p_tcp_port: u16,
+    pub cofirmation_depth: u32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -92,6 +93,7 @@ pub struct ConfigStore {
     grpc_port: u16,
     libp2p_udp_port: u16,
     libp2p_tcp_port: u16,
+    cofirmation_depth: u32,
 }
 
 impl NodeConfig {
@@ -160,6 +162,7 @@ impl NodeConfig {
             grpc_port: 50051,
             libp2p_udp_port: 0,
             libp2p_tcp_port: 0,
+            cofirmation_depth: 6,
         })
     }
 
@@ -198,6 +201,7 @@ impl NodeConfig {
             grpc_port: self.grpc_port,
             libp2p_udp_port: self.libp2p_udp_port,
             libp2p_tcp_port: self.libp2p_tcp_port,
+            cofirmation_depth: self.cofirmation_depth,
         };
 
         let config_str: String = serde_yaml::to_string(&config_store).unwrap();
@@ -230,6 +234,10 @@ impl NodeConfig {
 
     pub fn set_database_directory(&mut self, dir: PathBuf) {
         self.database_directory = dir;
+    }
+
+    pub fn set_cofirmation_depth(&mut self, depth: u32) {
+        self.cofirmation_depth = depth;
     }
 }
 
