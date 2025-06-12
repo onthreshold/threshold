@@ -26,6 +26,7 @@ pub async fn start_node(
     let config_database_path = config.database_directory.clone();
     let config_grpc_port = config.grpc_port;
     let confirmation_depth = config.confirmation_depth;
+    let monitor_start_block = config.monitor_start_block;
 
     let registry = tracing_subscriber::registry().with(env_filter);
 
@@ -150,6 +151,7 @@ pub async fn start_node(
             Some(transaction_tx),
             Some(deposit_intent_rx),
             confirmation_depth,
+            monitor_start_block,
         );
 
         client.poll_new_transactions(vec![]).await;

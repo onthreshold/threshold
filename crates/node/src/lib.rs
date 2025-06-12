@@ -76,6 +76,7 @@ pub struct NodeConfig {
     pub libp2p_udp_port: u16,
     pub libp2p_tcp_port: u16,
     pub confirmation_depth: u32,
+    pub monitor_start_block: i32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -94,6 +95,7 @@ pub struct ConfigStore {
     libp2p_udp_port: u16,
     libp2p_tcp_port: u16,
     confirmation_depth: u32,
+    monitor_start_block: i32,
 }
 
 impl NodeConfig {
@@ -163,6 +165,7 @@ impl NodeConfig {
             libp2p_udp_port: 0,
             libp2p_tcp_port: 0,
             confirmation_depth: 6,
+            monitor_start_block: -1,
         })
     }
 
@@ -202,6 +205,7 @@ impl NodeConfig {
             libp2p_udp_port: self.libp2p_udp_port,
             libp2p_tcp_port: self.libp2p_tcp_port,
             confirmation_depth: self.confirmation_depth,
+            monitor_start_block: self.monitor_start_block,
         };
 
         let config_str: String = serde_yaml::to_string(&config_store).unwrap();
@@ -238,6 +242,10 @@ impl NodeConfig {
 
     pub fn set_confirmation_depth(&mut self, depth: u32) {
         self.confirmation_depth = depth;
+    }
+
+    pub fn set_monitor_start_block(&mut self, block: i32) {
+        self.monitor_start_block = block;
     }
 }
 

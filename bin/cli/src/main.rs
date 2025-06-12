@@ -154,6 +154,8 @@ enum Commands {
         min_signers: Option<u16>,
         #[arg(short = 'f', long)]
         confirmation_depth: Option<u32>,
+        #[arg(short = 's', long)]
+        monitor_start_block: Option<i32>,
     },
     Spend {
         amount: u64,
@@ -209,6 +211,7 @@ async fn main() -> Result<(), CliError> {
             max_signers,
             min_signers,
             confirmation_depth,
+            monitor_start_block,
         } => {
             start_node_cli(StartNodeConfigParams {
                 key_file_path,
@@ -221,6 +224,7 @@ async fn main() -> Result<(), CliError> {
                 max_signers,
                 min_signers,
                 confirmation_depth,
+                monitor_start_block,
             })
             .await
             .map_err(|e| CliError::NodeError(e.to_string()))?;
@@ -344,6 +348,7 @@ struct StartNodeConfigParams {
     max_signers: Option<u16>,
     min_signers: Option<u16>,
     confirmation_depth: Option<u32>,
+    monitor_start_block: Option<i32>,
 }
 
 async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> {
@@ -375,6 +380,10 @@ async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> 
 
     if let Some(depth) = params.confirmation_depth {
         config.set_confirmation_depth(depth);
+    }
+
+    if let Some(block) = params.monitor_start_block {
+        config.set_monitor_start_block(block);
     }
 
     start_node(
