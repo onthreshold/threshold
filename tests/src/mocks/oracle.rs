@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
-use bitcoin::{Address, Txid};
+use bitcoin::{Address, Amount, OutPoint, ScriptBuf, Txid};
 use protocol::oracle::{Oracle, Utxo};
 use types::errors::NodeError;
 
+#[derive(Clone)]
 pub struct MockOracle {
     // Map of tx_hash -> (address, amount, is_valid)
     pub transactions: HashMap<String, (String, u64, bool)>,
@@ -75,7 +76,41 @@ impl Oracle for MockOracle {
         _start_transactions: Option<Txid>,
         _allow_unconfirmed: bool,
     ) -> Result<Vec<Utxo>, NodeError> {
-        Ok(vec![])
+        Ok(vec![
+            Utxo {
+                outpoint: OutPoint::new(
+                    Txid::from_str(
+                        "0000000000000000000000000000000000000000000000000000000000000000",
+                    )
+                    .unwrap(),
+                    0,
+                ),
+                value: Amount::from_sat(1000),
+                script_pubkey: ScriptBuf::new(),
+            },
+            Utxo {
+                outpoint: OutPoint::new(
+                    Txid::from_str(
+                        "0000000000000000000000000000000000000000000000000000000000000000",
+                    )
+                    .unwrap(),
+                    0,
+                ),
+                value: Amount::from_sat(10000),
+                script_pubkey: ScriptBuf::new(),
+            },
+            Utxo {
+                outpoint: OutPoint::new(
+                    Txid::from_str(
+                        "0000000000000000000000000000000000000000000000000000000000000000",
+                    )
+                    .unwrap(),
+                    0,
+                ),
+                value: Amount::from_sat(100000),
+                script_pubkey: ScriptBuf::new(),
+            },
+        ])
     }
 
     async fn broadcast_transaction(&self, _tx: &bitcoin::Transaction) -> Result<String, NodeError> {

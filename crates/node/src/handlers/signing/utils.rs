@@ -39,10 +39,11 @@ impl SigningState {
         fee: u64,
         address: &str,
         user_pubkey: String,
+        dry_run: bool,
     ) -> Option<String> {
         info!("🚀 Creating spend request for {} sat", amount_sat);
         let address = bitcoin::Address::from_str(address).ok()?.assume_checked();
-        match node.wallet.create_spend(amount_sat, fee, &address) {
+        match node.wallet.create_spend(amount_sat, fee, &address, dry_run) {
             Ok((tx, sighash)) => {
                 let sighash_hex = hex::encode(sighash);
                 match self.start_signing_session(node, &sighash_hex) {
@@ -67,6 +68,7 @@ impl SigningState {
                 }
             }
             Err(e) => {
+                println!("Failed to create spend transaction: {:?}", e);
                 error!("❌ Failed to create spend transaction: {:?}", e);
                 None
             }

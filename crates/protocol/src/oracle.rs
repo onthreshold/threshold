@@ -11,7 +11,7 @@ pub struct Utxo {
 }
 
 #[async_trait::async_trait]
-pub trait Oracle: Send + Default {
+pub trait Oracle: Send + Default + Clone {
     async fn validate_transaction(
         &self,
         address: &str,

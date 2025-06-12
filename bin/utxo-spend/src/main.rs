@@ -36,7 +36,9 @@ async fn main() {
     let oracle = protocol::oracle::EsploraOracle::new(true);
     let mut wallet = SimpleWallet::new(&address, oracle.clone(), Some(true)).await;
 
-    let (tx, sighash) = wallet.create_spend(amount, fee, &address_to).unwrap();
+    let (tx, sighash) = wallet
+        .create_spend(amount, fee, &address_to, false)
+        .unwrap();
     println!(
         "Created Transaction for amount: {} to address: {}",
         amount, address_to

@@ -10,6 +10,7 @@ use crate::{
 use bitcoin::{
     Transaction,
     key::Secp256k1,
+    network,
     secp256k1::{Message, PublicKey, ecdsa::Signature},
 };
 use libp2p::gossipsub;
@@ -23,7 +24,7 @@ impl SpendIntentState {
         node: &mut NodeState<N, D, O>,
         withdrawal_intent: &SpendIntent,
     ) -> Result<(u64, String), NodeError> {
-        let account = node.chain_state.get_account(&withdrawal_intent.address_to);
+        let account = node.chain_state.get_account(&withdrawal_intent.public_key);
         let Some(account) = account else {
             return Err(NodeError::Error("Account not found".to_string()));
         };
@@ -43,6 +44,7 @@ impl SpendIntentState {
             &bitcoin::Address::from_str(&withdrawal_intent.address_to)
                 .unwrap()
                 .assume_checked(),
+            true,
         )?;
 
         let vsize = tx.vsize();
@@ -60,30 +62,28 @@ impl SpendIntentState {
     }
 
     fn verify_signature(
-        message: &str,
+        message_hex: &str,
         signature_hex: &str,
         public_key_hex: &str,
     ) -> Result<bool, NodeError> {
-        let secp = Secp256k1::new();
-
-        // Parse public key
         let public_key =
             PublicKey::from_str(public_key_hex).map_err(|e| NodeError::Error(e.to_string()))?;
 
-        // Parse signature
         let signature_bytes =
             hex::decode(signature_hex).map_err(|e| NodeError::Error(e.to_string()))?;
         let signature =
             Signature::from_der(&signature_bytes).map_err(|e| NodeError::Error(e.to_string()))?;
 
-        // Hash the message (Bitcoin uses double SHA256)
-        let message_hash = Sha256::digest(message);
-        let message_bytes =
-            hex::decode(message_hash).map_err(|e| NodeError::Error(e.to_string()))?;
-        let message = Message::from_digest_slice(&message_bytes)
-            .map_err(|e| NodeError::Error(e.to_string()))?;
+        let msg_bytes = hex::decode(message_hex)
+            .map_err(|e| NodeError::Error(format!("Invalid message hex: {}", e)))?;
+        if msg_bytes.len() != 32 {
+            return Err(NodeError::Error("Message must be 32 bytes".to_string()));
+        }
 
-        // Verify signature
+        let message =
+            Message::from_digest_slice(&msg_bytes).map_err(|e| NodeError::Error(e.to_string()))?;
+
+        let secp = Secp256k1::new();
         Ok(secp.verify_ecdsa(&message, &signature, &public_key).is_ok())
     }
 
@@ -165,6 +165,17 @@ impl SpendIntentState {
 
         node.chain_state
             .upsert_account(&pending_spend.user_pubkey, updated_account);
+
+        node.wallet.create_spend(
+            pending_spend.tx.output[0].value.to_sat(),
+            0, // Just estimate for now this doesnt affect vsize
+            &bitcoin::Address::from_script(
+                &pending_spend.tx.output[1].script_pubkey,
+                network::Network::Testnet,
+            )
+            .unwrap(),
+            false,
+        )?;
 
         Ok(())
     }

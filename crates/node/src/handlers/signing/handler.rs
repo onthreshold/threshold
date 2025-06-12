@@ -30,8 +30,14 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for SigningState {
                     },
                 response_channel,
             }) => {
-                let response =
-                    self.start_spend_request(node, amount_sat, fee, &address_to, user_pubkey);
+                let response = self.start_spend_request(
+                    node,
+                    amount_sat,
+                    fee,
+                    &address_to,
+                    user_pubkey,
+                    false,
+                );
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::SpendRequestSent {

@@ -95,8 +95,6 @@ impl Network for MockNetwork {
             target_peers: Vec::new(), // Empty means broadcast to all
         };
 
-        println!("Queuing broadcast event: {:?}", pending_event);
-
         self.pending_events_tx
             .send(pending_event)
             .map_err(|_| NetworkError::SendError("Failed to send pending event".to_string()))?;

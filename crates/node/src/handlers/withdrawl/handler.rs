@@ -1,6 +1,7 @@
 use crate::swarm_manager::{Network, NetworkEvent, SelfRequest, SelfResponse};
 use crate::wallet::PendingSpend;
 use crate::{NodeState, db::Db, handlers::Handler, handlers::withdrawl::SpendIntentState};
+use libp2p::gossipsub::Message;
 use protocol::oracle::Oracle;
 use types::errors::NodeError;
 
@@ -43,12 +44,14 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for SpendIntentState {
                         .map_err(|e| NodeError::Error(e.to_string()))?;
                 }
             }
-            Some(NetworkEvent::GossipsubMessage(message)) => {
-                let spend_intent: PendingSpend =
-                    bincode::decode_from_slice(&message.data, bincode::config::standard())
-                        .map_err(|e| NodeError::Error(e.to_string()))?
-                        .0;
-                self.handle_withdrawl_message(node, spend_intent).await?;
+            Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {
+                if topic.as_str() == "withdrawls" {
+                    let spend_intent: PendingSpend =
+                        bincode::decode_from_slice(&data, bincode::config::standard())
+                            .map_err(|e| NodeError::Error(e.to_string()))?
+                            .0;
+                    self.handle_withdrawl_message(node, spend_intent).await?;
+                }
             }
             _ => {}
         }
