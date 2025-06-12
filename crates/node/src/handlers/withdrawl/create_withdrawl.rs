@@ -170,7 +170,7 @@ impl SpendIntentState {
             pending_spend.tx.output[0].value.to_sat(),
             0, // Just estimate for now this doesnt affect vsize
             &bitcoin::Address::from_script(
-                &pending_spend.tx.output[1].script_pubkey,
+                &pending_spend.tx.output[0].script_pubkey,
                 network::Network::Testnet,
             )
             .unwrap(),
