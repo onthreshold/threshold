@@ -5,7 +5,7 @@ use crate::{
     db::Db,
     handlers::withdrawl::{SpendIntent, SpendIntentState},
     swarm_manager::{Network, SelfRequest},
-    wallet::PendingSpend,
+    wallet::{PendingSpend, Wallet},
 };
 use bitcoin::{
     Transaction,
@@ -18,9 +18,9 @@ use sha2::{Digest, Sha256};
 use types::errors::NodeError;
 
 impl SpendIntentState {
-    pub async fn propose_withdrawal<N: Network, D: Db, O: Oracle>(
+    pub async fn propose_withdrawal<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         withdrawal_intent: &SpendIntent,
     ) -> Result<(u64, String), NodeError> {
         let account = node.chain_state.get_account(&withdrawal_intent.public_key);
@@ -86,9 +86,9 @@ impl SpendIntentState {
         Ok(secp.verify_ecdsa(&message, &signature, &public_key).is_ok())
     }
 
-    pub async fn confirm_withdrawal<N: Network, D: Db, O: Oracle>(
+    pub async fn confirm_withdrawal<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         challenge: &str,
         signature: &str,
     ) -> Result<(), NodeError> {
@@ -115,8 +115,8 @@ impl SpendIntentState {
         Ok(())
     }
 
-    pub async fn handle_signed_withdrawal<N: Network, D: Db, O: Oracle>(
-        node: &mut NodeState<N, D, O>,
+    pub async fn handle_signed_withdrawal<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+        node: &mut NodeState<N, D, O, W>,
         tx: &Transaction,
         fee: u64,
         user_pubkey: String,
@@ -153,9 +153,9 @@ impl SpendIntentState {
         Ok(())
     }
 
-    pub async fn handle_withdrawl_message<N: Network, D: Db, O: Oracle>(
+    pub async fn handle_withdrawl_message<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         pending: PendingSpend,
     ) -> Result<(), NodeError> {
         node.oracle.broadcast_transaction(&pending.tx).await?;

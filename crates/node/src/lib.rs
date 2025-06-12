@@ -1,7 +1,10 @@
 use crate::{
-    db::Db, handlers::Handler, handlers::balance::BalanceState,
-    handlers::deposit::DepositIntentState, handlers::dkg::DkgState,
-    handlers::signing::SigningState, handlers::withdrawl::SpendIntentState,
+    db::Db,
+    handlers::{
+        Handler, balance::BalanceState, deposit::DepositIntentState, dkg::DkgState,
+        signing::SigningState, withdrawl::SpendIntentState,
+    },
+    wallet::Wallet,
 };
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{
@@ -32,7 +35,7 @@ pub mod utils;
 pub use utils::db;
 pub use utils::key_manager;
 pub use utils::swarm_manager;
-pub use utils::wallet;
+pub mod wallet;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub struct PeerData {
@@ -249,8 +252,8 @@ impl NodeConfig {
     }
 }
 
-pub struct NodeState<N: Network, D: Db, O: Oracle> {
-    pub handlers: Vec<Box<dyn Handler<N, D, O>>>,
+pub struct NodeState<N: Network, D: Db, O: Oracle, W: Wallet<O>> {
+    pub handlers: Vec<Box<dyn Handler<N, D, O, W>>>,
     pub db: D,
     pub chain_state: ChainState,
 
@@ -264,7 +267,7 @@ pub struct NodeState<N: Network, D: Db, O: Oracle> {
     pub private_key_package: Option<frost::keys::KeyPackage>,
 
     // FROST signing
-    pub wallet: crate::wallet::SimpleWallet<O>,
+    pub wallet: W,
     pub config: NodeConfig,
     pub network_handle: N,
     pub network_events_stream: broadcast::Receiver<NetworkEvent>,
@@ -272,7 +275,7 @@ pub struct NodeState<N: Network, D: Db, O: Oracle> {
     pub oracle: O,
 }
 
-impl<N: Network, D: Db, O: Oracle> NodeState<N, D, O> {
+impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> NodeState<N, D, O, W> {
     #[allow(clippy::too_many_arguments)]
     pub fn new_from_config(
         network_handle: N,
@@ -284,6 +287,7 @@ impl<N: Network, D: Db, O: Oracle> NodeState<N, D, O> {
         deposit_intent_tx: broadcast::Sender<String>,
         transaction_rx: broadcast::Receiver<Transaction>,
         oracle: O,
+        wallet: W,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
@@ -319,7 +323,7 @@ impl<N: Network, D: Db, O: Oracle> NodeState<N, D, O> {
             db: storage_db,
             peers: HashSet::new(),
             rng: frost::rand_core::OsRng,
-            wallet: crate::wallet::SimpleWallet::default(),
+            wallet,
             config,
             handlers: vec![
                 Box::new(dkg_state),

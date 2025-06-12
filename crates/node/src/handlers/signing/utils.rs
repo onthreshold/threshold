@@ -5,8 +5,11 @@ use tracing::{error, info};
 use types::errors::NodeError;
 
 use crate::{
-    NodeState, db::Db, handlers::signing::SigningState, swarm_manager::Network,
-    wallet::PendingSpend,
+    NodeState,
+    db::Db,
+    handlers::signing::SigningState,
+    swarm_manager::Network,
+    wallet::{PendingSpend, Wallet},
 };
 use protocol::oracle::Oracle;
 
@@ -35,9 +38,9 @@ impl SigningState {
             .map_err(|e| format!("Parse schnorr sig: {}", e))
     }
 
-    pub fn start_spend_request<N: Network, D: Db, O: Oracle>(
+    pub fn start_spend_request<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         amount_sat: u64,
         estimated_fee_sat: u64,
         address: &str,

@@ -5,6 +5,7 @@ use frost_secp256k1::Identifier;
 use node::{
     NodeState,
     swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture, SelfResponse},
+    wallet::TaprootWallet,
 };
 use tokio::sync::{
     broadcast,
@@ -17,6 +18,8 @@ use crate::mocks::db::MockDb;
 use crate::mocks::oracle::MockOracle;
 
 use crate::util::local_dkg::perform_distributed_key_generation;
+
+type MockNodeState = NodeState<MockNetwork, MockDb, MockOracle, TaprootWallet<MockOracle>>;
 
 #[derive(Debug)]
 pub struct SenderToNode {
@@ -156,7 +159,7 @@ impl Network for MockNetwork {
 }
 
 pub struct MockNodeCluster {
-    pub nodes: BTreeMap<libp2p::PeerId, NodeState<MockNetwork, MockDb, MockOracle>>,
+    pub nodes: BTreeMap<libp2p::PeerId, MockNodeState>,
     pub senders: BTreeMap<libp2p::PeerId, SenderToNode>,
     pub networks: BTreeMap<libp2p::PeerId, MockNetwork>,
     pub pending_events_rx: mpsc::UnboundedReceiver<PendingNetworkEvent>,
@@ -482,7 +485,7 @@ pub fn create_node_network(
     min_signers: u16,
     max_signers: u16,
     pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
-) -> Result<(NodeState<MockNetwork, MockDb, MockOracle>, MockNetwork), errors::NodeError> {
+) -> Result<(MockNodeState, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(256);
     let (deposit_intent_tx, _) = broadcast::channel::<String>(100);
     let (_, transaction_rx) = broadcast::channel::<Transaction>(100);
@@ -491,6 +494,12 @@ pub fn create_node_network(
 
     let mock_db = MockDb::new();
     let oracle = MockOracle::new();
+
+    let wallet = TaprootWallet::new(
+        oracle.clone(),
+        Vec::new(),
+        bitcoin::network::Network::Testnet,
+    );
 
     let nodes_state = NodeState::new_from_config(
         network.clone(),
@@ -502,6 +511,7 @@ pub fn create_node_network(
         deposit_intent_tx,
         transaction_rx,
         oracle,
+        wallet,
     )?;
 
     Ok((nodes_state, network))

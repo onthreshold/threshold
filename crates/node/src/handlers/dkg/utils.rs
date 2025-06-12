@@ -14,6 +14,7 @@ use crate::{
     handlers::dkg::DkgState,
     key_manager::{decrypt_private_key, encrypt_private_key, get_password_from_prompt},
     swarm_manager::Network,
+    wallet::Wallet,
 };
 use types::errors::NodeError;
 
@@ -60,9 +61,9 @@ impl DkgState {
         }
     }
 
-    pub fn save_dkg_keys<N: Network, D: Db, O: Oracle>(
+    pub fn save_dkg_keys<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         private_key: &frost::keys::KeyPackage,
         pubkey: &frost::keys::PublicKeyPackage,
     ) -> Result<(), NodeError> {

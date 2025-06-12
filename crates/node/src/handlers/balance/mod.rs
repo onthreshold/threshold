@@ -3,6 +3,7 @@ use crate::{
     db::Db,
     handlers::Handler,
     swarm_manager::{NetworkEvent, SelfRequest, SelfResponse},
+    wallet::Wallet,
 };
 use protocol::oracle::Oracle;
 use types::errors::NodeError;
@@ -17,10 +18,10 @@ impl BalanceState {
 }
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for BalanceState {
+impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for BalanceState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), NodeError> {
         if let Some(NetworkEvent::SelfRequest {
