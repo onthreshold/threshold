@@ -21,6 +21,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: github-pages
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,6 +40,9 @@ jobs:
       - name: Build project
         run: yarn build
         working-directory: ./website
+        env:
+          NODE_ENV: production
+          PUBLIC_LISTMONK_API_KEY: ${{ secrets.PUBLIC_LISTMONK_API_KEY }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
