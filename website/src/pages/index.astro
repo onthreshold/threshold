@@ -159,6 +159,33 @@ invariant(i18n, "No homepage content found");
               currentCount + 1
             ).toLocaleString();
           }
+
+          try {
+            const txEmailResponse = await fetch(
+              "https://listmonk.skeptrune.com/api/tx",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json; charset=utf-8",
+                  Authorization: `Basic ${btoa(`${apiUsername}:${apiKey}`)}`,
+                },
+                body: JSON.stringify({
+                  subscriber_email: email,
+                  template_id: 5,
+                  content_type: "html",
+                }),
+              }
+            );
+            if (!txEmailResponse.ok) {
+              console.error(
+                "Failed to send welcome email:",
+                txEmailResponse.status,
+                await txEmailResponse.text()
+              );
+            }
+          } catch (txError) {
+            console.error("Error sending welcome email:", txError);
+          }
         } else if (response.status === 409) {
           htmlSubmitButton.textContent = "Already Subscribed";
           htmlSubmitButton.disabled = false;
