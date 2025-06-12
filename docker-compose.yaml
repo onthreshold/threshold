@@ -6,6 +6,7 @@ services:
     image: vault-node
     environment:
       - KEY_PASSWORD=
+      - IS_TESTNET=true
     entrypoint: "/app/cli run --key-file-path one.json --config-file-path one.yaml"
     ports:
       - "50051:50051"
@@ -22,6 +23,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - KEY_PASSWORD=
+      - IS_TESTNET=true
     entrypoint: "/app/cli run --key-file-path two.json --config-file-path two.yaml"
     volumes:
       - ./keys/two.json:/app/two.json
@@ -36,6 +38,7 @@ services:
     image: vault-node
     environment:
       - KEY_PASSWORD=
+      - IS_TESTNET=true
     entrypoint: "/app/cli run --key-file-path three.json --config-file-path three.yaml"
     volumes:
       - ./keys/three.json:/app/three.json
@@ -50,6 +53,7 @@ services:
     image: vault-node
     environment:
       - KEY_PASSWORD=
+      - IS_TESTNET=true
     entrypoint: "/app/cli run --key-file-path four.json --config-file-path four.yaml"
     volumes:
       - ./keys/four.json:/app/four.json
@@ -64,6 +68,7 @@ services:
     image: vault-node
     environment:
       - KEY_PASSWORD=
+      - IS_TESTNET=true
     entrypoint: "/app/cli run --key-file-path five.json --config-file-path five.yaml"
     volumes:
       - ./keys/five.json:/app/five.json

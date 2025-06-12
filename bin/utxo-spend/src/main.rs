@@ -4,16 +4,17 @@ use node::wallet::SimpleWallet;
 use protocol::oracle::Oracle;
 use std::str::FromStr;
 
-const FEE_SATS: u64 = 200;
-
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
 
     // Get command line arguments
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 3 {
-        println!("Usage: {} <destination_address> <amount_in_sats>", args[0]);
+    if args.len() != 4 {
+        println!(
+            "Usage: {} <destination_address> <amount_in_sats> [fee_in_sats]",
+            args[0]
+        );
         std::process::exit(1);
     }
 
@@ -24,6 +25,10 @@ async fn main() {
         .parse::<u64>()
         .expect("Amount must be a valid number");
 
+    let fee = args[3]
+        .parse::<u64>()
+        .expect("Fee sats must be a valid number");
+
     let mnemonic = std::env::var("MNEMONIC").expect("MNEMONIC env variable not set");
     let (address, private_key) = generate_keys_from_mnemonic(mnemonic.as_str());
     println!("Sender address: {}. Loading wallet utxos...", address);
@@ -31,7 +36,7 @@ async fn main() {
     let oracle = protocol::oracle::EsploraOracle::new(true);
     let mut wallet = SimpleWallet::new(&address, oracle.clone(), Some(true)).await;
 
-    let (tx, sighash) = wallet.create_spend(amount, FEE_SATS, &address_to).unwrap();
+    let (tx, sighash) = wallet.create_spend(amount, fee, &address_to).unwrap();
     println!(
         "Created Transaction for amount: {} to address: {}",
         amount, address_to
