@@ -110,5 +110,7 @@ pub async fn rpc_check_balance(
         }))
         .await?;
 
+    println!("Balance: {:?}", check_balance_response);
+
     Ok(check_balance_response.into_inner())
 }

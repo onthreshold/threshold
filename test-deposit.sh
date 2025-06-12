@@ -17,7 +17,7 @@ if [ -z "$fee" ]; then
 fi
 
 # Run the deposit command and extract the deposit_address
-deposit_output=$(cargo run --bin "cli" -- deposit "$deposit_amount" 2>&1)
+deposit_output=$(cargo run --bin "cli" -- deposit "tb1q62qxecgfyn7ud6esrxc50xh9hs56dysatwqheh" "$deposit_amount" 2>&1)
 echo "$deposit_output"
 deposit_address=$(echo "$deposit_output" | grep "deposit_address" | sed 's/.*deposit_address: "\([^"]*\)".*/\1/')
 

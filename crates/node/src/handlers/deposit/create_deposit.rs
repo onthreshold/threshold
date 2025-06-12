@@ -103,7 +103,7 @@ impl DepositIntentState {
 
         let deposit_intent = DepositIntent {
             amount_sat,
-            user_pubkey,
+            user_pubkey: user_pubkey.clone(),
             deposit_tracking_id: deposit_tracking_id.clone(),
             deposit_address: deposit_address.to_string(),
             timestamp: std::time::SystemTime::now()
@@ -111,6 +111,13 @@ impl DepositIntentState {
                 .unwrap()
                 .as_secs(),
         };
+
+        if node.chain_state.get_account(&user_pubkey).is_none() {
+            node.chain_state.upsert_account(
+                &user_pubkey,
+                protocol::chain_state::Account::new(user_pubkey.clone(), 0),
+            );
+        }
 
         node.db.insert_deposit_intent(deposit_intent.clone())?;
 
