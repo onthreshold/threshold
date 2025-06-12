@@ -25,6 +25,7 @@ pub async fn start_node(
 
     let config_database_path = config.database_directory.clone();
     let config_grpc_port = config.grpc_port;
+    let cofirmation_depth = config.cofirmation_depth;
 
     let registry = tracing_subscriber::registry().with(env_filter);
 
@@ -138,6 +139,7 @@ pub async fn start_node(
             .unwrap_or("false".to_string())
             .parse()
             .unwrap();
+
         let mut client = EsploraApiClient::new_with_network(
             if is_testnet {
                 Network::Testnet
@@ -147,6 +149,7 @@ pub async fn start_node(
             Some(100),
             Some(transaction_tx),
             Some(deposit_intent_rx),
+            cofirmation_depth,
         );
 
         client.poll_new_transactions(vec![]).await;

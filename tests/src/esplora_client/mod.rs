@@ -6,7 +6,7 @@ mod esplora_client_test {
 
     #[tokio::test]
     async fn test_get_confirmed_transactions() {
-        let client = EsploraApiClient::new_with_network(Network::Bitcoin, Some(100), None, None);
+        let client = EsploraApiClient::new_with_network(Network::Bitcoin, Some(100), None, None, 6);
         let address = Address::from_str("bc1qezwz3yt46nsgzcwlg0dsw680nryjpq5u8pvzts")
             .unwrap()
             .require_network(Network::Bitcoin)

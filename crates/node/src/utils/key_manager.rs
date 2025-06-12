@@ -153,6 +153,7 @@ pub fn get_config(
         grpc_port: config_store.grpc_port,
         libp2p_udp_port: config_store.libp2p_udp_port,
         libp2p_tcp_port: config_store.libp2p_tcp_port,
+        confirmation_depth: config_store.confirmation_depth,
     };
 
     debug!("Read config file");
