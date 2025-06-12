@@ -70,7 +70,9 @@ pub enum SelfRequest {
     },
     Spend {
         amount_sat: u64,
+        fee: u64,
         address_to: String,
+        user_pubkey: String,
     },
     ProposeWithdrawal {
         withdrawal_intent: SpendIntent,
@@ -255,6 +257,7 @@ pub struct SwarmManager {
     pub round1_topic: gossipsub::IdentTopic,
     pub start_dkg_topic: gossipsub::IdentTopic,
     pub deposit_intents_topic: gossipsub::IdentTopic,
+    pub withdrawls_topic: gossipsub::IdentTopic,
 }
 
 impl SwarmManager {
@@ -303,12 +306,20 @@ impl SwarmManager {
             .subscribe(&deposit_intents_topic)
             .map_err(|e| NodeError::Error(e.to_string()))?;
 
+        let withdrawls_topic = gossipsub::IdentTopic::new("withdrawls");
+        swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&withdrawls_topic)
+            .map_err(|e| NodeError::Error(e.to_string()))?;
+
         Ok((
             Self {
                 round1_topic,
                 live_peers: HashSet::new(),
                 start_dkg_topic,
                 deposit_intents_topic,
+                withdrawls_topic,
                 inner: swarm,
                 network_manager_rx: receiving_commands,
                 network_events: network_events_emitter,

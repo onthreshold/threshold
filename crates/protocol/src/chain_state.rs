@@ -15,10 +15,12 @@ impl Account {
         Self { address, balance }
     }
 
-    pub fn update_balance(&self, amount: u64) -> Self {
+    pub fn update_balance(&self, amount: i64) -> Self {
+        let new_balance = self.balance as i64 + amount;
+
         Self {
             address: self.address.clone(),
-            balance: self.balance + amount,
+            balance: new_balance as u64,
         }
     }
 }

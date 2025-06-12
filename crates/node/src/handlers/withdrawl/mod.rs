@@ -14,7 +14,7 @@ pub struct SpendIntent {
 }
 
 pub struct SpendIntentState {
-    pub pending_intents: HashMap<String, SpendIntent>,
+    pub pending_intents: HashMap<String, (SpendIntent, u64)>,
 }
 
 impl Default for SpendIntentState {

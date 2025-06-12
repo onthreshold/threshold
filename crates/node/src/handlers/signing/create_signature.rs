@@ -10,6 +10,7 @@ use tracing::{debug, error, info, warn};
 use crate::NodeState;
 use crate::db::Db;
 use crate::handlers::signing::ActiveSigning;
+use crate::handlers::withdrawl::SpendIntentState;
 use crate::swarm_manager::{DirectMessage, Network};
 use crate::{handlers::signing::SigningState, peer_id_to_identifier};
 use protocol::oracle::Oracle;
@@ -308,7 +309,7 @@ impl SigningState {
     }
 
     /// Coordinator handles incoming signature share
-    pub fn handle_signature_share<N: Network, D: Db, O: Oracle>(
+    pub async fn handle_signature_share<N: Network, D: Db, O: Oracle>(
         &mut self,
         node: &mut NodeState<N, D, O>,
         peer: PeerId,
@@ -373,6 +374,10 @@ impl SigningState {
                         }
                         let raw_tx = bitcoin::consensus::encode::serialize(&tx);
                         debug!("📤 Signed transaction (hex): {}", hex::encode(raw_tx));
+
+                        SpendIntentState::handle_signed_withdrawal(node, &tx, pending.user_pubkey)
+                            .await?;
+                        debug!("📤 Broadcasted transaction");
                     }
                     Err(e) => debug!("❌ Failed to convert signature: {}", e),
                 }

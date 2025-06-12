@@ -21,7 +21,9 @@ pub async fn spend_funds(
         .send_self_request(
             SelfRequest::Spend {
                 amount_sat,
+                fee: 200,
                 address_to,
+                user_pubkey: "".to_string(),
             },
             true,
         )
