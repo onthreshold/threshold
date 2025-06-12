@@ -144,8 +144,17 @@ impl DepositIntentState {
         Ok((deposit_tracking_id, deposit_address.to_string()))
     }
 
-    pub fn get_pending_deposit_intents(&self) -> Vec<DepositIntent> {
-        self.pending_intents.clone()
+    pub fn get_pending_deposit_intents<N: Network, D: Db, O: Oracle>(
+        &self,
+        node: &NodeState<N, D, O>,
+    ) -> Vec<DepositIntent> {
+        match node.db.get_all_deposit_intents() {
+            Ok(intents) => intents,
+            Err(e) => {
+                error!("Failed to fetch deposit intents from db: {}", e);
+                Vec::new()
+            }
+        }
     }
 
     pub fn update_user_balance<N: Network, D: Db, O: Oracle>(
