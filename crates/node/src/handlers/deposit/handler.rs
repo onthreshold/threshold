@@ -45,7 +45,7 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for DepositIntentState {
                 request: SelfRequest::GetPendingDepositIntents,
                 response_channel,
             }) => {
-                let response = self.get_pending_deposit_intents();
+                let response = self.get_pending_deposit_intents(node);
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::GetPendingDepositIntentsResponse { intents: response })
