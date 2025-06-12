@@ -73,4 +73,8 @@ impl Db for MockDb {
     fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError> {
         Ok(self.deposit_intents.get(tracking_id).cloned())
     }
+
+    fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError> {
+        Ok(self.deposit_intents.values().cloned().collect())
+    }
 }

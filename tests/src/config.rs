@@ -23,7 +23,8 @@ mod config_test {
             "database_directory": "nodedb.db",
             "grpc_port": 50051,
             "libp2p_udp_port": 0,
-            "libp2p_tcp_port": 0
+            "libp2p_tcp_port": 0,
+            "confirmation_depth": 6
         }"#;
 
         let config: NodeConfig = serde_json::from_str(json_str).expect("Failed to deserialize");
@@ -40,5 +41,6 @@ mod config_test {
         assert_eq!(config.grpc_port, 50051);
         assert_eq!(config.libp2p_udp_port, 0);
         assert_eq!(config.libp2p_tcp_port, 0);
+        assert_eq!(config.confirmation_depth, 6);
     }
 }

@@ -17,6 +17,7 @@ pub trait Db: Send {
     fn insert_block(&mut self, block: Block) -> Result<(), NodeError>;
     fn insert_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError>;
     fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError>;
+    fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError>;
 }
 
 pub struct RocksDb {
@@ -129,5 +130,20 @@ impl Db for RocksDb {
                 .ok()
                 .map(|(intent, _)| intent)
         }))
+    }
+
+    fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError> {
+        let cf_handle = self.db.cf_handle("deposit_intents").unwrap();
+        let iter = self.db.iterator_cf(cf_handle, rocksdb::IteratorMode::Start);
+        let mut intents = Vec::new();
+
+        for (_, value) in iter.flatten() {
+            if let Ok((intent, _)) =
+                bincode::decode_from_slice::<DepositIntent, _>(&value, bincode::config::standard())
+            {
+                intents.push(intent);
+            }
+        }
+        Ok(intents)
     }
 }

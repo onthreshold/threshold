@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::{Network, NetworkEvent};
 use tokio::sync::broadcast;
-use tracing::error;
+use tracing::{error, info};
 use types::errors::NodeError;
 
 pub mod grpc;
@@ -75,7 +75,7 @@ pub struct NodeConfig {
     pub grpc_port: u16,
     pub libp2p_udp_port: u16,
     pub libp2p_tcp_port: u16,
-    pub cofirmation_depth: u32,
+    pub confirmation_depth: u32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -93,7 +93,7 @@ pub struct ConfigStore {
     grpc_port: u16,
     libp2p_udp_port: u16,
     libp2p_tcp_port: u16,
-    cofirmation_depth: u32,
+    confirmation_depth: u32,
 }
 
 impl NodeConfig {
@@ -162,7 +162,7 @@ impl NodeConfig {
             grpc_port: 50051,
             libp2p_udp_port: 0,
             libp2p_tcp_port: 0,
-            cofirmation_depth: 6,
+            confirmation_depth: 6,
         })
     }
 
@@ -201,7 +201,7 @@ impl NodeConfig {
             grpc_port: self.grpc_port,
             libp2p_udp_port: self.libp2p_udp_port,
             libp2p_tcp_port: self.libp2p_tcp_port,
-            cofirmation_depth: self.cofirmation_depth,
+            confirmation_depth: self.confirmation_depth,
         };
 
         let config_str: String = serde_yaml::to_string(&config_store).unwrap();
@@ -236,8 +236,8 @@ impl NodeConfig {
         self.database_directory = dir;
     }
 
-    pub fn set_cofirmation_depth(&mut self, depth: u32) {
-        self.cofirmation_depth = depth;
+    pub fn set_confirmation_depth(&mut self, depth: u32) {
+        self.confirmation_depth = depth;
     }
 }
 
@@ -281,9 +281,26 @@ impl<N: Network, D: Db, O: Oracle> NodeState<N, D, O> {
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
         let dkg_state = DkgState::new()?;
         let signing_state = SigningState::new()?;
-        let deposit_intent_state = DepositIntentState::new(deposit_intent_tx, transaction_rx);
+        let mut deposit_intent_state = DepositIntentState::new(deposit_intent_tx, transaction_rx);
         let withdrawl_intent_state = SpendIntentState::new();
         let balance_state = BalanceState::new();
+
+        if let Ok(intents) = storage_db.get_all_deposit_intents() {
+            info!("Found {} deposit intents", intents.len());
+            for intent in intents {
+                if deposit_intent_state
+                    .deposit_addresses
+                    .insert(intent.deposit_address.clone())
+                {
+                    if let Err(e) = deposit_intent_state
+                        .deposit_intent_tx
+                        .send(intent.deposit_address.clone())
+                    {
+                        error!("Failed to notify deposit monitor of new address: {}", e);
+                    }
+                }
+            }
+        }
 
         let mut node_state = NodeState {
             network_handle: network_handle.clone(),

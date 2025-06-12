@@ -13,6 +13,7 @@ services:
     volumes:
       - ./keys/one.json:/app/one.json
       - ./keys/one.yaml:/app/one.yaml
+      - ./nodedb_1.db:/app/nodedb.db
     networks:
       - vaultnet
 
@@ -28,6 +29,7 @@ services:
     volumes:
       - ./keys/two.json:/app/two.json
       - ./keys/two.yaml:/app/two.yaml
+      - ./nodedb_2.db:/app/nodedb.db
     networks:
       - vaultnet
 
@@ -43,6 +45,7 @@ services:
     volumes:
       - ./keys/three.json:/app/three.json
       - ./keys/three.yaml:/app/three.yaml
+      - ./nodedb_3.db:/app/nodedb.db
     networks:
       - vaultnet
 
@@ -58,6 +61,7 @@ services:
     volumes:
       - ./keys/four.json:/app/four.json
       - ./keys/four.yaml:/app/four.yaml
+      - ./nodedb_4.db:/app/nodedb.db
     networks:
       - vaultnet
 
@@ -73,6 +77,7 @@ services:
     volumes:
       - ./keys/five.json:/app/five.json
       - ./keys/five.yaml:/app/five.yaml
+      - ./nodedb_5.db:/app/nodedb.db
     networks:
       - vaultnet
 
