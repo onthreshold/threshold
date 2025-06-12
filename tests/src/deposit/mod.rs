@@ -4,7 +4,7 @@ mod deposit_tests {
 
     use crate::mocks::network::MockNodeCluster;
     use bitcoin::hashes::Hash;
-    use bitcoin::{Address, CompressedPublicKey, Transaction};
+    use bitcoin::{Address, Transaction};
     use node::{
         db::Db,
         grpc::{
@@ -201,8 +201,8 @@ mod deposit_tests {
         // ----- Prepare user address and account -----
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let (_, user_pubkey) = secp.generate_keypair(&mut bitcoin::secp256k1::rand::thread_rng());
-        let user_compressed_pk = CompressedPublicKey::from_slice(&user_pubkey.serialize()).unwrap();
-        let user_address = Address::p2wpkh(&user_compressed_pk, bitcoin::Network::Testnet);
+        let user_btc_pubkey = bitcoin::PublicKey::from_slice(&user_pubkey.serialize()).unwrap();
+        let user_address = Address::p2pkh(user_btc_pubkey, bitcoin::Network::Testnet);
 
         // Insert user account with zero balance
         node.chain_state.upsert_account(
@@ -227,17 +227,14 @@ mod deposit_tests {
         // ----- Craft transaction -----
         let deposit_amount_sat = 15_000;
         let tx_in = {
-            let mut witness = bitcoin::witness::Witness::new();
-            witness.push(user_address.script_pubkey().into_bytes());
-
             bitcoin::TxIn {
                 previous_output: bitcoin::OutPoint {
                     txid: bitcoin::Txid::from_slice(&[9u8; 32]).unwrap(),
                     vout: 0,
                 },
-                script_sig: bitcoin::ScriptBuf::new(),
+                script_sig: user_address.script_pubkey(),
                 sequence: bitcoin::Sequence::ZERO,
-                witness,
+                witness: bitcoin::witness::Witness::new(),
             }
         };
 
@@ -290,8 +287,8 @@ mod deposit_tests {
         // ----- Prepare user address and account -----
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let (_, user_pubkey) = secp.generate_keypair(&mut bitcoin::secp256k1::rand::thread_rng());
-        let user_compressed_pk = CompressedPublicKey::from_slice(&user_pubkey.serialize()).unwrap();
-        let user_address = Address::p2wpkh(&user_compressed_pk, bitcoin::Network::Testnet);
+        let user_btc_pubkey = bitcoin::PublicKey::from_slice(&user_pubkey.serialize()).unwrap();
+        let user_address = Address::p2pkh(user_btc_pubkey, bitcoin::Network::Testnet);
 
         // Insert user account with zero balance
         node.chain_state.upsert_account(
@@ -302,17 +299,14 @@ mod deposit_tests {
         // ----- Craft transaction -----
         let deposit_amount_sat = 15_000;
         let tx_in = {
-            let mut witness = bitcoin::witness::Witness::new();
-            witness.push(user_address.script_pubkey().into_bytes());
-
             bitcoin::TxIn {
                 previous_output: bitcoin::OutPoint {
                     txid: bitcoin::Txid::from_slice(&[9u8; 32]).unwrap(),
                     vout: 0,
                 },
-                script_sig: bitcoin::ScriptBuf::new(),
+                script_sig: user_address.script_pubkey(),
                 sequence: bitcoin::Sequence::ZERO,
-                witness,
+                witness: bitcoin::witness::Witness::new(),
             }
         };
 
