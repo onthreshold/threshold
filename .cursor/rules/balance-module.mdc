@@ -1,6 +1,6 @@
 ---
 description: 
-globs: balance/**
+globs: 
 alwaysApply: false
 ---
 # Balance Module & CheckBalance RPC

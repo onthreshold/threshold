@@ -1,6 +1,6 @@
 use bitcoin::Address;
 use node::key_manager::generate_keys_from_mnemonic;
-use node::wallet::SimpleWallet;
+use node::wallet::{TaprootWallet, Wallet};
 use protocol::oracle::Oracle;
 use std::str::FromStr;
 
@@ -34,7 +34,11 @@ async fn main() {
     println!("Sender address: {}. Loading wallet utxos...", address);
 
     let oracle = protocol::oracle::EsploraOracle::new(true);
-    let mut wallet = SimpleWallet::new(&address, oracle.clone(), Some(true)).await;
+    let mut wallet = TaprootWallet::new(
+        oracle.clone(),
+        vec![address],
+        bitcoin::network::Network::Testnet,
+    );
 
     let (tx, sighash) = wallet
         .create_spend(amount, fee, &address_to, false)

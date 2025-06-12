@@ -1,9 +1,12 @@
 #[cfg(test)]
 mod withdrawl_tests {
     use bitcoin::{Address, Amount, CompressedPublicKey, OutPoint, Txid, hashes::Hash};
-    use node::grpc::{
-        grpc_handler::node_proto::{ProposeWithdrawalRequest, ProposeWithdrawalResponse},
-        grpc_operator,
+    use node::{
+        grpc::{
+            grpc_handler::node_proto::{ProposeWithdrawalRequest, ProposeWithdrawalResponse},
+            grpc_operator,
+        },
+        wallet::TrackedUtxo,
     };
 
     use crate::mocks::network::MockNodeCluster;
@@ -39,14 +42,18 @@ mod withdrawl_tests {
             },
         );
 
-        node.wallet.address = Some(address.clone());
-        node.wallet.utxos.push(Utxo {
+        let utxo = Utxo {
             outpoint: OutPoint {
-                txid: Txid::from_slice(&[1u8; 32]).unwrap(),
+                txid: Txid::from_slice(&[2u8; 32]).unwrap(),
                 vout: 0,
             },
             value: Amount::from_sat(100_000),
             script_pubkey: address.script_pubkey(),
+        };
+
+        node.wallet.utxos.push(TrackedUtxo {
+            utxo,
+            address: address.clone(),
         });
 
         // Build the withdrawal request
@@ -150,14 +157,18 @@ mod withdrawl_tests {
             },
         );
 
-        node.wallet.address = Some(address.clone());
-        node.wallet.utxos.push(Utxo {
+        let utxo = Utxo {
             outpoint: OutPoint {
                 txid: Txid::from_slice(&[2u8; 32]).unwrap(),
                 vout: 0,
             },
             value: Amount::from_sat(100_000),
             script_pubkey: address.script_pubkey(),
+        };
+
+        node.wallet.utxos.push(TrackedUtxo {
+            utxo,
+            address: address.clone(),
         });
 
         // SpendIntentState under test
@@ -222,14 +233,18 @@ mod withdrawl_tests {
                 },
             );
 
-            node.wallet.address = Some(dest_addr.clone());
-            node.wallet.utxos.push(Utxo {
+            let utxo = Utxo {
                 outpoint: OutPoint {
                     txid: Txid::from_slice(&[3u8; 32]).unwrap(),
                     vout: 0,
                 },
                 value: Amount::from_sat(initial_balance),
                 script_pubkey: dest_addr.script_pubkey(),
+            };
+
+            node.wallet.utxos.push(TrackedUtxo {
+                utxo,
+                address: dest_addr.clone(),
             });
         }
 

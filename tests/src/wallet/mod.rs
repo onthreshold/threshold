@@ -1,7 +1,10 @@
+pub mod taproot;
+
 #[cfg(test)]
 mod utxo_spend_test {
     use node::key_manager::generate_keys_from_mnemonic;
-    use node::wallet::SimpleWallet;
+    use node::wallet::TaprootWallet;
+    use node::wallet::Wallet;
     use protocol::oracle::EsploraOracle;
     use protocol::oracle::Oracle;
 
@@ -24,8 +27,25 @@ mod utxo_spend_test {
 
         let oracle = EsploraOracle::new(true);
 
-        let mut wallet_one = SimpleWallet::new(&address, oracle.clone(), Some(true)).await;
-        let mut wallet_two = SimpleWallet::new(&address_to, oracle.clone(), Some(true)).await;
+        let mut wallet_one = TaprootWallet::new(
+            oracle.clone(),
+            vec![address.clone()],
+            bitcoin::network::Network::Testnet,
+        );
+        let mut wallet_two = TaprootWallet::new(
+            oracle.clone(),
+            vec![address_to.clone()],
+            bitcoin::network::Network::Testnet,
+        );
+
+        wallet_one
+            .refresh_utxos(Some(true))
+            .await
+            .expect("Failed to refresh utxos");
+        wallet_two
+            .refresh_utxos(Some(true))
+            .await
+            .expect("Failed to refresh utxos");
 
         let result = wallet_one.create_spend(1000, 200, &address_to, false);
 

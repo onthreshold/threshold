@@ -8,14 +8,15 @@ use crate::{
     handlers::Handler,
     handlers::deposit::DepositIntentState,
     swarm_manager::{Network, NetworkEvent, SelfRequest, SelfResponse},
+    wallet::Wallet,
 };
 use protocol::oracle::Oracle;
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for DepositIntentState {
+impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for DepositIntentState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         if let Ok(tx) = self.transaction_rx.try_recv() {

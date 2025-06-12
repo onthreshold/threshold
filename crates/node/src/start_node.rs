@@ -3,7 +3,7 @@ use types::errors::NodeError;
 
 use crate::{
     NodeConfig, NodeState, db::RocksDb, grpc::grpc_handler::NodeControlService,
-    key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm,
+    key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm, wallet::TaprootWallet,
 };
 use bitcoin::Network;
 use clients::{EsploraApiClient, WindowedConfirmedTransactionProvider};
@@ -97,6 +97,7 @@ pub async fn start_node(
 
     let (deposit_intent_tx, deposit_intent_rx) = broadcast::channel(100);
     let (transaction_tx, transaction_rx) = broadcast::channel(1000);
+    let oracle = EsploraOracle::default();
 
     let mut node_state = NodeState::new_from_config(
         network_handle,
@@ -107,7 +108,18 @@ pub async fn start_node(
         swarm.network_events.clone(),
         deposit_intent_tx,
         transaction_rx,
-        EsploraOracle::default(),
+        oracle.clone(),
+        TaprootWallet::new(oracle.clone(), Vec::new(), {
+            let is_testnet: bool = std::env::var("IS_TESTNET")
+                .unwrap_or("false".to_string())
+                .parse()
+                .unwrap_or(false);
+            if is_testnet {
+                bitcoin::Network::Testnet
+            } else {
+                bitcoin::Network::Bitcoin
+            }
+        }),
     )
     .expect("Failed to create node");
 

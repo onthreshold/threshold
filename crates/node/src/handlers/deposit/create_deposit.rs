@@ -13,6 +13,7 @@ use crate::{
     db::Db,
     handlers::deposit::{DepositIntent, DepositIntentState},
     swarm_manager::Network,
+    wallet::Wallet,
 };
 use protocol::oracle::Oracle;
 
@@ -30,9 +31,9 @@ impl DepositIntentState {
         }
     }
 
-    pub fn create_deposit_from_intent<N: Network, D: Db, O: Oracle>(
+    pub fn create_deposit_from_intent<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         deposit_intent: DepositIntent,
     ) -> Result<(), NodeError> {
         node.db.insert_deposit_intent(deposit_intent.clone())?;
@@ -52,9 +53,9 @@ impl DepositIntentState {
         Ok(())
     }
 
-    pub async fn create_deposit<N: Network, D: Db, O: Oracle>(
+    pub async fn create_deposit<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         user_pubkey: String,
         amount_sat: u64,
     ) -> Result<(String, String), NodeError> {
@@ -72,34 +73,12 @@ impl DepositIntentState {
         let public_key = bitcoin::PublicKey::from_slice(&frost_public_key)
             .map_err(|e| NodeError::Error(format!("Failed to parse public key: {}", e)))?;
 
-        let secp = bitcoin::secp256k1::Secp256k1::new();
-
-        let internal_key = public_key.inner.x_only_public_key().0;
-
         let tweak_scalar = Scalar::from_be_bytes(
             bitcoin::hashes::sha256::Hash::hash(deposit_tracking_id.as_bytes()).to_byte_array(),
         )
         .expect("32 bytes, should not fail");
 
-        let (tweaked_key, _) = internal_key
-            .add_tweak(&secp, &tweak_scalar)
-            .map_err(|e| NodeError::Error(format!("Failed to add tweak: {:?}", e)))?;
-
-        let is_testnet: bool = std::env::var("IS_TESTNET")
-            .unwrap_or("false".to_string())
-            .parse()
-            .unwrap();
-
-        let deposit_address = Address::p2tr(
-            &secp,
-            tweaked_key,
-            None,
-            if is_testnet {
-                BitcoinNetwork::Testnet
-            } else {
-                BitcoinNetwork::Bitcoin
-            },
-        );
+        let deposit_address = node.wallet.generate_new_address(public_key, tweak_scalar);
 
         let deposit_intent = DepositIntent {
             amount_sat,
@@ -144,9 +123,9 @@ impl DepositIntentState {
         Ok((deposit_tracking_id, deposit_address.to_string()))
     }
 
-    pub fn get_pending_deposit_intents<N: Network, D: Db, O: Oracle>(
+    pub fn get_pending_deposit_intents<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &self,
-        node: &NodeState<N, D, O>,
+        node: &NodeState<N, D, O, W>,
     ) -> Vec<DepositIntent> {
         match node.db.get_all_deposit_intents() {
             Ok(intents) => intents,
@@ -157,9 +136,9 @@ impl DepositIntentState {
         }
     }
 
-    pub fn update_user_balance<N: Network, D: Db, O: Oracle>(
+    pub fn update_user_balance<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
-        node: &mut NodeState<N, D, O>,
+        node: &mut NodeState<N, D, O, W>,
         tx: Transaction,
     ) -> Result<(), NodeError> {
         if !self.processed_txids.insert(tx.compute_txid()) {
