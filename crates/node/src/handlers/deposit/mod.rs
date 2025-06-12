@@ -11,6 +11,7 @@ pub mod handler;
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct DepositIntent {
     pub amount_sat: u64,
+    pub user_pubkey: String,
     pub deposit_tracking_id: String,
     pub deposit_address: String,
     pub timestamp: u64,

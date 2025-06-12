@@ -62,6 +62,7 @@ pub enum DirectMessage {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SelfRequest {
     CreateDeposit {
+        user_pubkey: String,
         amount_sat: u64,
     },
     GetPendingDepositIntents,

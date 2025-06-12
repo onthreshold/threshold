@@ -77,4 +77,15 @@ impl Db for MockDb {
     fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError> {
         Ok(self.deposit_intents.values().cloned().collect())
     }
+
+    fn get_deposit_intent_by_address(
+        &self,
+        address: &str,
+    ) -> Result<Option<DepositIntent>, NodeError> {
+        Ok(self
+            .deposit_intents
+            .values()
+            .find(|intent| intent.deposit_address == address)
+            .cloned())
+    }
 }

@@ -10,7 +10,6 @@ use crate::{
 use bitcoin::{
     Transaction,
     key::Secp256k1,
-    network,
     secp256k1::{Message, PublicKey, ecdsa::Signature},
 };
 use libp2p::gossipsub;
@@ -97,8 +96,7 @@ impl SpendIntentState {
             return Err(NodeError::Error("Challenge not found".to_string()));
         };
 
-        let is_valid = Self::verify_signature(challenge, signature, &withdrawal_intent.public_key)?;
-        if !is_valid {
+        if !Self::verify_signature(challenge, signature, &withdrawal_intent.public_key)? {
             return Err(NodeError::Error("Invalid signature".to_string()));
         }
 
@@ -120,6 +118,7 @@ impl SpendIntentState {
     pub async fn handle_signed_withdrawal<N: Network, D: Db, O: Oracle>(
         node: &mut NodeState<N, D, O>,
         tx: &Transaction,
+        fee: u64,
         user_pubkey: String,
     ) -> Result<(), NodeError> {
         node.oracle.broadcast_transaction(tx).await?;
@@ -128,14 +127,19 @@ impl SpendIntentState {
             .get_account(&user_pubkey)
             .ok_or(NodeError::Error("User not found".to_string()))?;
 
-        let updated_account = user_account.update_balance(-(tx.output[0].value.to_sat() as i64));
+        let updated_account =
+            user_account.update_balance(-((tx.output[0].value.to_sat() + fee) as i64));
 
         node.chain_state
             .upsert_account(&user_pubkey, updated_account);
 
+        let recipient_script = tx.output[0].script_pubkey.clone();
+
         let spend_intent = PendingSpend {
             tx: tx.clone(),
             user_pubkey: user_pubkey.clone(),
+            recipient_script,
+            fee,
         };
 
         node.network_handle
@@ -152,30 +156,28 @@ impl SpendIntentState {
     pub async fn handle_withdrawl_message<N: Network, D: Db, O: Oracle>(
         &self,
         node: &mut NodeState<N, D, O>,
-        pending_spend: PendingSpend,
+        pending: PendingSpend,
     ) -> Result<(), NodeError> {
-        node.oracle.broadcast_transaction(&pending_spend.tx).await?;
-        let user_account = node
+        node.oracle.broadcast_transaction(&pending.tx).await?;
+
+        node.wallet.ingest_external_tx(&pending.tx)?;
+
+        let pay_out = pending
+            .tx
+            .output
+            .iter()
+            .find(|o| o.script_pubkey == pending.recipient_script)
+            .ok_or(NodeError::Error("payment output not found".into()))?;
+
+        let debit = pay_out.value.to_sat() + pending.fee;
+
+        let mut acct = node
             .chain_state
-            .get_account(&pending_spend.user_pubkey)
-            .ok_or(NodeError::Error("User not found".to_string()))?;
-
-        let updated_account =
-            user_account.update_balance(-(pending_spend.tx.output[0].value.to_sat() as i64));
-
-        node.chain_state
-            .upsert_account(&pending_spend.user_pubkey, updated_account);
-
-        node.wallet.create_spend(
-            pending_spend.tx.output[0].value.to_sat(),
-            0, // Just estimate for now this doesnt affect vsize
-            &bitcoin::Address::from_script(
-                &pending_spend.tx.output[0].script_pubkey,
-                network::Network::Testnet,
-            )
-            .unwrap(),
-            false,
-        )?;
+            .get_account(&pending.user_pubkey)
+            .ok_or(NodeError::Error("user missing".into()))?
+            .clone();
+        acct = acct.update_balance(-(debit as i64));
+        node.chain_state.upsert_account(&pending.user_pubkey, acct);
 
         Ok(())
     }

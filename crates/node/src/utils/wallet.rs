@@ -148,12 +148,51 @@ impl<O: Oracle> SimpleWallet<O> {
 
         response_tx
     }
+
+    pub fn input_value(&self, tx: &Transaction) -> u64 {
+        tx.input
+            .iter()
+            .filter_map(|i| {
+                self.utxos
+                    .iter()
+                    .find(|u| u.outpoint == i.previous_output)
+                    .map(|u| u.value.to_sat())
+            })
+            .sum()
+    }
+
+    pub fn output_value(tx: &Transaction) -> u64 {
+        tx.output.iter().map(|o| o.value.to_sat()).sum()
+    }
+
+    pub fn ingest_external_tx(&mut self, tx: &Transaction) -> Result<(), NodeError> {
+        self.utxos
+            .retain(|u| !tx.input.iter().any(|i| i.previous_output == u.outpoint));
+
+        // 2) Add change outputs that belong to *this* wallet
+        for (idx, out) in tx.output.iter().enumerate() {
+            if out.script_pubkey == self.address.as_ref().unwrap().script_pubkey() {
+                self.utxos.push(Utxo {
+                    outpoint: bitcoin::OutPoint {
+                        txid: tx.compute_txid(),
+                        vout: idx as u32,
+                    },
+                    value: out.value,
+                    script_pubkey: out.script_pubkey.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
 pub struct PendingSpend {
     pub tx: Transaction,
     pub user_pubkey: String,
+    pub recipient_script: ScriptBuf,
+    pub fee: u64,
 }
 
 impl Encode for PendingSpend {
@@ -164,6 +203,8 @@ impl Encode for PendingSpend {
         let raw_tx = bitcoin::consensus::encode::serialize(&self.tx);
         bincode::Encode::encode(&raw_tx, encoder)?;
         bincode::Encode::encode(&self.user_pubkey, encoder)?;
+        bincode::Encode::encode(&self.recipient_script.as_bytes(), encoder)?;
+        bincode::Encode::encode(&self.fee, encoder)?;
         Ok(())
     }
 }
@@ -176,9 +217,13 @@ impl<Context> Decode<Context> for PendingSpend {
         let raw_tx: Transaction = bitcoin::consensus::encode::deserialize(&raw_tx_bytes)
             .map_err(|_| bincode::error::DecodeError::Other("Failed to deserialize transaction"))?;
         let user_pubkey = bincode::Decode::decode(decoder)?;
+        let recipient_script = ScriptBuf::from_bytes(bincode::Decode::decode(decoder)?);
+        let fee = bincode::Decode::decode(decoder)?;
         Ok(PendingSpend {
             tx: raw_tx,
             user_pubkey,
+            recipient_script,
+            fee,
         })
     }
 }

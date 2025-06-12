@@ -4,7 +4,10 @@ use frost_secp256k1::{self as frost};
 use tracing::{error, info};
 use types::errors::NodeError;
 
-use crate::{NodeState, db::Db, handlers::signing::SigningState, swarm_manager::Network};
+use crate::{
+    NodeState, db::Db, handlers::signing::SigningState, swarm_manager::Network,
+    wallet::PendingSpend,
+};
 use protocol::oracle::Oracle;
 
 impl SigningState {
@@ -36,42 +39,49 @@ impl SigningState {
         &mut self,
         node: &mut NodeState<N, D, O>,
         amount_sat: u64,
-        fee: u64,
+        estimated_fee_sat: u64,
         address: &str,
         user_pubkey: String,
         dry_run: bool,
     ) -> Option<String> {
         info!("🚀 Creating spend request for {} sat", amount_sat);
-        let address = bitcoin::Address::from_str(address).ok()?.assume_checked();
-        match node.wallet.create_spend(amount_sat, fee, &address, dry_run) {
-            Ok((tx, sighash)) => {
-                let sighash_hex = hex::encode(sighash);
-                match self.start_signing_session(node, &sighash_hex) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!("❌ Failed to start signing session: {}", e);
-                        return None;
-                    }
-                }
 
-                if let Some(active) = &self.active_signing {
-                    self.pending_spends.insert(
-                        active.sign_id,
-                        crate::wallet::PendingSpend { tx, user_pubkey },
-                    );
-                    info!("🚀 Spend request prepared (session id {})", active.sign_id);
+        let addr = bitcoin::Address::from_str(address).ok()?.assume_checked();
 
-                    Some(hex::encode(sighash))
-                } else {
-                    error!("❌ Failed to start signing session");
-                    None
+        let (tx, sighash) =
+            match node
+                .wallet
+                .create_spend(amount_sat, estimated_fee_sat, &addr, dry_run)
+            {
+                Ok(res) => res,
+                Err(e) => {
+                    error!("❌ Failed to create spend transaction: {:?}", e);
+                    return None;
                 }
-            }
-            Err(e) => {
-                println!("Failed to create spend transaction: {:?}", e);
-                error!("❌ Failed to create spend transaction: {:?}", e);
-                None
-            }
+            };
+
+        let sighash_hex = hex::encode(sighash);
+        if let Err(e) = self.start_signing_session(node, &sighash_hex) {
+            error!("❌ Failed to start signing session: {}", e);
+            return None;
+        }
+
+        if let Some(active) = &self.active_signing {
+            let recipient_script = addr.script_pubkey();
+            self.pending_spends.insert(
+                active.sign_id,
+                PendingSpend {
+                    tx: tx.clone(),
+                    user_pubkey: user_pubkey.clone(),
+                    recipient_script,
+                    fee: estimated_fee_sat,
+                },
+            );
+            info!("🚀 Spend request prepared (session id {})", active.sign_id);
+            Some(sighash_hex)
+        } else {
+            error!("❌ Signing session never became active");
+            None
         }
     }
 }

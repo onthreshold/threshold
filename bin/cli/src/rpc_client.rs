@@ -52,6 +52,7 @@ pub async fn rpc_start_signing(
 pub async fn rpc_create_deposit_intent(
     endpoint: Option<String>,
     amount: u64,
+    public_key: String,
 ) -> Result<CreateDepositIntentResponse, Status> {
     println!("Creating deposit intent: {}", amount);
 
@@ -64,6 +65,7 @@ pub async fn rpc_create_deposit_intent(
         .create_deposit_intent(tonic::Request::new(
             node_proto::CreateDepositIntentRequest {
                 amount_satoshis: amount,
+                public_key,
             },
         ))
         .await?;
