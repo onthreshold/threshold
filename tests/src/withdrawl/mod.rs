@@ -32,14 +32,13 @@ mod withdrawl_tests {
 
         // Provide the node with sufficient on-chain balance for this address
         node.chain_state.upsert_account(
-            &address.to_string(),
+            &hex::encode(public_key.serialize()),
             Account {
-                address: address.to_string(),
+                address: hex::encode(public_key.serialize()),
                 balance: 100_000,
             },
         );
 
-        // Add a dummy UTXO so that wallet::create_spend succeeds
         node.wallet.address = Some(address.clone());
         node.wallet.utxos.push(Utxo {
             outpoint: OutPoint {
@@ -144,9 +143,9 @@ mod withdrawl_tests {
 
         // Fund account and wallet UTXO so propose succeeds
         node.chain_state.upsert_account(
-            &address.to_string(),
+            &hex::encode(public_key.serialize()),
             Account {
-                address: address.to_string(),
+                address: hex::encode(public_key.serialize()),
                 balance: 100_000,
             },
         );
@@ -189,5 +188,110 @@ mod withdrawl_tests {
 
         // And the intent should have been removed from pending_intents
         assert!(!spend_state.pending_intents.contains_key(&challenge));
+    }
+
+    #[tokio::test]
+    async fn confirm_withdrawal_generates_tx_and_updates_peers() {
+        let mut cluster = MockNodeCluster::new_with_keys(3, 2, 3).await;
+        cluster.setup().await;
+
+        // Select an initiating node and its network handle
+        let initiator_peer = *cluster.nodes.keys().next().unwrap();
+        let initiator_network = cluster.networks.get(&initiator_peer).unwrap().clone();
+
+        // Generate a fresh keypair for the user
+        let secp = bitcoin::secp256k1::Secp256k1::new();
+        let (secret_key, public_key) =
+            secp.generate_keypair(&mut bitcoin::secp256k1::rand::thread_rng());
+        let public_key_hex = hex::encode(public_key.serialize());
+
+        // Destination (withdrawal) address derived from the same pubkey for simplicity
+        let btc_pubkey = bitcoin::CompressedPublicKey::from_slice(&public_key.serialize()).unwrap();
+        let dest_addr = bitcoin::Address::p2wpkh(&btc_pubkey, bitcoin::Network::Signet);
+
+        // Initial balance for user & destination address
+        let initial_balance = 100_000u64;
+
+        // Populate chain state on **all** peers before we take any mutable references to a single node
+        for (_peer, node) in cluster.nodes.iter_mut() {
+            node.chain_state.upsert_account(
+                &public_key_hex,
+                Account {
+                    address: public_key_hex.clone(),
+                    balance: initial_balance,
+                },
+            );
+
+            node.wallet.address = Some(dest_addr.clone());
+            node.wallet.utxos.push(Utxo {
+                outpoint: OutPoint {
+                    txid: Txid::from_slice(&[3u8; 32]).unwrap(),
+                    vout: 0,
+                },
+                value: Amount::from_sat(initial_balance),
+                script_pubkey: dest_addr.script_pubkey(),
+            });
+        }
+
+        // --- Step 1: Propose the withdrawal ---
+        let amount_sat = 50_000u64;
+
+        // Spawn the propose_withdrawal request so the cluster can process events concurrently
+        let (prop_tx, mut prop_rx) = unbounded_channel::<ProposeWithdrawalResponse>();
+        let network_clone = initiator_network.clone();
+        let dest_addr_str = dest_addr.to_string();
+        let pubkey_hex_clone = public_key_hex.clone();
+        tokio::spawn(async move {
+            let resp = node::grpc::grpc_operator::propose_withdrawal(
+                &network_clone,
+                ProposeWithdrawalRequest {
+                    amount_satoshis: amount_sat,
+                    address_to: dest_addr_str,
+                    public_key: pubkey_hex_clone,
+                    blocks_to_confirm: None,
+                },
+            )
+            .await
+            .expect("Failed to propose withdrawal");
+            prop_tx.send(resp).unwrap();
+        });
+
+        // Run a few iterations so that the proposal is processed and we receive the challenge
+        cluster.run_n_iterations(10).await;
+
+        let propose_resp = prop_rx.recv().await.expect("No propose response");
+
+        // --- Step 2: Sign the received challenge ---
+        let challenge_hex = propose_resp.challenge;
+        let challenge_bytes = hex::decode(&challenge_hex).unwrap();
+        let msg = bitcoin::secp256k1::Message::from_digest_slice(&challenge_bytes).unwrap();
+        let signature = secp.sign_ecdsa(&msg, &secret_key);
+        let signature_hex = hex::encode(signature.serialize_der());
+
+        // --- Step 3: Confirm the withdrawal with the valid signature ---
+        let network_clone2 = initiator_network.clone();
+        tokio::spawn(async move {
+            let _ = node::grpc::grpc_operator::confirm_withdrawal(
+                &network_clone2,
+                node::grpc::grpc_handler::node_proto::ConfirmWithdrawalRequest {
+                    challenge: challenge_hex.clone(),
+                    signature: signature_hex,
+                },
+            )
+            .await
+            .expect("Failed to confirm withdrawal");
+        });
+
+        // Run enough iterations so that signing workflow and gossipsub propagation complete
+        cluster.run_n_iterations(10).await;
+
+        // --- Assert: every peer has updated the user's balance ---
+        for (_, node) in cluster.nodes.iter() {
+            let account = node
+                .chain_state
+                .get_account(&public_key_hex)
+                .expect("Account should exist on all peers");
+            assert_eq!(account.balance, initial_balance - amount_sat);
+        }
     }
 }

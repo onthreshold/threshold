@@ -27,7 +27,7 @@ mod utxo_spend_test {
         let mut wallet_one = SimpleWallet::new(&address, oracle.clone(), Some(true)).await;
         let mut wallet_two = SimpleWallet::new(&address_to, oracle.clone(), Some(true)).await;
 
-        let result = wallet_one.create_spend(1000, 200, &address_to);
+        let result = wallet_one.create_spend(1000, 200, &address_to, false);
 
         match result {
             Ok((tx, sighash)) => {
@@ -42,7 +42,7 @@ mod utxo_spend_test {
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
                 // return money
-                let result = wallet_two.create_spend(amount - fee, fee, &address);
+                let result = wallet_two.create_spend(amount - fee, fee, &address, false);
                 match result {
                     Ok((tx, sighash)) => {
                         let signed_tx = wallet_two.sign(&tx, &private_key_to, sighash);

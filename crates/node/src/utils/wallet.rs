@@ -47,6 +47,7 @@ impl<O: Oracle> SimpleWallet<O> {
         amount_sat: u64,
         estimated_fee_sat: u64,
         address: &bitcoin::Address,
+        dry_run: bool,
     ) -> Result<(Transaction, [u8; 32]), NodeError> {
         let total_needed = amount_sat + estimated_fee_sat;
 
@@ -59,7 +60,12 @@ impl<O: Oracle> SimpleWallet<O> {
                         total_needed, amount_sat, estimated_fee_sat)
             }).map_err(|e| NodeError::Error(e.to_string()))?;
 
-        let utxo = self.utxos.remove(pos);
+        let utxo = if dry_run {
+            self.utxos[pos].clone()
+        } else {
+            self.utxos.remove(pos)
+        };
+
         let change_sat = utxo.value.to_sat() - amount_sat - estimated_fee_sat;
 
         let input = TxIn {
@@ -81,6 +87,13 @@ impl<O: Oracle> SimpleWallet<O> {
                 value: Amount::from_sat(change_sat),
                 script_pubkey: self.address.as_ref().unwrap().script_pubkey(),
             });
+            if !dry_run {
+                self.utxos.push(Utxo {
+                    outpoint: utxo.outpoint,
+                    value: Amount::from_sat(change_sat),
+                    script_pubkey: address.script_pubkey(),
+                });
+            }
         }
 
         let tx = Transaction {
