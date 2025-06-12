@@ -65,3 +65,10 @@ visuals/manim/media/
 
 tests/config.json
 tests/config.toml
+
+nodedb.db
+nodedb_1.db
+nodedb_2.db
+nodedb_3.db
+nodedb_4.db
+nodedb_5.db

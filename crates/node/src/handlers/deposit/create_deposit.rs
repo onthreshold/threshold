@@ -157,6 +157,8 @@ impl DepositIntentState {
             return Ok(());
         }
 
+        println!("tx: {:?}", tx);
+
         let input_address = tx
             .input
             .iter()
@@ -165,10 +167,12 @@ impl DepositIntentState {
             })
             .collect::<Vec<_>>();
 
+        println!("input_address: {:?}", input_address);
         if input_address.is_empty() {
             return Err(NodeError::Error("No input address found".to_string()));
         }
 
+        println!("tx.output: {:?}", tx.output);
         let deposit_amount = tx
             .output
             .iter()
@@ -184,15 +188,19 @@ impl DepositIntentState {
             })
             .sum::<u64>();
 
+        println!("deposit_amount: {:?}", deposit_amount);
         let user_account = node
             .chain_state
             .get_account(&input_address[0].to_string())
             .ok_or(NodeError::Error("User not found".to_string()))?;
 
+        println!("user_account: {:?}", user_account);
         let updated_account = user_account.update_balance(deposit_amount as i64);
 
+        println!("updated_account: {:?}", updated_account.clone());
         node.chain_state
-            .upsert_account(&input_address[0].to_string(), updated_account);
+            .upsert_account(&input_address[0].to_string(), updated_account.clone());
+        println!("updated_account: {:?}", updated_account);
         Ok(())
     }
 }
