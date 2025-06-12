@@ -1,6 +1,7 @@
 use node::grpc::grpc_handler::node_proto::{
-    self, node_control_client::NodeControlClient, CreateDepositIntentResponse,
-    GetPendingDepositIntentsResponse, SpendFundsResponse, StartSigningResponse,
+    self, node_control_client::NodeControlClient, CheckBalanceResponse,
+    CreateDepositIntentResponse, GetPendingDepositIntentsResponse, SpendFundsResponse,
+    StartSigningResponse,
 };
 use tonic::Status;
 
@@ -85,4 +86,22 @@ pub async fn rpc_get_pending_deposit_intents(
         .await?;
 
     Ok(get_pending_deposit_intents_response.into_inner())
+}
+
+pub async fn rpc_check_balance(
+    endpoint: Option<String>,
+    address: String,
+) -> Result<CheckBalanceResponse, Status> {
+    let mut client =
+        NodeControlClient::connect(endpoint.unwrap_or("http://[::1]:50051".to_string()))
+            .await
+            .expect("Failed to connect");
+
+    let check_balance_response = client
+        .check_balance(tonic::Request::new(node_proto::CheckBalanceRequest {
+            address,
+        }))
+        .await?;
+
+    Ok(check_balance_response.into_inner())
 }

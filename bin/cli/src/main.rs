@@ -16,7 +16,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use libp2p::identity::Keypair;
-use rpc_client::{rpc_create_deposit_intent, rpc_spend, rpc_start_signing};
+use rpc_client::{rpc_check_balance, rpc_create_deposit_intent, rpc_spend, rpc_start_signing};
 use std::{fs, path::PathBuf};
 
 use crate::{
@@ -173,6 +173,11 @@ enum Commands {
         #[arg(short, long)]
         endpoint: Option<String>,
     },
+    CheckBalance {
+        #[arg(short, long)]
+        endpoint: Option<String>,
+        address: String,
+    },
 }
 
 #[tokio::main]
@@ -241,6 +246,11 @@ async fn main() -> Result<(), CliError> {
         }
         Commands::GetPendingDepositIntents { endpoint } => {
             rpc_get_pending_deposit_intents(endpoint)
+                .await
+                .map_err(CliError::RpcError)?;
+        }
+        Commands::CheckBalance { endpoint, address } => {
+            rpc_check_balance(endpoint, address)
                 .await
                 .map_err(CliError::RpcError)?;
         }
