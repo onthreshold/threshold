@@ -55,6 +55,7 @@ impl DepositIntentState {
     pub async fn create_deposit<N: Network, D: Db, O: Oracle>(
         &mut self,
         node: &mut NodeState<N, D, O>,
+        user_pubkey: String,
         amount_sat: u64,
     ) -> Result<(String, String), NodeError> {
         let deposit_tracking_id = Uuid::new_v4().to_string();
@@ -102,6 +103,7 @@ impl DepositIntentState {
 
         let deposit_intent = DepositIntent {
             amount_sat,
+            user_pubkey,
             deposit_tracking_id: deposit_tracking_id.clone(),
             deposit_address: deposit_address.to_string(),
             timestamp: std::time::SystemTime::now()
@@ -124,19 +126,10 @@ impl DepositIntentState {
             }
         }
 
-        let broadcast_message = serde_json::json!({
-            "deposit_address": deposit_address.to_string(),
-            "amount_sat": amount_sat,
-            "deposit_tracking_id": deposit_tracking_id,
-            "timestamp": std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        });
-
         if let Err(e) = node.network_handle.send_broadcast(
             IdentTopic::new("deposit-intents"),
-            broadcast_message.to_string().as_bytes().to_vec(),
+            bincode::encode_to_vec(&deposit_intent, bincode::config::standard())
+                .map_err(|x| NodeError::Error(x.to_string()))?,
         ) {
             info!("Failed to broadcast new deposit address: {:?}", e);
         }
@@ -157,38 +150,27 @@ impl DepositIntentState {
             return Ok(());
         }
 
-        // Extract the user's address from the script_sig which is a P2PKH scriptPubKey
-        let user_address = Address::from_script(&tx.input[0].script_sig, BitcoinNetwork::Testnet)
-            .map_err(|_| NodeError::Error("No input address found".to_string()))?;
-
-        println!("tx.output: {:?}", tx.output);
-        let deposit_amount = tx
-            .output
-            .iter()
-            .filter_map(|output| {
-                if let Ok(address) =
-                    Address::from_script(&output.script_pubkey, BitcoinNetwork::Testnet)
-                {
-                    if self.deposit_addresses.contains(&address.to_string()) {
-                        return Some(output.value.to_sat());
-                    }
+        for output in &tx.output {
+            if let Ok(address) =
+                Address::from_script(&output.script_pubkey, BitcoinNetwork::Testnet)
+            {
+                let addr_str = address.to_string();
+                if !self.deposit_addresses.contains(&addr_str) {
+                    continue;
                 }
-                None
-            })
-            .sum::<u64>();
 
-        println!("deposit_amount: {:?}", deposit_amount);
-        let user_account = node
-            .chain_state
-            .get_account(&user_address.to_string())
-            .ok_or(NodeError::Error("User not found".to_string()))?;
+                if let Some(intent) = node.db.get_deposit_intent_by_address(&addr_str)? {
+                    let user_account = node
+                        .chain_state
+                        .get_account(&intent.user_pubkey)
+                        .ok_or(NodeError::Error("User not found".into()))?;
 
-        println!("user_account: {:?}", user_account);
-        let updated_account = user_account.update_balance(deposit_amount as i64);
-
-        println!("updated_account: {:?}", updated_account.clone());
-        node.chain_state
-            .upsert_account(&user_address.to_string(), updated_account);
+                    let updated = user_account.update_balance(output.value.to_sat() as i64);
+                    node.chain_state
+                        .upsert_account(&intent.user_pubkey, updated);
+                }
+            }
+        }
 
         Ok(())
     }

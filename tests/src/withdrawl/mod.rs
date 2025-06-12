@@ -286,12 +286,13 @@ mod withdrawl_tests {
         cluster.run_n_iterations(10).await;
 
         // --- Assert: every peer has updated the user's balance ---
+        let expected_debit = propose_resp.quote_satoshis;
         for (_, node) in cluster.nodes.iter() {
             let account = node
                 .chain_state
                 .get_account(&public_key_hex)
                 .expect("Account should exist on all peers");
-            assert_eq!(account.balance, initial_balance - amount_sat);
+            assert_eq!(account.balance, initial_balance - expected_debit);
         }
     }
 }

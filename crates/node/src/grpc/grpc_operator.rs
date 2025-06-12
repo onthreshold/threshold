@@ -89,7 +89,13 @@ pub async fn create_deposit_intent(
     };
 
     let response = network
-        .send_self_request(SelfRequest::CreateDeposit { amount_sat }, true)
+        .send_self_request(
+            SelfRequest::CreateDeposit {
+                user_pubkey: req.public_key,
+                amount_sat,
+            },
+            true,
+        )
         .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
         .ok_or(Status::internal("No response from node"))?
         .await

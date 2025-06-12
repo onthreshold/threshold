@@ -5,8 +5,7 @@ use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{Argon2, password_hash::SaltString};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use bip39::{Language, Mnemonic};
-#[allow(deprecated)]
-use bitcoin::bip32::{DerivationPath, ExtendedPrivKey};
+use bitcoin::bip32::{DerivationPath, Xpriv};
 use bitcoin::key::Secp256k1;
 use bitcoin::{Address, CompressedPublicKey, Network, PrivateKey};
 use directories::ProjectDirs;
@@ -210,7 +209,6 @@ pub fn load_dkg_keys(
     }
 }
 
-#[allow(deprecated)]
 pub fn generate_keys_from_mnemonic(mnemonic: &str) -> (Address, PrivateKey) {
     // Generate a new mnemonic (12 words)
     let mnemonic = Mnemonic::parse_in_normalized(Language::English, mnemonic).unwrap();
@@ -220,7 +218,7 @@ pub fn generate_keys_from_mnemonic(mnemonic: &str) -> (Address, PrivateKey) {
 
     // Create extended private key
     let secp = Secp256k1::new();
-    let xprv = ExtendedPrivKey::new_master(Network::Testnet, &seed).unwrap();
+    let xprv = Xpriv::new_master(Network::Testnet, &seed).unwrap();
 
     // Derive key at standard path (m/84'/1'/0'/0/0 for signet P2WPKH)
     let derivation_path = DerivationPath::from_str("m/84'/1'/0'/0/0").unwrap();

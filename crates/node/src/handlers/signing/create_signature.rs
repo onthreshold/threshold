@@ -375,8 +375,13 @@ impl SigningState {
                         let raw_tx = bitcoin::consensus::encode::serialize(&tx);
                         debug!("📤 Signed transaction (hex): {}", hex::encode(raw_tx));
 
-                        SpendIntentState::handle_signed_withdrawal(node, &tx, pending.user_pubkey)
-                            .await?;
+                        SpendIntentState::handle_signed_withdrawal(
+                            node,
+                            &tx,
+                            pending.fee,
+                            pending.user_pubkey,
+                        )
+                        .await?;
                         debug!("📤 Broadcasted transaction");
                     }
                     Err(e) => debug!("❌ Failed to convert signature: {}", e),

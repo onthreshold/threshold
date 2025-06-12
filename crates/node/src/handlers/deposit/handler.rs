@@ -6,7 +6,7 @@ use crate::{
     NodeState,
     db::Db,
     handlers::Handler,
-    handlers::deposit::{DepositIntent, DepositIntentState},
+    handlers::deposit::DepositIntentState,
     swarm_manager::{Network, NetworkEvent, SelfRequest, SelfResponse},
 };
 use protocol::oracle::Oracle;
@@ -27,11 +27,15 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for DepositIntentState {
 
         match message {
             Some(NetworkEvent::SelfRequest {
-                request: SelfRequest::CreateDeposit { amount_sat },
+                request:
+                    SelfRequest::CreateDeposit {
+                        user_pubkey,
+                        amount_sat,
+                    },
                 response_channel,
             }) => {
                 let (deposit_tracking_id, deposit_address) =
-                    self.create_deposit(node, amount_sat).await?;
+                    self.create_deposit(node, user_pubkey, amount_sat).await?;
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::CreateDepositResponse {
@@ -54,10 +58,10 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for DepositIntentState {
             }
             Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {
                 if topic == IdentTopic::new("deposit-intents").hash() {
-                    let deposit_intent =
-                        serde_json::from_slice::<DepositIntent>(&data).map_err(|e| {
-                            NodeError::Error(format!("Failed to parse deposit intent: {}", e))
-                        })?;
+                    let (deposit_intent, _) =
+                        bincode::decode_from_slice(&data, bincode::config::standard()).map_err(
+                            |e| NodeError::Error(format!("Failed to parse deposit intent: {}", e)),
+                        )?;
 
                     if let Err(e) = self.create_deposit_from_intent(node, deposit_intent) {
                         info!("Failed to store deposit intent: {}", e);

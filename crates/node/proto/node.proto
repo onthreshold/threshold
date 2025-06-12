@@ -51,7 +51,8 @@ message DepositIntent {
 }
 
 message CreateDepositIntentRequest {
-    uint64 amount_satoshis = 1;
+    string public_key = 1;
+    uint64 amount_satoshis = 2;
 }
 
 message CreateDepositIntentResponse {

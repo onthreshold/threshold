@@ -31,6 +31,9 @@ mod deposit_tests {
             let response = grpc_operator::create_deposit_intent(
                 &network,
                 CreateDepositIntentRequest {
+                    public_key:
+                        "020202020202020202020202020202020202020202020202020202020202020202"
+                            .to_string(),
                     amount_satoshis: amount_sat,
                 },
             )
@@ -40,6 +43,7 @@ mod deposit_tests {
         });
 
         cluster.run_n_iterations(10).await;
+        println!("cluster.run_n_iterations(10).await;");
 
         let response = rx.recv().await.unwrap();
         let node = cluster.nodes.get(&node_peer).unwrap();
@@ -50,8 +54,15 @@ mod deposit_tests {
             .get_deposit_intent(&response.deposit_tracking_id)
             .unwrap();
 
+        println!("intent_opt: {:?}", intent_opt);
+
         assert!(intent_opt.is_some(), "deposit intent not stored");
+
         let intent = intent_opt.unwrap();
+        assert_eq!(
+            intent.user_pubkey,
+            "020202020202020202020202020202020202020202020202020202020202020202"
+        );
 
         // parse address and validate
         let addr = Address::from_str(&intent.deposit_address).unwrap();
@@ -81,6 +92,9 @@ mod deposit_tests {
             let response = grpc_operator::create_deposit_intent(
                 &network,
                 CreateDepositIntentRequest {
+                    public_key:
+                        "020202020202020202020202020202020202020202020202020202020202020202"
+                            .to_string(),
                     amount_satoshis: amount_sat,
                 },
             )
@@ -125,7 +139,11 @@ mod deposit_tests {
 
         // Act: invoke create_deposit
         let (tracking_id, deposit_address) = state
-            .create_deposit(node, amount_sat)
+            .create_deposit(
+                node,
+                "020202020202020202020202020202020202020202020202020202020202020202".to_string(),
+                amount_sat,
+            )
             .await
             .expect("create_deposit should succeed");
 
@@ -137,6 +155,10 @@ mod deposit_tests {
             .expect("intent not stored");
         assert_eq!(stored.deposit_address, deposit_address);
         assert_eq!(stored.amount_sat, amount_sat);
+        assert_eq!(
+            stored.user_pubkey,
+            "020202020202020202020202020202020202020202020202020202020202020202"
+        );
 
         // Assert: notification broadcast
         let notified_addr = rx.recv().await.expect("no broadcast received");
@@ -164,6 +186,8 @@ mod deposit_tests {
             deposit_tracking_id: deposit_tracking_id.clone(),
             deposit_address: deposit_address.clone(),
             timestamp: 0,
+            user_pubkey: "020202020202020202020202020202020202020202020202020202020202020202"
+                .to_string(),
         };
 
         // Act
@@ -224,8 +248,19 @@ mod deposit_tests {
 
         state.deposit_addresses.insert(deposit_address.to_string());
 
-        // ----- Craft transaction -----
         let deposit_amount_sat = 15_000;
+
+        node.db
+            .insert_deposit_intent(DepositIntent {
+                amount_sat: deposit_amount_sat,
+                user_pubkey: user_address.to_string(), // must match account key
+                deposit_tracking_id: Uuid::new_v4().to_string(),
+                deposit_address: deposit_address.to_string(),
+                timestamp: 0,
+            })
+            .unwrap();
+
+        // ----- Craft transaction -----
         let tx_in = {
             bitcoin::TxIn {
                 previous_output: bitcoin::OutPoint {

@@ -167,6 +167,7 @@ enum Commands {
         endpoint: Option<String>,
     },
     Deposit {
+        public_key: String,
         amount: u64,
         #[arg(short, long)]
         endpoint: Option<String>,
@@ -241,8 +242,12 @@ async fn main() -> Result<(), CliError> {
                 .await
                 .map_err(CliError::RpcError)?;
         }
-        Commands::Deposit { amount, endpoint } => {
-            let response = rpc_create_deposit_intent(endpoint, amount)
+        Commands::Deposit {
+            amount,
+            public_key,
+            endpoint,
+        } => {
+            let response = rpc_create_deposit_intent(endpoint, amount, public_key)
                 .await
                 .map_err(CliError::RpcError)?;
 

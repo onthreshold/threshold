@@ -18,6 +18,10 @@ pub trait Db: Send {
     fn insert_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError>;
     fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError>;
     fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError>;
+    fn get_deposit_intent_by_address(
+        &self,
+        address: &str,
+    ) -> Result<Option<DepositIntent>, NodeError>;
 }
 
 pub struct RocksDb {
@@ -110,12 +114,25 @@ impl Db for RocksDb {
     }
 
     fn insert_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError> {
-        let key = format!("di:{}", intent.deposit_tracking_id);
-        let value = bincode::encode_to_vec(&intent, bincode::config::standard())
-            .map_err(|e| NodeError::Error(format!("Failed to serialize deposit intent: {}", e)))?;
+        let key_di = format!("di:{}", intent.deposit_tracking_id);
+        let key_da = format!("da:{}", intent.deposit_address);
 
-        self.db
-            .put_cf(self.db.cf_handle("deposit_intents").unwrap(), key, value)?;
+        let value = bincode::encode_to_vec(&intent, bincode::config::standard())
+            .map_err(|e| NodeError::Error(format!("encode di: {}", e)))?;
+
+        // 1) store canonical row
+        self.db.put_cf(
+            self.db.cf_handle("deposit_intents").unwrap(),
+            key_di.as_bytes(),
+            &value,
+        )?;
+
+        // 2) store address → tracking-id index
+        self.db.put_cf(
+            self.db.cf_handle("deposit_intents").unwrap(),
+            key_da.as_bytes(),
+            intent.deposit_tracking_id.as_bytes(),
+        )?;
         Ok(())
     }
 
@@ -130,6 +147,26 @@ impl Db for RocksDb {
                 .ok()
                 .map(|(intent, _)| intent)
         }))
+    }
+
+    fn get_deposit_intent_by_address(
+        &self,
+        address: &str,
+    ) -> Result<Option<DepositIntent>, NodeError> {
+        // Step 1: addr → tracking-id
+        let key_da = format!("da:{}", address);
+        let tracking_id = match self.db.get_cf(
+            self.db.cf_handle("deposit_intents").unwrap(),
+            key_da.as_bytes(),
+        )? {
+            Some(bytes) => String::from_utf8(bytes).ok(),
+            None => None,
+        };
+        if let Some(id) = tracking_id {
+            self.get_deposit_intent(&id)
+        } else {
+            Ok(None)
+        }
     }
 
     fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError> {
