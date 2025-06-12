@@ -14,4 +14,4 @@ grpc_port: 50051
 libp2p_udp_port: 0
 libp2p_tcp_port: 0
 confirmation_depth: 0
-monitor_start_block: -1
+monitor_start_block: 4506343
