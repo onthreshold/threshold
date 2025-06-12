@@ -27,13 +27,8 @@ jobs:
           MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
           MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
           IS_TESTNET: "true"
-        run: cargo test --all
         run: |
           cargo tarpaulin --all-targets --exclude-files "target/*" --count --out xml
-        env:
-          MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
-          MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
-          IS_TESTNET: "true"
       - name: Post Coverage Comment on PR
         if: github.event_name == 'pull_request'
         uses: 5monkeys/cobertura-action@v14
