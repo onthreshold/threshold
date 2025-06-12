@@ -19,6 +19,7 @@ impl<N: Network, D: Db, O: Oracle> Handler<N, D, O> for DepositIntentState {
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         if let Ok(tx) = self.transaction_rx.try_recv() {
+            tracing::info!("New transaction: {}", tx.compute_txid());
             if let Err(e) = self.update_user_balance(node, tx) {
                 info!("Failed to update user balance: {}", e);
             }

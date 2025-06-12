@@ -163,6 +163,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
                             continue;
                         }
                     };
+                    tracing::info!("Current height: {}", current_height);
 
                     let new_confirmed_height = current_height - 6;
 
@@ -205,8 +206,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
                     if addresses.insert(
                         Address::from_str(&address_str)
                             .unwrap()
-                            .require_network(Network::Bitcoin)
-                            .unwrap(),
+                            .assume_checked()
                     ) {
                         info!("Now polling {} addresses.", addresses.len());
                     }

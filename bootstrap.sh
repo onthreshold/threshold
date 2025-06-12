@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# Bootstrap multiple TheVault nodes for local testing / development.
+# Bootstrap multiple threshold nodes for local testing / development.
 #
 # This script will:
 #   1. Generate N node identities & config files via the CLI (`cargo run --bin cli setup`).
