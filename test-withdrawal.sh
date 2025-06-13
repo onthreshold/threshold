@@ -4,7 +4,6 @@
 withdrawal_amount=$1
 destination_address=$2
 public_key=$3
-endpoint=${4:-"http://127.0.0.1:50051"}  # Optional endpoint with default value
 
 # Check if the withdrawal amount is provided
 if [ -z "$withdrawal_amount" ]; then
@@ -25,7 +24,7 @@ if [ -z "$public_key" ]; then
 fi
 
 # Run the propose withdrawal command and extract the challenge
-propose_output=$(cargo run --bin "withdrawal" -- propose "$withdrawal_amount" "$destination_address" "$public_key" --endpoint "$endpoint" 2>&1)
+propose_output=$(cargo run --bin "withdrawal" -- propose "$withdrawal_amount" "$destination_address" "$public_key" 2>&1)
 echo "$propose_output"
 
 # Extract challenge from the output
@@ -53,7 +52,7 @@ fi
 echo "Signature: $signature"
 
 # Confirm the withdrawal with the signature
-confirm_output=$(cargo run --bin "withdrawal" -- confirm "$challenge" "$signature" --endpoint "$endpoint" 2>&1)
+confirm_output=$(cargo run --bin "withdrawal" -- confirm "$challenge" "$signature" 2>&1)
 echo "$confirm_output"
 
 # Check if the confirmation was successful
