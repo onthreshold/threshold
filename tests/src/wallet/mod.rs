@@ -22,8 +22,8 @@ mod utxo_spend_test {
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".to_string()
         });
 
-        let (address, private_key) = generate_keys_from_mnemonic(&mnemonic);
-        let (address_to, private_key_to) = generate_keys_from_mnemonic(&mnemonic_to);
+        let (address, private_key, _) = generate_keys_from_mnemonic(&mnemonic);
+        let (address_to, private_key_to, _) = generate_keys_from_mnemonic(&mnemonic_to);
 
         let oracle = EsploraOracle::new(true);
 

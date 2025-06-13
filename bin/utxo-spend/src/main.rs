@@ -41,6 +41,8 @@ async fn main() {
         bitcoin::network::Network::Testnet,
     );
 
+    wallet.refresh_utxos(Some(true)).await.unwrap();
+
     let (tx, sighash) = wallet
         .create_spend(amount, fee, &address_to, false)
         .unwrap();
