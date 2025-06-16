@@ -41,7 +41,7 @@ impl ConsensusState {
             proposer: None,
             validators: HashSet::new(),
             leader_topic: IdentTopic::new("leader"),
-            round_timeout: Duration::from_secs(20),
+            round_timeout: Duration::from_secs(10),
             round_start_time: None,
             is_leader: false,
         }

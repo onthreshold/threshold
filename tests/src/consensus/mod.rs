@@ -24,31 +24,7 @@ mod consensus_tests {
             }
         }
 
-        cluster.run_n_iterations(30).await;
-
-        let peer_count = cluster.get_peer_ids().len();
-        let mut attempts = 0;
-        loop {
-            let mut all_ready = true;
-            for node in cluster.nodes.values() {
-                let cs = node
-                    .handlers
-                    .iter()
-                    .find_map(|h| h.downcast_ref::<ConsensusState>())
-                    .expect("ConsensusState not found");
-                if cs.validators.len() != peer_count {
-                    all_ready = false;
-                    break;
-                }
-            }
-
-            if all_ready || attempts > 20 {
-                break;
-            }
-
-            cluster.run_n_iterations(5).await;
-            attempts += 1;
-        }
+        cluster.run_n_iterations(10).await;
 
         let mut leaders: HashSet<PeerId> = HashSet::new();
         for node in cluster.nodes.values() {
@@ -58,7 +34,7 @@ mod consensus_tests {
                 .find_map(|h| h.downcast_ref::<ConsensusState>())
                 .expect("ConsensusState missing");
 
-            assert_eq!(cs.validators.len(), peer_count, "Validator set incomplete");
+            assert_eq!(cs.validators.len(), 4, "Validator set incomplete");
             let leader = cs.select_leader(1).expect("No leader selected");
             leaders.insert(leader);
         }
