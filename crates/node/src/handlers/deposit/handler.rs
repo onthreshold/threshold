@@ -1,14 +1,11 @@
 use libp2p::gossipsub::{IdentTopic, Message};
 use tracing::info;
 use types::errors::NodeError;
+use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 
+use crate::swarm_manager::Network;
 use crate::{
-    NodeState,
-    db::Db,
-    handlers::Handler,
-    handlers::deposit::DepositIntentState,
-    swarm_manager::{Network, NetworkEvent, SelfRequest, SelfResponse},
-    wallet::Wallet,
+    NodeState, db::Db, handlers::Handler, handlers::deposit::DepositIntentState, wallet::Wallet,
 };
 
 #[async_trait::async_trait]
@@ -18,13 +15,6 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DepositIntentState {
         node: &mut NodeState<N, D, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
-        if let Ok(tx) = self.transaction_rx.try_recv() {
-            tracing::info!("New transaction: {}", tx.compute_txid());
-            if let Err(e) = self.update_user_balance(node, tx) {
-                info!("Failed to update user balance: {}", e);
-            }
-        }
-
         match message {
             Some(NetworkEvent::SelfRequest {
                 request:
@@ -54,6 +44,14 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DepositIntentState {
                     response_channel
                         .send(SelfResponse::GetPendingDepositIntentsResponse { intents: response })
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
+                }
+            }
+            Some(NetworkEvent::SelfRequest {
+                request: SelfRequest::ConfirmDeposit { confirmed_tx },
+                ..
+            }) => {
+                if let Err(e) = self.update_user_balance(node, confirmed_tx) {
+                    info!("Failed to update user balance: {}", e);
                 }
             }
             Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {

@@ -7,16 +7,15 @@ use hex;
 use libp2p::PeerId;
 use tracing::{debug, error, info, warn};
 
+use crate::handlers::signing::SigningState;
+use crate::peer_id_to_identifier;
+use crate::swarm_manager::Network;
 use crate::{
-    NodeState,
-    db::Db,
-    handlers::signing::ActiveSigning,
-    handlers::withdrawl::SpendIntentState,
-    swarm_manager::{DirectMessage, Network},
+    NodeState, db::Db, handlers::signing::ActiveSigning, handlers::withdrawl::SpendIntentState,
     wallet::Wallet,
 };
-use crate::{handlers::signing::SigningState, peer_id_to_identifier};
 use types::errors::NodeError;
+use types::network_event::DirectMessage;
 
 impl SigningState {
     pub fn start_signing_session<N: Network, D: Db, W: Wallet>(

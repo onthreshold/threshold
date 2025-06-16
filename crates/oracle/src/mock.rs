@@ -4,19 +4,23 @@ use crate::oracle::Oracle;
 use bitcoin::{hashes::Hash, Address, Amount, OutPoint, ScriptBuf, Transaction, Txid};
 use tokio::sync::broadcast;
 use tracing::{error, info};
-use types::{errors::NodeError, utxo::Utxo};
+use types::{
+    errors::NodeError,
+    network_event::{NetworkEvent, SelfRequest},
+    utxo::Utxo,
+};
 
 #[derive(Clone)]
 pub struct MockOracle {
     // Map of tx_hash -> (address, amount, is_valid)
     pub transactions: HashMap<String, (String, u64, bool)>,
-    pub tx_channel: broadcast::Sender<Transaction>,
+    pub tx_channel: broadcast::Sender<NetworkEvent>,
     pub deposit_intent_rx: Option<broadcast::Sender<String>>,
 }
 
 impl MockOracle {
     pub fn new(
-        tx_channel: broadcast::Sender<Transaction>,
+        tx_channel: broadcast::Sender<NetworkEvent>,
         deposit_intent_rx: Option<broadcast::Sender<String>>,
     ) -> Self {
         Self {
@@ -143,7 +147,10 @@ impl Oracle for MockOracle {
                     info!("Received new address: {}", addr_str);
                     if let Ok(addr) = Address::from_str(&addr_str) {
                         let tx = self.create_dummy_tx(addr.assume_checked(), 10_000);
-                        if let Err(e) = self.tx_channel.send(tx) {
+                        if let Err(e) = self.tx_channel.send(NetworkEvent::SelfRequest {
+                            request: SelfRequest::ConfirmDeposit { confirmed_tx: tx },
+                            response_channel: None,
+                        }) {
                             error!("Failed to send dummy tx: {}", e);
                         }
                     }

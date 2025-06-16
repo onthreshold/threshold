@@ -1,9 +1,10 @@
-use crate::swarm_manager::{Network, NetworkEvent, SelfRequest, SelfResponse};
+use crate::swarm_manager::Network;
 use crate::wallet::PendingSpend;
 use crate::wallet::Wallet;
 use crate::{NodeState, db::Db, handlers::Handler, handlers::withdrawl::SpendIntentState};
 use libp2p::gossipsub::Message;
 use types::errors::NodeError;
+use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 
 #[async_trait::async_trait]
 impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SpendIntentState {

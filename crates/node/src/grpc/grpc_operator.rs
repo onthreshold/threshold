@@ -4,10 +4,11 @@ use crate::grpc::grpc_handler::node_proto::{
     GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
     SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
 };
-use crate::handlers::withdrawl::SpendIntent;
-use crate::swarm_manager::{Network, NetworkHandle, SelfRequest, SelfResponse};
+use crate::swarm_manager::{Network, NetworkHandle};
 use tonic::Status;
 use tracing::{debug, info};
+use types::intents::SpendIntent;
+use types::network_event::{SelfRequest, SelfResponse};
 
 pub async fn spend_funds(
     network: &NetworkHandle,

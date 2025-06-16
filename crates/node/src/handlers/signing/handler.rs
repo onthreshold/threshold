@@ -2,9 +2,10 @@ use crate::NodeState;
 use crate::db::Db;
 use crate::handlers::Handler;
 use crate::handlers::signing::SigningState;
-use crate::swarm_manager::{DirectMessage, Network, NetworkEvent, SelfRequest, SelfResponse};
+use crate::swarm_manager::Network;
 use crate::wallet::Wallet;
 use types::errors::NodeError;
+use types::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
 
 #[async_trait::async_trait]
 impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SigningState {

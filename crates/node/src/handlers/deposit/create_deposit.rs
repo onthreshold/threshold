@@ -9,23 +9,17 @@ use types::errors::NodeError;
 use uuid::Uuid;
 
 use crate::{
-    NodeState,
-    db::Db,
-    handlers::deposit::{DepositIntent, DepositIntentState},
-    swarm_manager::Network,
+    NodeState, db::Db, handlers::deposit::DepositIntentState, swarm_manager::Network,
     wallet::Wallet,
 };
+use types::intents::DepositIntent;
 
 impl DepositIntentState {
-    pub fn new(
-        deposit_intent_tx: broadcast::Sender<String>,
-        transaction_rx: broadcast::Receiver<Transaction>,
-    ) -> Self {
+    pub fn new(deposit_intent_tx: broadcast::Sender<String>) -> Self {
         Self {
             pending_intents: vec![],
             deposit_addresses: HashSet::new(),
             deposit_intent_tx,
-            transaction_rx,
             processed_txids: HashSet::new(),
         }
     }
@@ -154,6 +148,11 @@ impl DepositIntentState {
                 }
 
                 if let Some(intent) = node.db.get_deposit_intent_by_address(&addr_str)? {
+                    info!(
+                        "Updating user balance for address: {} amount: {}",
+                        addr_str,
+                        output.value.to_sat()
+                    );
                     let user_account = node
                         .chain_state
                         .get_account(&intent.user_pubkey)

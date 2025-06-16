@@ -7,12 +7,16 @@ use tokio::{
     time::{sleep, Duration},
 };
 use tracing::{error, info};
-use types::{errors::NodeError, utxo::Utxo};
+use types::{
+    errors::NodeError,
+    network_event::{NetworkEvent, SelfRequest},
+    utxo::Utxo,
+};
 
 #[derive(Clone)]
 pub struct EsploraOracle {
     pub client: AsyncClient,
-    pub tx_channel: broadcast::Sender<Transaction>,
+    pub tx_channel: broadcast::Sender<NetworkEvent>,
     pub deposit_intent_rx: Option<broadcast::Sender<String>>,
     pub confirmation_depth: u32,
     pub monitor_start_block: i32,
@@ -22,7 +26,7 @@ impl EsploraOracle {
     pub fn new(
         network: Network,
         capacity: Option<usize>,
-        tx_channel: Option<broadcast::Sender<Transaction>>,
+        tx_channel: Option<broadcast::Sender<NetworkEvent>>,
         deposit_intent_rx: Option<broadcast::Sender<String>>,
         confirmation_depth: u32,
         monitor_start_block: i32,
@@ -301,7 +305,10 @@ impl Oracle for EsploraOracle {
                         };
 
                         for tx in new_txs {
-                            match self.tx_channel.send(tx) {
+                            match self.tx_channel.send(NetworkEvent::SelfRequest {
+                                request: SelfRequest::ConfirmDeposit { confirmed_tx: tx },
+                                response_channel: None,
+                            }) {
                                 Ok(_) => (),
                                 Err(e) => {
                                     error!("Error sending transaction to channel: {:?}", e);
