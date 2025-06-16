@@ -1,4 +1,5 @@
 pub mod config;
+pub mod consensus;
 pub mod deposit;
 pub mod dkg;
 pub mod esplora_client;

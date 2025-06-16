@@ -28,6 +28,7 @@ use tokio::{
     },
 };
 
+use crate::PeerData;
 use types::errors::{NetworkError, NodeError};
 use types::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
 use crate::PeerData;
