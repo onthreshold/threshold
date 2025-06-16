@@ -31,29 +31,26 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         if let Some(start_time) = self.round_start_time {
-            if start_time.elapsed() >= self.round_timeout {
-                if self.is_leader {
-                    info!("Round timeout reached. I am current leader. Proposing new round.");
-                    let next_round = self.current_round + 1;
-                    let new_round_message = ConsensusMessage::NewRound(next_round);
-                    let data =
-                        bincode::encode_to_vec(&new_round_message, bincode::config::standard())
-                            .map_err(|e| {
-                                types::errors::NodeError::Error(format!(
-                                    "Failed to encode new round message: {}",
-                                    e
-                                ))
-                            })?;
+            if start_time.elapsed() >= self.round_timeout && self.is_leader {
+                info!("Round timeout reached. I am current leader. Proposing new round.");
+                let next_round = self.current_round + 1;
+                let new_round_message = ConsensusMessage::NewRound(next_round);
+                let data = bincode::encode_to_vec(&new_round_message, bincode::config::standard())
+                    .map_err(|e| {
+                        types::errors::NodeError::Error(format!(
+                            "Failed to encode new round message: {}",
+                            e
+                        ))
+                    })?;
 
-                    node.network_handle
-                        .send_broadcast(self.leader_topic.clone(), data)
-                        .map_err(|e| {
-                            types::errors::NodeError::Error(format!(
-                                "Failed to broadcast new round message: {:?}",
-                                e
-                            ))
-                        })?;
-                }
+                node.network_handle
+                    .send_broadcast(self.leader_topic.clone(), data)
+                    .map_err(|e| {
+                        types::errors::NodeError::Error(format!(
+                            "Failed to broadcast new round message: {:?}",
+                            e
+                        ))
+                    })?;
             }
         }
 

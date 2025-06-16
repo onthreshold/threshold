@@ -5,7 +5,7 @@ mod consensus_tests {
     use crate::mocks::network::MockNodeCluster;
     use libp2p::PeerId;
     use node::handlers::consensus::ConsensusState;
-    use node::swarm_manager::NetworkEvent;
+    use types::network_event::NetworkEvent;
 
     #[tokio::test]
     async fn leader_remains_consistent_across_nodes() {

@@ -26,6 +26,12 @@ pub struct ConsensusState {
     pub is_leader: bool,
 }
 
+impl Default for ConsensusState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConsensusState {
     pub fn new() -> Self {
         Self {
