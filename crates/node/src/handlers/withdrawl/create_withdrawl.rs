@@ -14,6 +14,7 @@ use bitcoin::{
 };
 use libp2p::gossipsub;
 use sha2::{Digest, Sha256};
+use tracing::info;
 use types::errors::NodeError;
 use types::intents::SpendIntent;
 use types::network_event::SelfRequest;
@@ -130,6 +131,10 @@ impl SpendIntentState {
 
         let updated_account =
             user_account.update_balance(-((tx.output[0].value.to_sat() + fee) as i64));
+        info!(
+            "🚀 Updated account balance: account: {}, balance: {}",
+            user_pubkey, updated_account.balance
+        );
 
         node.chain_state
             .upsert_account(&user_pubkey, updated_account);

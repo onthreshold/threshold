@@ -12,6 +12,7 @@ mod deposit_tests {
             grpc_operator,
         },
         handlers::deposit::DepositIntentState,
+        wallet::Wallet,
     };
     use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;
@@ -130,7 +131,7 @@ mod deposit_tests {
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
         // Create custom broadcast channel to observe deposit notifications
-        let (tx, mut rx) = broadcast::channel::<String>(4);
+        let (tx, mut rx) = broadcast::channel::<DepositIntent>(4);
 
         // Instantiate fresh DepositIntentState using our tx instead of node default
         let mut state = DepositIntentState::new(tx.clone());
@@ -162,7 +163,7 @@ mod deposit_tests {
 
         // Assert: notification broadcast
         let notified_addr = rx.recv().await.expect("no broadcast received");
-        assert_eq!(notified_addr, deposit_address);
+        assert_eq!(notified_addr.deposit_address, deposit_address);
     }
 
     #[tokio::test]
@@ -174,7 +175,7 @@ mod deposit_tests {
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
         // Broadcast channel for notifications
-        let (tx, mut rx) = broadcast::channel::<String>(4);
+        let (tx, mut rx) = broadcast::channel::<DepositIntent>(4);
         let mut state = DepositIntentState::new(tx.clone());
 
         // Craft DepositIntent manually
@@ -204,7 +205,7 @@ mod deposit_tests {
 
         // Assert notification via channel
         let notified_addr = rx.recv().await.unwrap();
-        assert_eq!(notified_addr, deposit_address);
+        assert_eq!(notified_addr.deposit_address, deposit_address);
     }
 
     #[tokio::test]
@@ -217,7 +218,7 @@ mod deposit_tests {
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
         // Broadcast channels for DepositIntentState constructor
-        let (addr_tx, _addr_rx) = broadcast::channel::<String>(4);
+        let (addr_tx, _addr_rx) = broadcast::channel::<DepositIntent>(4);
         let mut state = DepositIntentState::new(addr_tx);
 
         // ----- Prepare user address and account -----
@@ -245,6 +246,8 @@ mod deposit_tests {
         let deposit_address = Address::p2tr(&secp, internal_key, None, bitcoin::Network::Testnet);
 
         state.deposit_addresses.insert(deposit_address.to_string());
+
+        node.wallet.add_address(deposit_address.clone());
 
         let deposit_amount_sat = 15_000;
 
@@ -294,6 +297,15 @@ mod deposit_tests {
             .update_user_balance(node, tx.clone())
             .expect("balance update failed");
 
+        // --- Assert wallet updated with the new UTXO ---
+        let txid = tx.compute_txid();
+        let utxo_found = node.wallet.utxos.iter().any(|u| {
+            u.utxo.outpoint.txid == txid
+                && u.utxo.outpoint.vout == 0
+                && u.address == deposit_address
+        });
+        assert!(utxo_found, "wallet did not ingest expected UTXO");
+
         let balance_after = node
             .chain_state
             .get_account(&user_address.to_string())
@@ -313,7 +325,7 @@ mod deposit_tests {
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
         // Broadcast channels for DepositIntentState constructor
-        let (addr_tx, _addr_rx) = broadcast::channel::<String>(4);
+        let (addr_tx, _addr_rx) = broadcast::channel::<DepositIntent>(4);
         let mut state = DepositIntentState::new(addr_tx);
 
         // ----- Prepare user address and account -----
@@ -355,7 +367,6 @@ mod deposit_tests {
         };
 
         // ----- Call update_user_balance -----
-
         state
             .update_user_balance(node, tx.clone())
             .expect("balance update failed");
@@ -367,5 +378,11 @@ mod deposit_tests {
             .unwrap()
             .balance;
         assert_eq!(balance, 0);
+
+        // Wallet UTXOs should remain unchanged (none ingested)
+        assert!(
+            node.wallet.utxos.is_empty(),
+            "wallet should not have ingested any UTXO"
+        );
     }
 }

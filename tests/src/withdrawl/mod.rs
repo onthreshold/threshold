@@ -250,6 +250,12 @@ mod withdrawl_tests {
             });
         }
 
+        // Keep a reference to the original outpoint that should be spent
+        let original_outpoint = bitcoin::OutPoint {
+            txid: Txid::from_slice(&[3u8; 32]).unwrap(),
+            vout: 0,
+        };
+
         // --- Step 1: Propose the withdrawal ---
         let amount_sat = 50_000u64;
 
@@ -310,6 +316,14 @@ mod withdrawl_tests {
                 .get_account(&public_key_hex)
                 .expect("Account should exist on all peers");
             assert_eq!(account.balance, initial_balance - expected_debit);
+
+            // Assert the spent UTXO has been removed from the wallet
+            let spent_still_present = node
+                .wallet
+                .utxos
+                .iter()
+                .any(|u| u.utxo.outpoint == original_outpoint);
+            assert!(!spent_still_present, "Spent UTXO still present in wallet");
         }
     }
 }

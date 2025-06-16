@@ -1,5 +1,5 @@
 use oracle::{esplora::EsploraOracle, mock::MockOracle, oracle::Oracle};
-use types::errors::NodeError;
+use types::{errors::NodeError, intents::DepositIntent};
 
 use crate::{
     NodeConfig, NodeState, db::RocksDb, grpc::grpc_handler::NodeControlService,
@@ -95,7 +95,7 @@ pub async fn start_node(
     )
     .expect("Failed to build swarm");
 
-    let (deposit_intent_tx, _) = broadcast::channel(100);
+    let (deposit_intent_tx, _) = broadcast::channel::<DepositIntent>(100);
     let is_testnet = dotenvy::var("IS_TESTNET")
         .unwrap_or("false".to_string())
         .parse()
@@ -186,12 +186,8 @@ pub async fn start_node(
                 Err(e) => tracing::error!("Swarm error: {}", e),
             }
         }
-        result = main_loop_handle => {
-            match result {
-                Ok(Ok(_)) => tracing::info!("Main loop stopped"),
-                Ok(Err(e)) => tracing::error!("Main loop error: {}", e),
-                Err(e) => tracing::error!("Main loop task error: {}", e),
-            }
+        _ = main_loop_handle => {
+            tracing::info!("Main loop stopped");
         }
         result = deposit_monitor_handle => {
             match result {

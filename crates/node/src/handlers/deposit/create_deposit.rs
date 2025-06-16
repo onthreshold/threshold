@@ -1,7 +1,8 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 
 use bitcoin::{Address, Network as BitcoinNetwork, Transaction, hashes::Hash, secp256k1::Scalar};
 use libp2p::gossipsub::IdentTopic;
+use protocol::chain_state::Account;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
@@ -15,7 +16,7 @@ use crate::{
 use types::intents::DepositIntent;
 
 impl DepositIntentState {
-    pub fn new(deposit_intent_tx: broadcast::Sender<String>) -> Self {
+    pub fn new(deposit_intent_tx: broadcast::Sender<DepositIntent>) -> Self {
         Self {
             pending_intents: vec![],
             deposit_addresses: HashSet::new(),
@@ -31,14 +32,17 @@ impl DepositIntentState {
     ) -> Result<(), NodeError> {
         node.db.insert_deposit_intent(deposit_intent.clone())?;
 
+        node.wallet.add_address(
+            Address::from_str(&deposit_intent.deposit_address)
+                .map_err(|e| NodeError::Error(format!("Failed to parse deposit address: {}", e)))?
+                .assume_checked(),
+        );
+
         if self
             .deposit_addresses
             .insert(deposit_intent.deposit_address.clone())
         {
-            if let Err(e) = self
-                .deposit_intent_tx
-                .send(deposit_intent.deposit_address.clone())
-            {
+            if let Err(e) = self.deposit_intent_tx.send(deposit_intent.clone()) {
                 error!("Failed to notify deposit monitor of new address: {}", e);
             }
         }
@@ -97,10 +101,7 @@ impl DepositIntentState {
             .deposit_addresses
             .insert(deposit_intent.deposit_address.clone())
         {
-            if let Err(e) = self
-                .deposit_intent_tx
-                .send(deposit_intent.deposit_address.clone())
-            {
+            if let Err(e) = self.deposit_intent_tx.send(deposit_intent.clone()) {
                 error!("Failed to notify deposit monitor of new address: {}", e);
             }
         }
@@ -155,8 +156,9 @@ impl DepositIntentState {
                     );
                     let user_account = node
                         .chain_state
-                        .get_account(&intent.user_pubkey)
-                        .ok_or(NodeError::Error("User not found".into()))?;
+                        .get_account(&intent.user_pubkey.clone())
+                        .cloned()
+                        .unwrap_or(Account::new(intent.user_pubkey.clone(), 0));
 
                     let updated = user_account.update_balance(output.value.to_sat() as i64);
                     node.chain_state

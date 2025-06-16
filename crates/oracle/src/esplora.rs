@@ -9,6 +9,7 @@ use tokio::{
 use tracing::{error, info};
 use types::{
     errors::NodeError,
+    intents::DepositIntent,
     network_event::{NetworkEvent, SelfRequest},
     utxo::Utxo,
 };
@@ -17,7 +18,7 @@ use types::{
 pub struct EsploraOracle {
     pub client: AsyncClient,
     pub tx_channel: broadcast::Sender<NetworkEvent>,
-    pub deposit_intent_rx: Option<broadcast::Sender<String>>,
+    pub deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
     pub confirmation_depth: u32,
     pub monitor_start_block: i32,
 }
@@ -27,7 +28,7 @@ impl EsploraOracle {
         network: Network,
         capacity: Option<usize>,
         tx_channel: Option<broadcast::Sender<NetworkEvent>>,
-        deposit_intent_rx: Option<broadcast::Sender<String>>,
+        deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
         confirmation_depth: u32,
         monitor_start_block: i32,
     ) -> Self {
@@ -319,10 +320,10 @@ impl Oracle for EsploraOracle {
                         last_confirmed_height = new_confirmed_height;
                     }
                 }
-                Ok(address_str) = deposit_intent_rx.recv() => {
-                    info!("Received new deposit address to monitor: {}", &address_str);
+                Ok(deposit_intent) = deposit_intent_rx.recv() => {
+                    info!("Received new deposit address to monitor: {}", &deposit_intent.deposit_address);
                     if addresses.insert(
-                        Address::from_str(&address_str)
+                        Address::from_str(&deposit_intent.deposit_address)
                             .unwrap()
                             .assume_checked()
                     ) {
