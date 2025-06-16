@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 // use bitcoin::Address;
 use bitcoin::Address;
 use bitcoin::secp256k1::{Message, Secp256k1};
@@ -8,6 +10,9 @@ use node::grpc::grpc_handler::node_proto::{
     ProposeWithdrawalRequest, node_control_client::NodeControlClient,
 };
 use node::key_manager::generate_keys_from_mnemonic;
+use node::wallet::{TaprootWallet, Wallet};
+use oracle::esplora::EsploraOracle;
+use oracle::oracle::Oracle;
 // use node::wallet::{TaprootWallet, Wallet};
 // use oracle::esplora::EsploraOracle;
 // use oracle::oracle::Oracle;
@@ -29,6 +34,8 @@ enum Commands {
         amount: u64,
         #[arg(short, long, default_value_t = 200)]
         fee: u64,
+        #[arg(short, long, default_value_t = false)]
+        use_testnet: bool,
         #[arg(short, long)]
         endpoint: Option<String>,
     },
@@ -41,6 +48,8 @@ enum Commands {
     /// Run an end-to-end test of the deposit and withdrawal flows.
     EndToEndTest {
         amount: u64,
+        #[arg(short, long, default_value_t = false)]
+        use_testnet: bool,
         #[arg(short, long)]
         endpoint: Option<String>,
     },
@@ -56,14 +65,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             amount,
             fee,
             endpoint,
+            use_testnet,
         } => {
-            run_deposit_test(amount, fee, endpoint).await?;
+            run_deposit_test(amount, fee, endpoint, use_testnet).await?;
         }
         Commands::WithdrawalTest { amount, endpoint } => {
             run_withdrawal_test(amount, endpoint).await?;
         }
-        Commands::EndToEndTest { amount, endpoint } => {
-            run_end_to_end_test(amount, endpoint).await?;
+        Commands::EndToEndTest {
+            amount,
+            endpoint,
+            use_testnet,
+        } => {
+            run_end_to_end_test(amount, endpoint, use_testnet).await?;
         }
     }
 
@@ -72,12 +86,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn run_deposit_test(
     amount: u64,
-    _fee: u64,
+    fee: u64,
     endpoint: Option<String>,
+    use_testnet: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("▶️  Creating deposit intent for {} sats", amount);
     let mnemonic = std::env::var("MNEMONIC").expect("MNEMONIC env variable not set");
-    let (_, _, sender_pub) = generate_keys_from_mnemonic(&mnemonic);
+    let (sender_address, sender_priv, sender_pub) = generate_keys_from_mnemonic(&mnemonic);
     let public_key = sender_pub.to_string();
 
     let mut client = NodeControlClient::connect(
@@ -119,23 +134,25 @@ async fn run_deposit_test(
         "Balance after deposit intent should be equal to initial balance + amount"
     );
 
-    // println!("🔑 Sender address: {}. Refreshing UTXOs...", sender_address);
+    if use_testnet {
+        println!("🔑 Sender address: {}. Refreshing UTXOs...", sender_address);
 
-    // let oracle = EsploraOracle::new(bitcoin::Network::Testnet, Some(100), None, None, 6, -1);
-    // let mut wallet = TaprootWallet::new(
-    //     Box::new(oracle.clone()),
-    //     vec![sender_address.clone()],
-    //     bitcoin::Network::Testnet,
-    // );
-    // wallet.refresh_utxos(Some(true)).await?;
+        let oracle = EsploraOracle::new(bitcoin::Network::Testnet, Some(100), None, None, 6, -1);
+        let mut wallet = TaprootWallet::new(
+            Box::new(oracle.clone()),
+            vec![sender_address.clone()],
+            bitcoin::Network::Testnet,
+        );
+        wallet.refresh_utxos(Some(true)).await?;
 
-    // let deposit_address = Address::from_str(&deposit_address_str)?.assume_checked();
-    // let (tx, sighash) = wallet.create_spend(amount, fee, &deposit_address, false)?;
-    // let txid = tx.compute_txid();
-    // let signed_tx = wallet.sign(&tx, &sender_priv, sighash);
+        let deposit_address = Address::from_str(&deposit_address_str)?.assume_checked();
+        let (tx, sighash) = wallet.create_spend(amount, fee, &deposit_address, false)?;
+        let txid = tx.compute_txid();
+        let signed_tx = wallet.sign(&tx, &sender_priv, sighash);
 
-    // oracle.broadcast_transaction(&signed_tx).await?;
-    // println!("📤 Broadcast Transaction txid: {}", txid);
+        oracle.broadcast_transaction(&signed_tx).await?;
+        println!("📤 Broadcast Transaction txid: {}", txid);
+    }
 
     println!("✅ Deposit test passed");
     Ok(())
@@ -222,8 +239,9 @@ async fn run_withdrawal_test(
 async fn run_end_to_end_test(
     amount: u64,
     endpoint: Option<String>,
+    use_testnet: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    run_deposit_test(amount, 0, endpoint.clone()).await?;
+    run_deposit_test(amount, 0, endpoint.clone(), use_testnet).await?;
     run_withdrawal_test(amount - 5000, endpoint).await?;
     println!("✅ End-to-end test passed");
     Ok(())
