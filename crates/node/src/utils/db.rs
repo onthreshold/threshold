@@ -43,14 +43,16 @@ impl RocksDb {
 
 impl Db for RocksDb {
     fn get_block_by_height(&self, height: u64) -> Result<Option<Block>, NodeError> {
+        let height_key = format!("h:{}", height);
         let block_hash = self.db.get_cf(
             self.db.cf_handle("blocks").unwrap(),
-            format!("h:{}", height),
+            &height_key,
         )?;
         if let Some(block_hash) = block_hash {
+            let block_key = format!("b:{}", hex::encode(&block_hash));
             let block = self.db.get_cf(
                 self.db.cf_handle("blocks").unwrap(),
-                format!("b:{}", hex::encode(block_hash)),
+                &block_key,
             )?;
             Ok(block.and_then(|b| Block::deserialize(&b).ok()))
         } else {
@@ -59,9 +61,10 @@ impl Db for RocksDb {
     }
 
     fn get_block_by_hash(&self, hash: BlockHash) -> Result<Option<Block>, NodeError> {
+        let block_key = format!("b:{}", hex::encode(hash));
         let block = self.db.get_cf(
             self.db.cf_handle("blocks").unwrap(),
-            format!("b:{}", hex::encode(hash)),
+            &block_key,
         )?;
         Ok(block.and_then(|b| Block::deserialize(&b).ok()))
     }
@@ -91,10 +94,13 @@ impl Db for RocksDb {
 
     fn insert_block(&mut self, block: Block) -> Result<(), NodeError> {
         let block_hash = block.hash();
+        let block_key = format!("b:{}", hex::encode(block_hash));
+        let height_key = format!("h:{}", block.header.height);
+        
         self.db
             .put_cf(
                 self.db.cf_handle("blocks").unwrap(),
-                format!("b:{}", hex::encode(block_hash)),
+                &block_key,
                 block.serialize()?,
             )
             .map_err(|e| NodeError::Error(format!("Failed to insert block: {}", e)))?;
@@ -102,7 +108,7 @@ impl Db for RocksDb {
         self.db
             .put_cf(
                 self.db.cf_handle("blocks").unwrap(),
-                format!("h:{}", block.header.height),
+                &height_key,
                 block_hash,
             )
             .map_err(|e| NodeError::Error(format!("Failed to insert block: {}", e)))?;
@@ -140,7 +146,7 @@ impl Db for RocksDb {
         let key = format!("di:{}", tracking_id);
         let value = self
             .db
-            .get_cf(self.db.cf_handle("deposit_intents").unwrap(), key)?;
+            .get_cf(self.db.cf_handle("deposit_intents").unwrap(), &key)?;
 
         Ok(value.and_then(|v| {
             bincode::decode_from_slice(&v, bincode::config::standard())
