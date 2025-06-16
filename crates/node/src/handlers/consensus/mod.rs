@@ -1,0 +1,55 @@
+use libp2p::{PeerId, gossipsub::IdentTopic};
+use std::collections::HashSet;
+use std::time::Duration;
+use tokio::time::Instant;
+
+pub mod handler;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConsensusPhase {
+    WaitingForPropose,
+    Propose,
+    Prevote,
+}
+
+pub struct ConsensusState {
+    pub current_state: ConsensusPhase,
+    pub current_round: u32,
+    pub current_height: u64,
+    pub proposer: Option<PeerId>,
+    pub validators: HashSet<PeerId>,
+
+    pub leader_topic: IdentTopic,
+
+    pub round_timeout: Duration,
+    pub round_start_time: Option<Instant>,
+    pub is_leader: bool,
+}
+
+impl ConsensusState {
+    pub fn new() -> Self {
+        Self {
+            current_state: ConsensusPhase::WaitingForPropose,
+            current_round: 0,
+            current_height: 0,
+            proposer: None,
+            validators: HashSet::new(),
+            leader_topic: IdentTopic::new("leader"),
+            round_timeout: Duration::from_secs(20),
+            round_start_time: None,
+            is_leader: false,
+        }
+    }
+
+    pub fn select_leader(&self, round: u32) -> Option<PeerId> {
+        if self.validators.is_empty() {
+            return None;
+        }
+
+        let mut sorted_validators: Vec<PeerId> = self.validators.iter().cloned().collect();
+        sorted_validators.sort();
+
+        let index = (round as usize) % self.validators.len();
+        sorted_validators.get(index).copied()
+    }
+}
