@@ -2,15 +2,10 @@ use frost_secp256k1::{self as frost, keys::dkg::round2};
 use libp2p::PeerId;
 use std::time::Duration;
 use types::errors::NodeError;
+use types::network_event::DirectMessage;
 
-use crate::{
-    NodeState,
-    db::Db,
-    handlers::dkg::DkgState,
-    peer_id_to_identifier,
-    swarm_manager::{DirectMessage, Network},
-    wallet::Wallet,
-};
+use crate::swarm_manager::Network;
+use crate::{NodeState, db::Db, handlers::dkg::DkgState, peer_id_to_identifier, wallet::Wallet};
 
 fn dkg_step_delay() -> Duration {
     std::env::var("DKG_STEP_DELAY_SECS")

@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
+use crate::swarm_manager::Network;
 use crate::{
     NodeState,
     db::Db,
-    handlers::withdrawl::{SpendIntent, SpendIntentState},
-    swarm_manager::{Network, SelfRequest},
+    handlers::withdrawl::SpendIntentState,
     wallet::{PendingSpend, Wallet},
 };
 use bitcoin::{
@@ -15,6 +15,8 @@ use bitcoin::{
 use libp2p::gossipsub;
 use sha2::{Digest, Sha256};
 use types::errors::NodeError;
+use types::intents::SpendIntent;
+use types::network_event::SelfRequest;
 
 impl SpendIntentState {
     pub async fn propose_withdrawal<N: Network, D: Db, W: Wallet>(

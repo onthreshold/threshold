@@ -1,11 +1,6 @@
-use crate::{
-    Network, NodeState,
-    db::Db,
-    handlers::Handler,
-    swarm_manager::{NetworkEvent, SelfRequest, SelfResponse},
-    wallet::Wallet,
-};
+use crate::{Network, NodeState, db::Db, handlers::Handler, wallet::Wallet};
 use types::errors::NodeError;
+use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 
 #[derive(Default)]
 pub struct BalanceState;

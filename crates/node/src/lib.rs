@@ -15,17 +15,16 @@ use argon2::{
     },
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use bitcoin::Transaction;
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::{PeerId, identity::Keypair};
 use oracle::oracle::Oracle;
 use protocol::chain_state::ChainState;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
-use swarm_manager::{Network, NetworkEvent};
+use swarm_manager::Network;
 use tokio::sync::broadcast;
 use tracing::{error, info};
-use types::errors::NodeError;
+use types::{errors::NodeError, network_event::NetworkEvent};
 
 pub mod grpc;
 pub mod handlers;
@@ -286,7 +285,6 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
         storage_db: D,
         network_events_sender: broadcast::Sender<NetworkEvent>,
         deposit_intent_tx: broadcast::Sender<String>,
-        transaction_rx: broadcast::Receiver<Transaction>,
         oracle: Box<dyn Oracle>,
         wallet: W,
     ) -> Result<Self, NodeError> {
@@ -294,7 +292,7 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
         let dkg_state = DkgState::new()?;
         let signing_state = SigningState::new()?;
-        let mut deposit_intent_state = DepositIntentState::new(deposit_intent_tx, transaction_rx);
+        let mut deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
         let withdrawl_intent_state = SpendIntentState::new();
         let balance_state = BalanceState::new();
 

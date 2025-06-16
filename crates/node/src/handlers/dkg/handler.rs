@@ -1,11 +1,6 @@
-use crate::{
-    NodeState,
-    db::Db,
-    handlers::Handler,
-    handlers::dkg::DkgState,
-    swarm_manager::{DirectMessage, Network, NetworkEvent},
-    wallet::Wallet,
-};
+use crate::swarm_manager::Network;
+use crate::{NodeState, db::Db, handlers::Handler, handlers::dkg::DkgState, wallet::Wallet};
+use types::network_event::{DirectMessage, NetworkEvent};
 
 #[async_trait::async_trait]
 impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DkgState {

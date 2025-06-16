@@ -96,7 +96,6 @@ pub async fn start_node(
     .expect("Failed to build swarm");
 
     let (deposit_intent_tx, _) = broadcast::channel(100);
-    let (transaction_tx, transaction_rx) = broadcast::channel(1000);
     let is_testnet = dotenvy::var("IS_TESTNET")
         .unwrap_or("false".to_string())
         .parse()
@@ -104,7 +103,7 @@ pub async fn start_node(
 
     let mut oracle: Box<dyn Oracle> = if use_mock_oracle.unwrap_or(false) {
         Box::new(MockOracle::new(
-            transaction_tx,
+            swarm.network_events.clone(),
             Some(deposit_intent_tx.clone()),
         ))
     } else {
@@ -115,7 +114,7 @@ pub async fn start_node(
                 Network::Bitcoin
             },
             Some(100),
-            Some(transaction_tx),
+            Some(swarm.network_events.clone()),
             Some(deposit_intent_tx.clone()),
             confirmation_depth,
             monitor_start_block,
@@ -130,7 +129,6 @@ pub async fn start_node(
         RocksDb::new(config_database_path.to_str().unwrap()),
         swarm.network_events.clone(),
         deposit_intent_tx,
-        transaction_rx,
         oracle.clone(),
         TaprootWallet::new(oracle.clone(), Vec::new(), {
             let is_testnet: bool = std::env::var("IS_TESTNET")
