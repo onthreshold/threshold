@@ -18,7 +18,7 @@ impl<N: Network + 'static, D: Db + 'static, W: Wallet + 'static> NodeState<N, D,
     }
 
     pub async fn poll(&mut self) -> Result<(), NodeError> {
-        let send_message = self.network_events_stream.recv().await.ok();
+        let send_message = self.network_events_stream.recv().ok();
         self.handle(send_message).await
     }
 

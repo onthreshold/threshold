@@ -30,3 +30,4 @@ uuid = "1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
 bip39 = { workspace = true, features = ["rand_core"] }
 clap = { version = "4.5.4", features = ["derive"] }
+crossbeam-channel = { workspace = true }
