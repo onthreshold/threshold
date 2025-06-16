@@ -1,10 +1,9 @@
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
-use bitcoin::Transaction;
 use frost_secp256k1::Identifier;
 use node::{
     NodeState,
-    swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture, SelfResponse},
+    swarm_manager::{Network, NetworkResponseFuture},
     wallet::TaprootWallet,
 };
 use oracle::mock::MockOracle;
@@ -12,7 +11,10 @@ use tokio::sync::{
     broadcast,
     mpsc::{self, unbounded_channel},
 };
-use types::errors::{self, NetworkError};
+use types::{
+    errors::{self, NetworkError},
+    network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
+};
 
 // Import MockDb from our mocks module
 use crate::mocks::db::MockDb;
@@ -107,7 +109,7 @@ impl Network for MockNetwork {
     fn send_private_message(
         &self,
         peer_id: libp2p::PeerId,
-        request: node::swarm_manager::DirectMessage,
+        request: DirectMessage,
     ) -> Result<(), errors::NetworkError> {
         // For mock purposes, we'll create a simplified message event
         // In a real implementation, this would use proper request-response channels
@@ -125,7 +127,7 @@ impl Network for MockNetwork {
 
     fn send_self_request(
         &self,
-        request: node::swarm_manager::SelfRequest,
+        request: SelfRequest,
         sync: bool,
     ) -> Result<Option<NetworkResponseFuture>, errors::NetworkError> {
         if sync {
@@ -412,11 +414,7 @@ impl MockNodeCluster {
         }
     }
 
-    pub fn send_self_request_to_peer(
-        &mut self,
-        peer_id: libp2p::PeerId,
-        request: node::swarm_manager::SelfRequest,
-    ) {
+    pub fn send_self_request_to_peer(&mut self, peer_id: libp2p::PeerId, request: SelfRequest) {
         if let Some(sender) = self.senders.get_mut(&peer_id) {
             sender.queue(NetworkEvent::SelfRequest {
                 request,
@@ -488,12 +486,11 @@ pub fn create_node_network(
 ) -> Result<(MockNodeState, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(256);
     let (deposit_intent_tx, _) = broadcast::channel::<String>(100);
-    let (transaction_tx, transaction_rx) = broadcast::channel::<Transaction>(100);
 
     let network = MockNetwork::new(events_emitter_tx.clone(), peer_id, pending_events_tx);
 
     let mock_db = MockDb::new();
-    let oracle = MockOracle::new(transaction_tx, Some(deposit_intent_tx.clone()));
+    let oracle = MockOracle::new(events_emitter_tx.clone(), Some(deposit_intent_tx.clone()));
 
     let wallet = TaprootWallet::new(
         Box::new(oracle.clone()),
@@ -509,7 +506,6 @@ pub fn create_node_network(
         mock_db,
         events_emitter_tx,
         deposit_intent_tx,
-        transaction_rx,
         Box::new(oracle),
         wallet,
     )?;

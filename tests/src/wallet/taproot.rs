@@ -7,10 +7,11 @@ mod taproot_wallet_tests {
     use node::wallet::Wallet;
     use oracle::mock::MockOracle;
     use tokio::sync::broadcast;
+    use types::network_event::NetworkEvent;
 
     #[tokio::test]
     async fn test_taproot_wallet_create_and_refresh() {
-        let (tx_channel, _) = broadcast::channel::<bitcoin::Transaction>(100);
+        let (tx_channel, _) = broadcast::channel::<NetworkEvent>(100);
         let oracle = MockOracle::new(tx_channel, None);
 
         // Create an empty Taproot wallet on testnet
