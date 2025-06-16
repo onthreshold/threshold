@@ -3,6 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use crate::oracle::Oracle;
 use bitcoin::{hashes::Hash, Address, Amount, OutPoint, ScriptBuf, Transaction, Txid};
 use tokio::sync::broadcast;
+use tracing::{error, info};
 use types::{errors::NodeError, utxo::Utxo};
 
 #[derive(Clone)]
@@ -129,6 +130,7 @@ impl Oracle for MockOracle {
     }
 
     async fn poll_new_transactions(&mut self, _addresses: Vec<Address>) {
+        info!("Polling new transactions");
         let Some(dep_tx_sender) = self.deposit_intent_rx.take() else {
             return;
         };
@@ -138,9 +140,12 @@ impl Oracle for MockOracle {
         loop {
             match deposit_rx.recv().await {
                 Ok(addr_str) => {
+                    info!("Received new address: {}", addr_str);
                     if let Ok(addr) = Address::from_str(&addr_str) {
                         let tx = self.create_dummy_tx(addr.assume_checked(), 10_000);
-                        let _ = self.tx_channel.send(tx);
+                        if let Err(e) = self.tx_channel.send(tx) {
+                            error!("Failed to send dummy tx: {}", e);
+                        }
                     }
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => continue, // skip missed messages
