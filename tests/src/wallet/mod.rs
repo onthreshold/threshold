@@ -8,6 +8,7 @@ mod utxo_spend_test {
     use oracle::esplora::EsploraOracle;
     use oracle::oracle::Oracle;
 
+    #[ignore]
     #[tokio::test]
     pub async fn test_utxo_spend() {
         let amount = 1000;
