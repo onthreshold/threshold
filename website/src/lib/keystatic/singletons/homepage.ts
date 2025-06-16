@@ -2,6 +2,26 @@ import { fields, singleton } from "@keystatic/core";
 import { action } from "@lib/keystatic/shared/action";
 import { opengraph } from "@lib/keystatic/shared/opengraph";
 
+export const logo = singleton({
+  label: "Logo",
+  path: "src/content/singles/logo/",
+  schema: {
+    image: fields.image({
+      label: "Logo Image",
+      description: "The logo image for the homepage.",
+      directory: "src/assets/images/logo",
+      publicPath: "/src/assets/images/logo/",
+      validation: { isRequired: true },
+    }),
+    altText: fields.text({
+      label: "Logo Alt Text",
+      description: "Alternative text for the logo image.",
+      defaultValue: "Company Logo",
+      validation: { isRequired: true },
+    }),
+  },
+});
+
 export const homepage = singleton({
   label: "Homepage",
   path: "src/content/singles/homepage/",

@@ -1,7 +1,7 @@
 import { config } from "@keystatic/core";
 import { blogPosts } from "@lib/keystatic/collections/blog-posts";
 import { blogCategories } from "@lib/keystatic/collections/blog-categories";
-import { homepage } from "@lib/keystatic/singletons/homepage";
+import { homepage, logo } from "@lib/keystatic/singletons/homepage";
 
 export default config({
   storage: {
@@ -13,6 +13,7 @@ export default config({
     blogPosts,
   },
   singletons: {
+    logo,
     homepage,
   },
 });

@@ -4,6 +4,14 @@ import { ClientRouter } from "astro:transitions";
 import { SiteName, SocialLinks } from "../theme.config";
 import { Font } from "astro:assets";
 import { Icon } from "astro-icon/components";
+import { keystatic } from "@lib/keystatic/client";
+import invariant from "tiny-invariant";
+import { Image } from "astro:assets";
+
+const logo = await keystatic.singletons.logo.read({
+  resolveLinkedFiles: true,
+});
+invariant(logo, "No logo found");
 
 const {
   title = "Default Title",
@@ -64,6 +72,7 @@ const {
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="manifest" href="/site.webmanifest" />
 
     <script
       defer
@@ -76,8 +85,22 @@ const {
       <div class="flex justify-between h-16 border-b border-btcgray-50">
         <div class="flex">
           <div class="flex-shrink-0 flex items-center">
-            <a href="/" class="text-xl font-bold text-btcgray-800">{SiteName}</a
-            >
+            <a href="/" class="flex items-center space-x-2">
+              {
+                logo?.image && (
+                  <Image
+                    src={logo.image}
+                    alt={logo.altText || "Site logo"}
+                    width={40}
+                    height={40}
+                    class="h-10 w-10 object-contain"
+                    loading="eager"
+                    decoding="async"
+                  />
+                )
+              }
+              <span class="text-xl font-bold text-btcgray-800">{SiteName}</span>
+            </a>
           </div>
         </div>
         <div class="flex sm:ml-6 space-x-4 sm:space-x-8">
