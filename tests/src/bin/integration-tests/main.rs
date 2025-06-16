@@ -122,6 +122,18 @@ async fn run_deposit_test(
         deposit_address_str, resp.deposit_tracking_id
     );
 
+    let request = CheckBalanceRequest {
+        address: public_key.clone(),
+    };
+    let resp = client.check_balance(request).await?.into_inner();
+    println!("💰 Final balance: {} sats", resp.balance_satoshis);
+
+    assert_eq!(
+        resp.balance_satoshis,
+        initial_balance + amount,
+        "Balance after deposit intent should be equal to initial balance + amount"
+    );
+
     if use_testnet {
         println!("🔑 Sender address: {}. Refreshing UTXOs...", sender_address);
 
@@ -140,39 +152,8 @@ async fn run_deposit_test(
 
         oracle.broadcast_transaction(&signed_tx).await?;
         println!("📤 Broadcast Transaction txid: {}", txid);
-
-        let start_time = std::time::Instant::now();
-        loop {
-            let request = CheckBalanceRequest {
-                address: public_key.clone(),
-            };
-            let resp = client.check_balance(request).await?.into_inner();
-            println!("💰 Final balance: {} sats", resp.balance_satoshis);
-
-            if resp.balance_satoshis == initial_balance + amount {
-                break;
-            }
-
-            if start_time.elapsed() >= std::time::Duration::from_secs(600) {
-                println!("⏰ Timeout reached. Exiting polling loop.");
-                break;
-            }
-
-            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-        }
-    } else {
-        let request = CheckBalanceRequest {
-            address: public_key.clone(),
-        };
-        let resp = client.check_balance(request).await?.into_inner();
-        println!("💰 Final balance: {} sats", resp.balance_satoshis);
-
-        assert_eq!(
-            resp.balance_satoshis,
-            initial_balance + amount,
-            "Balance after deposit intent should be equal to initial balance + amount"
-        );
     }
+
     println!("✅ Deposit test passed");
     Ok(())
 }
