@@ -180,7 +180,7 @@ mod deposit_tests {
 
         // Craft DepositIntent manually
         let deposit_tracking_id = Uuid::new_v4().to_string();
-        let deposit_address = "tb1qexampleaddressxxxx0000".to_string();
+        let deposit_address = "tb1q62qxecgfyn7ud6esrxc50xh9hs56dysatwqheh".to_string();
         let deposit_intent = DepositIntent {
             amount_sat: 10_000,
             deposit_tracking_id: deposit_tracking_id.clone(),
