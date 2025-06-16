@@ -7,10 +7,7 @@ use node::{
     wallet::TaprootWallet,
 };
 use oracle::mock::MockOracle;
-use tokio::sync::{
-    broadcast,
-    mpsc::{self, unbounded_channel},
-};
+use tokio::sync::mpsc::{self, unbounded_channel};
 use types::{
     errors::{self, NetworkError},
     intents::DepositIntent,
@@ -27,11 +24,11 @@ type MockNodeState = NodeState<MockNetwork, MockDb, TaprootWallet>;
 #[derive(Debug)]
 pub struct SenderToNode {
     pub pending_events: Vec<NetworkEvent>,
-    events_emitter_tx: broadcast::Sender<NetworkEvent>,
+    events_emitter_tx: crossbeam_channel::Sender<NetworkEvent>,
 }
 
 impl SenderToNode {
-    fn new(events_emitter_tx: broadcast::Sender<NetworkEvent>) -> Self {
+    fn new(events_emitter_tx: crossbeam_channel::Sender<NetworkEvent>) -> Self {
         Self {
             pending_events: Vec::new(),
             events_emitter_tx,
@@ -59,13 +56,13 @@ pub struct PendingNetworkEvent {
 #[derive(Debug, Clone)]
 pub struct MockNetwork {
     pub peer: libp2p::PeerId,
-    pub events_emitter_tx: broadcast::Sender<NetworkEvent>,
+    pub events_emitter_tx: crossbeam_channel::Sender<NetworkEvent>,
     pub pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
 }
 
 impl MockNetwork {
     pub fn new(
-        events_emitter_tx: broadcast::Sender<NetworkEvent>,
+        events_emitter_tx: crossbeam_channel::Sender<NetworkEvent>,
         peer: libp2p::PeerId,
         pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
     ) -> Self {
@@ -485,13 +482,13 @@ pub fn create_node_network(
     max_signers: u16,
     pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
 ) -> Result<(MockNodeState, MockNetwork), errors::NodeError> {
-    let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(256);
-    let (deposit_intent_tx, _) = broadcast::channel::<DepositIntent>(100);
+    let (events_emitter_tx, events_emitter_rx) = crossbeam_channel::bounded::<NetworkEvent>(256);
+    let (deposit_intent_tx, deposit_intent_rx) = crossbeam_channel::bounded::<DepositIntent>(100);
 
     let network = MockNetwork::new(events_emitter_tx.clone(), peer_id, pending_events_tx);
 
     let mock_db = MockDb::new();
-    let oracle = MockOracle::new(events_emitter_tx.clone(), Some(deposit_intent_tx.clone()));
+    let oracle = MockOracle::new(events_emitter_tx.clone(), Some(deposit_intent_rx.clone()));
 
     let wallet = TaprootWallet::new(
         Box::new(oracle.clone()),
@@ -505,7 +502,7 @@ pub fn create_node_network(
         max_signers,
         node_config,
         mock_db,
-        events_emitter_tx,
+        events_emitter_rx,
         deposit_intent_tx,
         Box::new(oracle),
         wallet,

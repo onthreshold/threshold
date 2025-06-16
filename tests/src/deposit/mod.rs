@@ -14,7 +14,6 @@ mod deposit_tests {
         handlers::deposit::DepositIntentState,
         wallet::Wallet,
     };
-    use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;
     use types::intents::DepositIntent;
     use uuid::Uuid;
@@ -131,7 +130,7 @@ mod deposit_tests {
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
         // Create custom broadcast channel to observe deposit notifications
-        let (tx, mut rx) = broadcast::channel::<DepositIntent>(4);
+        let (tx, rx) = crossbeam_channel::bounded::<DepositIntent>(4);
 
         // Instantiate fresh DepositIntentState using our tx instead of node default
         let mut state = DepositIntentState::new(tx.clone());
@@ -162,7 +161,7 @@ mod deposit_tests {
         );
 
         // Assert: notification broadcast
-        let notified_addr = rx.recv().await.expect("no broadcast received");
+        let notified_addr = rx.recv().expect("no broadcast received");
         assert_eq!(notified_addr.deposit_address, deposit_address);
     }
 
@@ -175,7 +174,7 @@ mod deposit_tests {
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
         // Broadcast channel for notifications
-        let (tx, mut rx) = broadcast::channel::<DepositIntent>(4);
+        let (tx, rx) = crossbeam_channel::bounded::<DepositIntent>(4);
         let mut state = DepositIntentState::new(tx.clone());
 
         // Craft DepositIntent manually
@@ -204,7 +203,7 @@ mod deposit_tests {
         assert_eq!(stored.deposit_address, deposit_address);
 
         // Assert notification via channel
-        let notified_addr = rx.recv().await.unwrap();
+        let notified_addr = rx.recv().unwrap();
         assert_eq!(notified_addr.deposit_address, deposit_address);
     }
 
@@ -218,7 +217,7 @@ mod deposit_tests {
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
         // Broadcast channels for DepositIntentState constructor
-        let (addr_tx, _addr_rx) = broadcast::channel::<DepositIntent>(4);
+        let (addr_tx, _addr_rx) = crossbeam_channel::bounded::<DepositIntent>(4);
         let mut state = DepositIntentState::new(addr_tx);
 
         // ----- Prepare user address and account -----
@@ -325,7 +324,7 @@ mod deposit_tests {
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
         // Broadcast channels for DepositIntentState constructor
-        let (addr_tx, _addr_rx) = broadcast::channel::<DepositIntent>(4);
+        let (addr_tx, _addr_rx) = crossbeam_channel::bounded::<DepositIntent>(4);
         let mut state = DepositIntentState::new(addr_tx);
 
         // ----- Prepare user address and account -----

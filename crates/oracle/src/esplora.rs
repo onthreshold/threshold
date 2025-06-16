@@ -2,10 +2,7 @@ use crate::oracle::Oracle;
 use bitcoin::{consensus, Address, Amount, Network, OutPoint, Transaction, Txid};
 use esplora_client::{AsyncClient, Builder};
 use std::{collections::HashSet, str::FromStr};
-use tokio::{
-    sync::broadcast,
-    time::{sleep, Duration},
-};
+use tokio::time::{sleep, Duration};
 use tracing::{error, info};
 use types::{
     errors::NodeError,
@@ -17,8 +14,8 @@ use types::{
 #[derive(Clone)]
 pub struct EsploraOracle {
     pub client: AsyncClient,
-    pub tx_channel: broadcast::Sender<NetworkEvent>,
-    pub deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
+    pub tx_channel: crossbeam_channel::Sender<NetworkEvent>,
+    pub deposit_intent_rx: Option<crossbeam_channel::Receiver<DepositIntent>>,
     pub confirmation_depth: u32,
     pub monitor_start_block: i32,
 }
@@ -27,8 +24,8 @@ impl EsploraOracle {
     pub fn new(
         network: Network,
         capacity: Option<usize>,
-        tx_channel: Option<broadcast::Sender<NetworkEvent>>,
-        deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
+        tx_channel: Option<crossbeam_channel::Sender<NetworkEvent>>,
+        deposit_intent_rx: Option<crossbeam_channel::Receiver<DepositIntent>>,
         confirmation_depth: u32,
         monitor_start_block: i32,
     ) -> Self {
@@ -43,7 +40,8 @@ impl EsploraOracle {
         let client = builder.build_async().unwrap();
         Self {
             client,
-            tx_channel: tx_channel.unwrap_or(broadcast::channel(capacity.unwrap_or(1000)).0),
+            tx_channel: tx_channel
+                .unwrap_or(crossbeam_channel::bounded(capacity.unwrap_or(1000)).0),
             deposit_intent_rx,
             confirmation_depth,
             monitor_start_block,
@@ -258,78 +256,79 @@ impl Oracle for EsploraOracle {
             last_confirmed_height
         );
 
-        let mut deposit_intent_rx = self.deposit_intent_rx.take().unwrap().subscribe();
+        let deposit_intent_rx = self.deposit_intent_rx.take().unwrap();
         let mut addresses: HashSet<_> = addresses.into_iter().collect();
 
         println!("monitor_start_block: {}", self.monitor_start_block);
 
+        let mut interval = tokio::time::interval(Duration::from_secs(30));
+
         loop {
-            tokio::select! {
-                _ = sleep(Duration::from_secs(30)) => {
-                    let current_height = match self.client.get_height().await {
-                        Ok(height) => height,
-                        Err(e) => {
-                            error!("Cannot retrieve height of blockchain: {}", e);
-                            continue;
-                        }
-                    };
-                    tracing::info!("Current height: {}", current_height);
+            interval.tick().await;
 
-                    let new_confirmed_height = current_height - confirmation_depth;
+            // Drain all pending deposit intents (non-blocking)
+            while let Ok(deposit_intent) = deposit_intent_rx.try_recv() {
+                info!(
+                    "Received new deposit address to monitor: {}",
+                    &deposit_intent.deposit_address
+                );
+                if addresses.insert(
+                    Address::from_str(&deposit_intent.deposit_address)
+                        .unwrap()
+                        .assume_checked(),
+                ) {
+                    info!("Now polling {} addresses.", addresses.len());
+                }
+            }
 
-                    if new_confirmed_height > last_confirmed_height {
-                        let min_height: u32 = if self.monitor_start_block >= 0 {
-                            self.monitor_start_block as u32
-                        } else {
-                            last_confirmed_height + 1
-                        };
+            let current_height = match self.client.get_height().await {
+                Ok(height) => height,
+                Err(e) => {
+                    error!("Cannot retrieve height of blockchain: {}", e);
+                    continue;
+                }
+            };
+            tracing::info!("Current height: {}", current_height);
 
-                        info!(
-                            "New confirmed block found. Now monitoring from height {} to {}",
-                            min_height,
-                            new_confirmed_height
-                        );
+            let new_confirmed_height = current_height - confirmation_depth;
 
-                        let new_txs = match self
-                            .get_confirmed_transactions(
-                                addresses.iter().cloned().collect(),
-                                min_height,
-                                new_confirmed_height,
-                            )
-                            .await
-                        {
-                            Ok(txs) => txs,
-                            Err(e) => {
-                                error!("Error getting confirmed transactions: {:?}", e);
-                                continue;
-                            }
-                        };
+            if new_confirmed_height > last_confirmed_height {
+                let min_height: u32 = if self.monitor_start_block >= 0 {
+                    self.monitor_start_block as u32
+                } else {
+                    last_confirmed_height + 1
+                };
 
-                        for tx in new_txs {
-                            match self.tx_channel.send(NetworkEvent::SelfRequest {
-                                request: SelfRequest::ConfirmDeposit { confirmed_tx: tx },
-                                response_channel: None,
-                            }) {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    error!("Error sending transaction to channel: {:?}", e);
-                                }
-                            }
-                        }
+                info!(
+                    "New confirmed block found. Now monitoring from height {} to {}",
+                    min_height, new_confirmed_height
+                );
 
-                        last_confirmed_height = new_confirmed_height;
+                let new_txs = match self
+                    .get_confirmed_transactions(
+                        addresses.iter().cloned().collect(),
+                        min_height,
+                        new_confirmed_height,
+                    )
+                    .await
+                {
+                    Ok(txs) => txs,
+                    Err(e) => {
+                        error!("Error getting confirmed transactions: {:?}", e);
+                        continue;
+                    }
+                };
+
+                for tx in new_txs {
+                    if let Err(e) = self.tx_channel.send(NetworkEvent::SelfRequest {
+                        request: SelfRequest::ConfirmDeposit { confirmed_tx: tx },
+                        response_channel: None,
+                    }) {
+                        error!("Error sending transaction to channel: {:?}", e);
                     }
                 }
-                Ok(deposit_intent) = deposit_intent_rx.recv() => {
-                    info!("Received new deposit address to monitor: {}", &deposit_intent.deposit_address);
-                    if addresses.insert(
-                        Address::from_str(&deposit_intent.deposit_address)
-                            .unwrap()
-                            .assume_checked()
-                    ) {
-                        info!("Now polling {} addresses.", addresses.len());
-                    }
-                }
+
+                last_confirmed_height = new_confirmed_height;
             }
         }
     }

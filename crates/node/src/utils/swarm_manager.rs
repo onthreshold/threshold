@@ -22,10 +22,7 @@ use libp2p::{identity::Keypair, request_response::cbor};
 use protocol::transaction::Transaction;
 use tokio::{
     io,
-    sync::{
-        broadcast,
-        mpsc::{self, unbounded_channel},
-    },
+    sync::mpsc::{self, unbounded_channel},
 };
 
 use crate::PeerData;
@@ -153,7 +150,8 @@ pub struct SwarmManager {
     pub inner: Swarm<MyBehaviour>,
 
     pub network_manager_rx: mpsc::UnboundedReceiver<NetworkMessage>,
-    pub network_events: broadcast::Sender<NetworkEvent>,
+    pub network_events: crossbeam_channel::Sender<NetworkEvent>,
+    pub network_events_rx: crossbeam_channel::Receiver<NetworkEvent>,
 
     pub allowed_peers: Vec<PeerId>,
     pub peers_to_names: BTreeMap<PeerId, String>,
@@ -174,7 +172,8 @@ impl SwarmManager {
     ) -> Result<(Self, NetworkHandle), NodeError> {
         let (send_commands, receiving_commands) = unbounded_channel::<NetworkMessage>();
 
-        let (network_events_emitter, _) = broadcast::channel::<NetworkEvent>(100);
+        let (network_events_emitter, network_events_rx) =
+            crossbeam_channel::bounded::<NetworkEvent>(100);
 
         let network_handle = NetworkHandle {
             peer_id: *swarm.local_peer_id(),
@@ -238,6 +237,7 @@ impl SwarmManager {
                 inner: swarm,
                 network_manager_rx: receiving_commands,
                 network_events: network_events_emitter,
+                network_events_rx,
                 allowed_peers,
                 peers_to_names,
             },
