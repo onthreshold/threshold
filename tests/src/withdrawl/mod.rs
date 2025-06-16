@@ -10,10 +10,11 @@ mod withdrawl_tests {
     };
 
     use crate::mocks::network::MockNodeCluster;
-    use node::handlers::withdrawl::{SpendIntent, SpendIntentState};
+    use node::handlers::withdrawl::SpendIntentState;
     use protocol::chain_state::Account;
     use std::collections::HashMap;
     use tokio::sync::mpsc::unbounded_channel;
+    use types::intents::SpendIntent;
     use types::utxo::Utxo;
 
     #[tokio::test]

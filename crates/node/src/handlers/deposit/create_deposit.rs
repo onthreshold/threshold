@@ -150,7 +150,7 @@ impl DepositIntentState {
                 if let Some(intent) = node.db.get_deposit_intent_by_address(&addr_str)? {
                     info!(
                         "Updating user balance for address: {} amount: {}",
-                        addr_str,
+                        intent.user_pubkey,
                         output.value.to_sat()
                     );
                     let user_account = node

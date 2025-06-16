@@ -1,8 +1,8 @@
 #[cfg(test)]
 pub mod signing_tests {
     use crate::mocks::network::MockNodeCluster;
-    use node::swarm_manager::{DirectMessage, NetworkEvent, SelfRequest};
     use rand::RngCore;
+    use types::network_event::{DirectMessage, NetworkEvent, SelfRequest};
 
     #[tokio::test]
     async fn signing_flow_completes_and_produces_shares() {

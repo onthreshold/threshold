@@ -5,13 +5,12 @@ mod dkg_test {
     use bincode;
     use log::info;
     use node::db::Db;
-    use node::swarm_manager::DirectMessage;
-    use node::swarm_manager::NetworkEvent;
     use protocol::block::{ChainConfig, ValidatorInfo};
     use sha2::{Digest, Sha256};
     use tracing_subscriber::EnvFilter;
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
+    use types::network_event::{DirectMessage, NetworkEvent};
 
     fn setup() {
         let env_filter =

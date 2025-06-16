@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
 use node::db::Db;
-use node::handlers::deposit::DepositIntent;
 use protocol::{
     block::{Block, BlockHash},
     chain_state::ChainState,
 };
-use types::errors::NodeError;
+use types::{errors::NodeError, intents::DepositIntent};
 
 pub struct MockDb {
     pub blocks: HashMap<BlockHash, Block>,

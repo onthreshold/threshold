@@ -3,18 +3,19 @@ mod deposit_tests {
     use std::str::FromStr;
 
     use crate::mocks::network::MockNodeCluster;
+    use bitcoin::Address;
     use bitcoin::hashes::Hash;
-    use bitcoin::{Address, Transaction};
     use node::{
         db::Db,
         grpc::{
             grpc_handler::node_proto::{CreateDepositIntentRequest, CreateDepositIntentResponse},
             grpc_operator,
         },
-        handlers::deposit::{DepositIntent, DepositIntentState},
+        handlers::deposit::DepositIntentState,
     };
     use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;
+    use types::intents::DepositIntent;
     use uuid::Uuid;
 
     #[tokio::test]
@@ -130,10 +131,9 @@ mod deposit_tests {
 
         // Create custom broadcast channel to observe deposit notifications
         let (tx, mut rx) = broadcast::channel::<String>(4);
-        let (_, transaction_rx) = broadcast::channel::<Transaction>(4);
 
         // Instantiate fresh DepositIntentState using our tx instead of node default
-        let mut state = DepositIntentState::new(tx.clone(), transaction_rx);
+        let mut state = DepositIntentState::new(tx.clone());
 
         let amount_sat = 42_000;
 
@@ -175,8 +175,7 @@ mod deposit_tests {
 
         // Broadcast channel for notifications
         let (tx, mut rx) = broadcast::channel::<String>(4);
-        let (_, transaction_rx) = broadcast::channel::<Transaction>(4);
-        let mut state = DepositIntentState::new(tx.clone(), transaction_rx);
+        let mut state = DepositIntentState::new(tx.clone());
 
         // Craft DepositIntent manually
         let deposit_tracking_id = Uuid::new_v4().to_string();
@@ -219,8 +218,7 @@ mod deposit_tests {
 
         // Broadcast channels for DepositIntentState constructor
         let (addr_tx, _addr_rx) = broadcast::channel::<String>(4);
-        let (_tx_chan, tx_rx) = broadcast::channel::<Transaction>(4);
-        let mut state = DepositIntentState::new(addr_tx, tx_rx);
+        let mut state = DepositIntentState::new(addr_tx);
 
         // ----- Prepare user address and account -----
         let secp = bitcoin::secp256k1::Secp256k1::new();
@@ -316,8 +314,7 @@ mod deposit_tests {
 
         // Broadcast channels for DepositIntentState constructor
         let (addr_tx, _addr_rx) = broadcast::channel::<String>(4);
-        let (_tx_chan, tx_rx) = broadcast::channel::<Transaction>(4);
-        let mut state = DepositIntentState::new(addr_tx, tx_rx);
+        let mut state = DepositIntentState::new(addr_tx);
 
         // ----- Prepare user address and account -----
         let secp = bitcoin::secp256k1::Secp256k1::new();
