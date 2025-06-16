@@ -44,16 +44,14 @@ impl RocksDb {
 impl Db for RocksDb {
     fn get_block_by_height(&self, height: u64) -> Result<Option<Block>, NodeError> {
         let height_key = format!("h:{}", height);
-        let block_hash = self.db.get_cf(
-            self.db.cf_handle("blocks").unwrap(),
-            &height_key,
-        )?;
+        let block_hash = self
+            .db
+            .get_cf(self.db.cf_handle("blocks").unwrap(), &height_key)?;
         if let Some(block_hash) = block_hash {
             let block_key = format!("b:{}", hex::encode(&block_hash));
-            let block = self.db.get_cf(
-                self.db.cf_handle("blocks").unwrap(),
-                &block_key,
-            )?;
+            let block = self
+                .db
+                .get_cf(self.db.cf_handle("blocks").unwrap(), &block_key)?;
             Ok(block.and_then(|b| Block::deserialize(&b).ok()))
         } else {
             Ok(None)
@@ -62,10 +60,9 @@ impl Db for RocksDb {
 
     fn get_block_by_hash(&self, hash: BlockHash) -> Result<Option<Block>, NodeError> {
         let block_key = format!("b:{}", hex::encode(hash));
-        let block = self.db.get_cf(
-            self.db.cf_handle("blocks").unwrap(),
-            &block_key,
-        )?;
+        let block = self
+            .db
+            .get_cf(self.db.cf_handle("blocks").unwrap(), &block_key)?;
         Ok(block.and_then(|b| Block::deserialize(&b).ok()))
     }
 
@@ -96,7 +93,7 @@ impl Db for RocksDb {
         let block_hash = block.hash();
         let block_key = format!("b:{}", hex::encode(block_hash));
         let height_key = format!("h:{}", block.header.height);
-        
+
         self.db
             .put_cf(
                 self.db.cf_handle("blocks").unwrap(),
