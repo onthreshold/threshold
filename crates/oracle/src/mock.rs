@@ -5,6 +5,7 @@ use bitcoin::{
     absolute::LockTime, hashes::Hash, transaction::Version, Address, Amount, OutPoint, ScriptBuf,
     Sequence, Transaction, TxIn, TxOut, Txid,
 };
+use tokio::sync::broadcast;
 use tracing::{error, info};
 use types::{
     errors::NodeError,
@@ -17,14 +18,14 @@ use types::{
 pub struct MockOracle {
     // Map of tx_hash -> (address, amount, is_valid)
     pub transactions: HashMap<String, (String, u64, bool)>,
-    pub tx_channel: crossbeam_channel::Sender<NetworkEvent>,
-    pub deposit_intent_rx: Option<crossbeam_channel::Receiver<DepositIntent>>,
+    pub tx_channel: broadcast::Sender<NetworkEvent>,
+    pub deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
 }
 
 impl MockOracle {
     pub fn new(
-        tx_channel: crossbeam_channel::Sender<NetworkEvent>,
-        deposit_intent_rx: Option<crossbeam_channel::Receiver<DepositIntent>>,
+        tx_channel: broadcast::Sender<NetworkEvent>,
+        deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
     ) -> Self {
         Self {
             transactions: HashMap::new(),
@@ -138,12 +139,14 @@ impl Oracle for MockOracle {
 
     async fn poll_new_transactions(&mut self, _addresses: Vec<Address>) {
         info!("Polling new transactions");
-        let Some(deposit_rx) = self.deposit_intent_rx.take() else {
+        let Some(dep_tx_sender) = self.deposit_intent_rx.take() else {
             return;
         };
 
+        let mut deposit_rx = dep_tx_sender.subscribe();
+
         loop {
-            match deposit_rx.recv() {
+            match deposit_rx.recv().await {
                 Ok(deposit_intent) => {
                     info!("Received new address: {}", deposit_intent.deposit_address);
                     if let Ok(addr) = Address::from_str(&deposit_intent.deposit_address) {
@@ -157,9 +160,8 @@ impl Oracle for MockOracle {
                         }
                     }
                 }
-                Err(e) => {
-                    error!("Error receiving deposit intent: {:?}", e);
-                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue, // skip missed messages
+                Err(broadcast::error::RecvError::Closed) => break,
             }
         }
     }

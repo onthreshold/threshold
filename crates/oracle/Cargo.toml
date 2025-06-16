@@ -12,4 +12,3 @@ tracing = "0.1"
 types = { path = "../types" }
 hex = { workspace = true }
 dyn-clone = "1.0.19"
-crossbeam-channel = { workspace = true }

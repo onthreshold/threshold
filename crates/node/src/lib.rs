@@ -22,6 +22,7 @@ use protocol::chain_state::ChainState;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::Network;
+use tokio::sync::broadcast;
 use tracing::{error, info};
 use types::{errors::NodeError, intents::DepositIntent, network_event::NetworkEvent};
 
@@ -269,7 +270,7 @@ pub struct NodeState<N: Network, D: Db, W: Wallet> {
     pub wallet: W,
     pub config: NodeConfig,
     pub network_handle: N,
-    pub network_events_stream: crossbeam_channel::Receiver<NetworkEvent>,
+    pub network_events_stream: broadcast::Receiver<NetworkEvent>,
 
     pub oracle: Box<dyn Oracle>,
 }
@@ -282,8 +283,8 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
         max_signers: u16,
         config: NodeConfig,
         storage_db: D,
-        network_events_rx: crossbeam_channel::Receiver<NetworkEvent>,
-        deposit_intent_tx: crossbeam_channel::Sender<DepositIntent>,
+        network_events_sender: broadcast::Sender<NetworkEvent>,
+        deposit_intent_tx: broadcast::Sender<DepositIntent>,
         oracle: Box<dyn Oracle>,
         wallet: W,
     ) -> Result<Self, NodeError> {
@@ -321,7 +322,7 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
 
         let mut node_state = NodeState {
             network_handle: network_handle.clone(),
-            network_events_stream: network_events_rx,
+            network_events_stream: network_events_sender.subscribe(),
             peer_id: network_handle.peer_id(),
             min_signers,
             max_signers,

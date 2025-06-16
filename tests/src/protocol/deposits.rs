@@ -2,6 +2,7 @@
 mod deposit_test {
     use bitcoin::{Txid, hashes::Hash};
     use std::collections::HashMap;
+    use tokio::sync::broadcast;
     use types::network_event::NetworkEvent;
 
     use oracle::mock::MockOracle;
@@ -43,7 +44,7 @@ mod deposit_test {
     }
 
     fn create_mock_oracle(transactions: Vec<(Txid, String, u64, bool)>) -> MockOracle {
-        let (tx_channel, _) = crossbeam_channel::bounded::<NetworkEvent>(100);
+        let (tx_channel, _) = broadcast::channel::<NetworkEvent>(100);
         let mut mock_oracle = MockOracle::new(tx_channel, None);
         for (tx_hash, address, amount, is_valid) in transactions {
             mock_oracle.add_transaction(tx_hash, address, amount, is_valid);

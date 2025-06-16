@@ -52,7 +52,6 @@ serde_yaml = "0.9.34"
 oracle = { path = "../oracle" }
 dotenvy = { workspace = true }
 bip39 = { workspace = true }
-crossbeam-channel = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.8"

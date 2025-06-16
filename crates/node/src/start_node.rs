@@ -7,6 +7,7 @@ use crate::{
 };
 use bitcoin::Network;
 use std::path::{Path, PathBuf};
+use tokio::sync::broadcast;
 use tonic::transport::Server;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
@@ -94,7 +95,7 @@ pub async fn start_node(
     )
     .expect("Failed to build swarm");
 
-    let (deposit_intent_tx, deposit_intent_rx) = crossbeam_channel::bounded::<DepositIntent>(100);
+    let (deposit_intent_tx, _) = broadcast::channel::<DepositIntent>(100);
     let is_testnet = dotenvy::var("IS_TESTNET")
         .unwrap_or("false".to_string())
         .parse()
@@ -103,7 +104,7 @@ pub async fn start_node(
     let mut oracle: Box<dyn Oracle> = if use_mock_oracle.unwrap_or(false) {
         Box::new(MockOracle::new(
             swarm.network_events.clone(),
-            Some(deposit_intent_rx.clone()),
+            Some(deposit_intent_tx.clone()),
         ))
     } else {
         Box::new(EsploraOracle::new(
@@ -114,7 +115,7 @@ pub async fn start_node(
             },
             Some(100),
             Some(swarm.network_events.clone()),
-            Some(deposit_intent_rx.clone()),
+            Some(deposit_intent_tx.clone()),
             confirmation_depth,
             monitor_start_block,
         ))
@@ -126,7 +127,7 @@ pub async fn start_node(
         max_signers,
         config,
         RocksDb::new(config_database_path.to_str().unwrap()),
-        swarm.network_events_rx.clone(),
+        swarm.network_events.clone(),
         deposit_intent_tx,
         oracle.clone(),
         TaprootWallet::new(oracle.clone(), Vec::new(), {

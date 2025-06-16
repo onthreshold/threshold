@@ -3,6 +3,7 @@ use std::{collections::HashSet, str::FromStr};
 use bitcoin::{Address, Network as BitcoinNetwork, Transaction, hashes::Hash, secp256k1::Scalar};
 use libp2p::gossipsub::IdentTopic;
 use protocol::chain_state::Account;
+use tokio::sync::broadcast;
 use tracing::{error, info};
 
 use types::errors::NodeError;
@@ -15,7 +16,7 @@ use crate::{
 use types::intents::DepositIntent;
 
 impl DepositIntentState {
-    pub fn new(deposit_intent_tx: crossbeam_channel::Sender<DepositIntent>) -> Self {
+    pub fn new(deposit_intent_tx: broadcast::Sender<DepositIntent>) -> Self {
         Self {
             pending_intents: vec![],
             deposit_addresses: HashSet::new(),
