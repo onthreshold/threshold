@@ -2,6 +2,11 @@
 name = "cli"
 version = "0.1.0"
 edition = "2021"
+description = "Command-line interface for the Threshold network"
+license = "MIT"
+repository = "https://github.com/onthreshold/threshold/"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
+categories = ["cryptography", "blockchain"]
 
 [dependencies]
 tokio = { workspace = true, features = ["full", "macros", "rt-multi-thread"] }

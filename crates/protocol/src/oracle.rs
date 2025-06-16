@@ -43,7 +43,8 @@ impl Default for EsploraOracle {
 }
 
 impl EsploraOracle {
-    #[must_use] pub fn new(is_testnet: bool) -> Self {
+    #[must_use]
+    pub fn new(is_testnet: bool) -> Self {
         let builder = Builder::new(if is_testnet {
             "https://blockstream.info/testnet/api"
         } else {
@@ -71,7 +72,7 @@ impl Oracle for EsploraOracle {
             .await
             .map_err(|e| NodeError::Error(e.to_string()))?;
 
-        let tx = tx.ok_or(NodeError::Error("Transaction not found".to_string()))?;
+        let tx = tx.ok_or_else(|| NodeError::Error("Transaction not found".to_string()))?;
 
         if !tx.status.confirmed {
             return Err(NodeError::Error("Transaction not confirmed".to_string()));
@@ -102,7 +103,7 @@ impl Oracle for EsploraOracle {
 
         let fee = fee
             .get(&priority)
-            .ok_or(NodeError::Error("Fee not found".to_string()))?;
+            .ok_or_else(|| NodeError::Error("Fee not found".to_string()))?;
 
         Ok(*fee)
     }
@@ -161,7 +162,7 @@ impl Oracle for EsploraOracle {
                     unspent_txs.push(Utxo {
                         outpoint: OutPoint {
                             txid: tx.txid,
-                            vout: vout as u32,
+                            vout: u32::try_from(vout).unwrap(),
                         },
                         value: Amount::from_sat(output.value.to_sat()),
                         script_pubkey: script.clone(),

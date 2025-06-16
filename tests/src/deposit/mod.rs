@@ -293,7 +293,7 @@ mod deposit_tests {
             .balance;
 
         state
-            .update_user_balance(node, tx.clone())
+            .update_user_balance(node, &tx.clone())
             .expect("balance update failed");
 
         let balance_after = node
@@ -360,7 +360,7 @@ mod deposit_tests {
         // ----- Call update_user_balance -----
 
         state
-            .update_user_balance(node, tx.clone())
+            .update_user_balance(node, &tx)
             .expect("balance update failed");
 
         // Assert: balance should not have changed

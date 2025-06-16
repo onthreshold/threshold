@@ -2,6 +2,11 @@
 name = "types"
 version = "0.1.0"
 edition = "2024"
+description = "Common types for the Threshold network"
+license = "MIT"
+repository = "https://github.com/onthreshold/threshold/"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "types"]
+categories = ["cryptography", "blockchain"]
 
 [dependencies]
 derive_more = { version = "2.0.1", features = ["full"] }

@@ -145,7 +145,7 @@ impl<O: Oracle> TransactionExecutor<O> {
             .new_chain_state
             .get_account(&address)
             .cloned()
-            .unwrap_or(Account {
+            .unwrap_or_else(|| Account {
                 address: address.clone(),
                 balance: 0,
             });

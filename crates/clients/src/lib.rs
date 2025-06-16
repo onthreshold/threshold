@@ -46,7 +46,8 @@ impl Default for EsploraApiClient {
 }
 
 impl EsploraApiClient {
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         client: AsyncClient,
         capacity: Option<usize>,
         tx_channel: Option<broadcast::Sender<Transaction>>,
@@ -56,14 +57,15 @@ impl EsploraApiClient {
     ) -> Self {
         Self {
             client,
-            tx_channel: tx_channel.unwrap_or(broadcast::channel(capacity.unwrap_or(1000)).0),
+            tx_channel: tx_channel.unwrap_or_else(|| broadcast::channel(capacity.unwrap_or(1000)).0),
             deposit_intent_rx,
             confirmation_depth,
             monitor_start_block,
         }
     }
 
-    #[must_use] pub fn new_with_network(
+    #[must_use]
+    pub fn new_with_network(
         network: Network,
         capacity: Option<usize>,
         tx_channel: Option<broadcast::Sender<Transaction>>,
@@ -75,8 +77,14 @@ impl EsploraApiClient {
             Network::Bitcoin => "https://blockstream.info/api",
             Network::Testnet => "https://blockstream.info/testnet/api",
             Network::Signet => "https://blockstream.info/signet/api",
-            Network::Regtest => panic!("Regtest network is not supported by Esplora"),
-            _ => panic!("Unsupported network type"),
+            Network::Regtest => {
+                error!("Regtest network is not supported by Esplora");
+                return Self::default();
+            }
+            _ => {
+                error!("Unsupported network type");
+                return Self::default();
+            }
         };
         let builder = Builder::new(url);
         let client = builder.build_async().unwrap();
@@ -99,9 +107,10 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
         min_height: u32,
         max_height: u32,
     ) -> Result<Vec<Transaction>, NodeError> {
-        let blockchain_height = self.client.get_height().await.map_err(|e| {
-            NodeError::Error(format!("Cannot retrieve height of blockchain: {e}"))
-        })?;
+        let blockchain_height =
+            self.client.get_height().await.map_err(|e| {
+                NodeError::Error(format!("Cannot retrieve height of blockchain: {e}"))
+            })?;
 
         let new_max_height = max_height.min(blockchain_height - self.confirmation_depth);
         let mut confirmed_txs = Vec::new();
@@ -190,7 +199,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
 
                     if new_confirmed_height > last_confirmed_height {
                         let min_height: u32 = if self.monitor_start_block >= 0 {
-                            self.monitor_start_block as u32
+                            u32::try_from(self.monitor_start_block).unwrap()
                         } else {
                             last_confirmed_height + 1
                         };
@@ -243,9 +252,10 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
     }
 
     async fn get_latest_block_height(&self) -> Result<u32, NodeError> {
-        let height = self.client.get_height().await.map_err(|e| {
-            NodeError::Error(format!("Cannot retrieve height of blockchain: {e}"))
-        })?;
+        let height =
+            self.client.get_height().await.map_err(|e| {
+                NodeError::Error(format!("Cannot retrieve height of blockchain: {e}"))
+            })?;
         Ok(height)
     }
 }

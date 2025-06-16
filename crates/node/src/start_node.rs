@@ -13,6 +13,7 @@ use tonic::transport::Server;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
+#[allow(clippy::too_many_lines)]
 pub async fn start_node(
     max_signers: Option<u16>,
     min_signers: Option<u16>,

@@ -75,13 +75,15 @@ pub struct BlockBody {
 }
 
 impl BlockBody {
-    #[must_use] pub const fn new(transactions: Vec<Transaction>) -> Self {
+    #[must_use]
+    pub const fn new(transactions: Vec<Transaction>) -> Self {
         Self { transactions }
     }
 }
 
 impl BlockHeader {
-    #[must_use] pub fn calculate_hash(&self) -> BlockHash {
+    #[must_use]
+    pub fn calculate_hash(&self) -> BlockHash {
         let mut hasher = Sha256::new();
 
         hasher.update(self.version.to_le_bytes());
@@ -100,7 +102,8 @@ impl BlockHeader {
 
 impl Block {
     /// Create a new block
-    #[must_use] pub const fn new(
+    #[must_use]
+    pub const fn new(
         previous_block_hash: BlockHash,
         state_root: StateRoot,
         height: u64,
@@ -123,7 +126,8 @@ impl Block {
         }
     }
 
-    #[must_use] pub fn hash(&self) -> BlockHash {
+    #[must_use]
+    pub fn hash(&self) -> BlockHash {
         self.header.calculate_hash()
     }
 
@@ -142,7 +146,8 @@ impl Block {
 
 impl GenesisBlock {
     /// Create a new genesis block
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         validators: Vec<ValidatorInfo>,
         chain_config: ChainConfig,
         vault_pub_key: Vec<u8>,
@@ -163,7 +168,8 @@ impl GenesisBlock {
         }
     }
 
-    #[must_use] pub fn to_block(&self) -> Block {
+    #[must_use]
+    pub fn to_block(&self) -> Block {
         let mut hasher = Sha256::new();
         hasher.update(b"GENESIS");
         hasher.update(self.timestamp.to_le_bytes());
@@ -189,7 +195,8 @@ impl GenesisBlock {
     }
 
     /// Get hash of genesis block
-    #[must_use] pub fn hash(&self) -> BlockHash {
+    #[must_use]
+    pub fn hash(&self) -> BlockHash {
         self.to_block().hash()
     }
 }

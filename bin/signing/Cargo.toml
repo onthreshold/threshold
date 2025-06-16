@@ -2,6 +2,11 @@
 name = "withdrawal"
 version = "0.1.0"
 edition = "2021"
+description = "Withdrawal signing utility for the Threshold network"
+license = "MIT"
+repository = "https://github.com/onthreshold/threshold/"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "withdrawal"]
+categories = ["cryptography", "blockchain"]
 
 [lints]
 workspace = true

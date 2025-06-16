@@ -46,7 +46,8 @@ pub enum Operation {
 }
 
 impl Transaction {
-    #[must_use] pub fn new(r#type: TransactionType, operations: Vec<Operation>) -> Self {
+    #[must_use]
+    pub fn new(r#type: TransactionType, operations: Vec<Operation>) -> Self {
         Self {
             version: 1,
             timestamp: std::time::SystemTime::now()
@@ -58,7 +59,8 @@ impl Transaction {
         }
     }
 
-    #[must_use] pub fn id(&self) -> TransactionId {
+    #[must_use]
+    pub fn id(&self) -> TransactionId {
         let mut hasher = Sha256::new();
         hasher.update(self.version.to_le_bytes());
         hasher.update(self.timestamp.to_le_bytes());

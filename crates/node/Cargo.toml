@@ -2,6 +2,11 @@
 name = "node"
 version = "0.1.0"
 edition = "2024"
+description = "building the best infrastructure for decentralized multisigs"
+license = "MIT"
+repository = "https://github.com/onthreshold/threshold/"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "node"]
+categories = ["cryptography", "blockchain"]
 
 [lib]
 name = "node"

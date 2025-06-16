@@ -11,15 +11,18 @@ pub struct Account {
 }
 
 impl Account {
-    #[must_use] pub const fn new(address: String, balance: u64) -> Self {
+    #[must_use]
+    pub const fn new(address: String, balance: u64) -> Self {
         Self { address, balance }
     }
 
-    #[must_use] pub fn update_balance(&self, amount: i64) -> Self {
+    #[must_use]
+    pub fn update_balance(&self, amount: i64) -> Self {
         let new_balance = self.balance as i64 + amount;
 
         Self {
             address: self.address.clone(),
+            #[allow(clippy::cast_sign_loss)]
             balance: new_balance as u64,
         }
     }
@@ -40,21 +43,24 @@ impl Default for ChainState {
 
 // TODO: implement periodic flushing of chain state to rocksdb
 impl ChainState {
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             accounts: HashMap::new(),
             block_height: 0,
         }
     }
 
-    #[must_use] pub const fn new_with_accounts(accounts: HashMap<String, Account>, block_height: u64) -> Self {
+    #[must_use]
+    pub const fn new_with_accounts(accounts: HashMap<String, Account>, block_height: u64) -> Self {
         Self {
             accounts,
             block_height,
         }
     }
 
-    #[must_use] pub fn get_account(&self, address: &str) -> Option<&Account> {
+    #[must_use]
+    pub fn get_account(&self, address: &str) -> Option<&Account> {
         self.accounts.get(address)
     }
 
@@ -62,7 +68,8 @@ impl ChainState {
         self.accounts.insert(address.to_string(), account);
     }
 
-    #[must_use] pub const fn get_block_height(&self) -> u64 {
+    #[must_use]
+    pub const fn get_block_height(&self) -> u64 {
         self.block_height
     }
 

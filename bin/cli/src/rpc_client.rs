@@ -87,9 +87,7 @@ pub async fn rpc_get_pending_deposit_intents(
         ))
         .await?;
 
-    println!(
-        "Deposit intents: {get_pending_deposit_intents_response:?}"
-    );
+    println!("Deposit intents: {get_pending_deposit_intents_response:?}");
 
     Ok(get_pending_deposit_intents_response.into_inner())
 }

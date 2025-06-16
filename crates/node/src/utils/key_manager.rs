@@ -9,12 +9,12 @@ use bitcoin::bip32::{DerivationPath, Xpriv};
 use bitcoin::key::Secp256k1;
 use bitcoin::{Address, CompressedPublicKey, Network, PrivateKey};
 use directories::ProjectDirs;
+use frost::rand_core::RngCore;
 use frost_secp256k1 as frost;
 use libp2p::identity::Keypair;
 use std::str::FromStr;
 use tracing::debug;
 use types::errors::NodeError;
-use frost::rand_core::RngCore;
 
 pub fn get_key_file_path() -> Result<PathBuf, NodeError> {
     let proj_dirs = ProjectDirs::from("", "", "TheVault")
@@ -173,11 +173,8 @@ pub fn load_and_decrypt_keypair(config_data: &NodeConfig) -> Result<Keypair, Nod
         &config_data.key_data.encryption_params,
     )?;
 
-    Keypair::from_protobuf_encoding(&private_key_protobuf).map_err(|e| {
-        NodeError::Error(format!(
-            "Failed to reconstruct keypair from protobuf: {e}"
-        ))
-    })
+    Keypair::from_protobuf_encoding(&private_key_protobuf)
+        .map_err(|e| NodeError::Error(format!("Failed to reconstruct keypair from protobuf: {e}")))
 }
 
 pub fn load_dkg_keys(
@@ -209,7 +206,8 @@ pub fn load_dkg_keys(
     }
 }
 
-#[must_use] pub fn generate_keys_from_mnemonic(mnemonic: &str) -> (Address, PrivateKey, CompressedPublicKey) {
+#[must_use]
+pub fn generate_keys_from_mnemonic(mnemonic: &str) -> (Address, PrivateKey, CompressedPublicKey) {
     // Generate a new mnemonic (12 words)
     let mnemonic = Mnemonic::parse_in_normalized(Language::English, mnemonic).unwrap();
 

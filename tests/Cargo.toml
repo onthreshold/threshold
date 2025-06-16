@@ -2,6 +2,11 @@
 name = "tests"
 version = "0.1.0"
 edition = "2024"
+description = "Integration tests for the Threshold network"
+license = "MIT"
+repository = "https://github.com/onthreshold/threshold/"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "tests"]
+categories = ["cryptography", "blockchain"]
 
 [dependencies]
 bitcoin = { workspace = true }

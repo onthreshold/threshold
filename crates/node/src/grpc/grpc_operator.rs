@@ -110,9 +110,7 @@ pub async fn create_deposit_intent(
 
     info!(
         "Received request to create deposit intent with amount {}. Tracking ID: {}. Deposit Address: {}",
-        amount_sat,
-        deposit_tracking_id,
-        deposit_address
+        amount_sat, deposit_tracking_id, deposit_address
     );
 
     Ok(CreateDepositIntentResponse {

@@ -12,7 +12,8 @@ use types::errors::NodeError;
 pub struct BalanceState;
 
 impl BalanceState {
-    #[must_use] pub const fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 }

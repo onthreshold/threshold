@@ -44,9 +44,7 @@ async fn main() {
     let (tx, sighash) = wallet
         .create_spend(amount, fee, &address_to, false)
         .unwrap();
-    println!(
-        "Created Transaction for amount: {amount} to address: {address_to}"
-    );
+    println!("Created Transaction for amount: {amount} to address: {address_to}");
     let tx_id = tx.compute_txid();
 
     let signed_tx = wallet.sign(&tx, &private_key, sighash);

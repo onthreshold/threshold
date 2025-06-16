@@ -47,6 +47,7 @@ impl SpendIntentState {
         )?;
 
         let vsize = tx.vsize();
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let fee = (current_fee_per_vb * vsize as f64) as u64;
         let total_amount = withdrawal_intent.amount_sat + fee;
 
@@ -86,7 +87,7 @@ impl SpendIntentState {
         Ok(secp.verify_ecdsa(&message, &signature, &public_key).is_ok())
     }
 
-    pub async fn confirm_withdrawal<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn confirm_withdrawal<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
         node: &mut NodeState<N, D, O, W>,
         challenge: &str,
@@ -125,7 +126,7 @@ impl SpendIntentState {
         let user_account = node
             .chain_state
             .get_account(&user_pubkey)
-            .ok_or(NodeError::Error("User not found".to_string()))?;
+            .ok_or_else(|| NodeError::Error("User not found".to_string()))?;
 
         let updated_account =
             user_account.update_balance(-((tx.output[0].value.to_sat() + fee) as i64));
@@ -167,14 +168,14 @@ impl SpendIntentState {
             .output
             .iter()
             .find(|o| o.script_pubkey == pending.recipient_script)
-            .ok_or(NodeError::Error("payment output not found".into()))?;
+            .ok_or_else(|| NodeError::Error("payment output not found".into()))?;
 
         let debit = pay_out.value.to_sat() + pending.fee;
 
         let mut acct = node
             .chain_state
             .get_account(&pending.user_pubkey)
-            .ok_or(NodeError::Error("user missing".into()))?
+            .ok_or_else(|| NodeError::Error("user missing".into()))?
             .clone();
         acct = acct.update_balance(-(debit as i64));
         node.chain_state.upsert_account(&pending.user_pubkey, acct);

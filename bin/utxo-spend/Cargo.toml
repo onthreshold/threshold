@@ -2,6 +2,11 @@
 name = "utxo-spend"
 version = "0.1.0"
 edition = "2021"
+description = "UTXO spending utility for the Threshold network"
+license = "MIT"
+repository = "https://github.com/onthreshold/threshold/"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "utxo"]
+categories = ["cryptography", "blockchain"]
 
 [lints]
 workspace = true

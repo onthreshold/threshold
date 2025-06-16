@@ -107,9 +107,7 @@ impl SigningState {
             };
             node.network_handle
                 .send_private_message(*peer, req)
-                .map_err(|e| {
-                    NodeError::Error(format!("Failed to send private request: {e:?}"))
-                })?;
+                .map_err(|e| NodeError::Error(format!("Failed to send private request: {e:?}")))?;
         }
 
         Ok(Some(sign_id))

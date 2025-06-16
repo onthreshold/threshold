@@ -334,8 +334,8 @@ impl SwarmManager {
     pub fn peer_name(&self, peer_id: &PeerId) -> String {
         self.peers_to_names
             .get(peer_id)
-            .unwrap_or(&peer_id.to_string())
-            .clone()
+            .cloned()
+            .unwrap_or_else(|| peer_id.to_string())
     }
 
     pub async fn start(&mut self) {

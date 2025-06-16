@@ -29,7 +29,8 @@ pub struct RocksDb {
 }
 
 impl RocksDb {
-    #[must_use] pub fn new(path: &str) -> Self {
+    #[must_use]
+    pub fn new(path: &str) -> Self {
         let mut opts = rocksdb::Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
@@ -43,10 +44,9 @@ impl RocksDb {
 
 impl Db for RocksDb {
     fn get_block_by_height(&self, height: u64) -> Result<Option<Block>, NodeError> {
-        let block_hash = self.db.get_cf(
-            self.db.cf_handle("blocks").unwrap(),
-            format!("h:{height}"),
-        )?;
+        let block_hash = self
+            .db
+            .get_cf(self.db.cf_handle("blocks").unwrap(), format!("h:{height}"))?;
         if let Some(block_hash) = block_hash {
             let block = self.db.get_cf(
                 self.db.cf_handle("blocks").unwrap(),
@@ -155,14 +155,10 @@ impl Db for RocksDb {
     ) -> Result<Option<DepositIntent>, NodeError> {
         // Step 1: addr → tracking-id
         let key_da = format!("da:{address}");
-        let tracking_id = match self.db.get_cf(
+        let tracking_id = self.db.get_cf(
             self.db.cf_handle("deposit_intents").unwrap(),
             key_da.as_bytes(),
-        )? {
-            Some(bytes) => String::from_utf8(bytes).ok(),
-            None => None,
-        };
-
+        )?.and_then(|bytes| String::from_utf8(bytes).ok());
 
         tracking_id.map_or(Ok(None), |id| self.get_deposit_intent(&id))
     }

@@ -18,7 +18,8 @@ use crate::{
 use protocol::oracle::Oracle;
 
 impl DepositIntentState {
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         deposit_intent_tx: broadcast::Sender<String>,
         transaction_rx: broadcast::Receiver<Transaction>,
     ) -> Self {
@@ -42,10 +43,7 @@ impl DepositIntentState {
             .deposit_addresses
             .insert(deposit_intent.deposit_address.clone())
         {
-            if let Err(e) = self
-                .deposit_intent_tx
-                .send(deposit_intent.deposit_address)
-            {
+            if let Err(e) = self.deposit_intent_tx.send(deposit_intent.deposit_address) {
                 error!("Failed to notify deposit monitor of new address: {}", e);
             }
         }
@@ -139,7 +137,7 @@ impl DepositIntentState {
     pub fn update_user_balance<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
         node: &mut NodeState<N, D, O, W>,
-        tx: Transaction,
+        tx: &Transaction,
     ) -> Result<(), NodeError> {
         if !self.processed_txids.insert(tx.compute_txid()) {
             return Ok(());

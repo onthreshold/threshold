@@ -2,6 +2,11 @@
 name = "protocol"
 version = "0.1.0"
 edition = "2024"
+description = "Protocol implementation for the Threshold network"
+license = "MIT"
+repository = "https://github.com/onthreshold/threshold/"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "protocol"]
+categories = ["cryptography", "blockchain"]
 
 [dependencies]
 serde = { workspace = true }

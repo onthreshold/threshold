@@ -2,6 +2,11 @@
 name = "clients"
 version = "0.1.0"
 edition = "2021"
+description = "Client implementations for the Threshold network"
+license = "MIT"
+repository = "https://github.com/onthreshold/threshold/"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "client"]
+categories = ["cryptography", "blockchain"]
 
 [dependencies]
 bitcoin = { workspace = true }

@@ -16,7 +16,8 @@ use protocol::oracle::Oracle;
 fn dkg_step_delay() -> Duration {
     std::env::var("DKG_STEP_DELAY_SECS")
         .ok()
-        .and_then(|v| v.parse::<u64>().ok()).map_or_else(|| Duration::ZERO, Duration::from_secs)
+        .and_then(|v| v.parse::<u64>().ok())
+        .map_or_else(|| Duration::ZERO, Duration::from_secs)
 }
 
 impl DkgState {
@@ -74,9 +75,7 @@ impl DkgState {
         ) {
             Ok(()) => (),
             Err(e) => {
-                return Err(NodeError::Error(format!(
-                    "Failed to send broadcast: {e:?}"
-                )));
+                return Err(NodeError::Error(format!("Failed to send broadcast: {e:?}")));
             }
         }
 
@@ -86,9 +85,7 @@ impl DkgState {
         {
             Ok(()) => tracing::debug!("Broadcast round1"),
             Err(e) => {
-                return Err(NodeError::Error(format!(
-                    "Failed to send broadcast: {e:?}"
-                )));
+                return Err(NodeError::Error(format!("Failed to send broadcast: {e:?}")));
             }
         }
 
@@ -154,11 +151,12 @@ impl DkgState {
 
                         for peer_to_send_to in &self.dkg_listeners {
                             let identifier = peer_id_to_identifier(peer_to_send_to);
-                            let package_to_send = if let Some(package) = round2_packages.get(&identifier) { package } else {
-                                tracing::warn!(
-                                    "Round2 package not found for {}",
-                                    peer_to_send_to
-                                );
+                            let package_to_send = if let Some(package) =
+                                round2_packages.get(&identifier)
+                            {
+                                package
+                            } else {
+                                tracing::warn!("Round2 package not found for {}", peer_to_send_to);
                                 return Err(NodeError::Error(format!(
                                     "Round2 package not found for {peer_to_send_to}"
                                 )));
