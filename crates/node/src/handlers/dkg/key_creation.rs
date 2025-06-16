@@ -11,7 +11,6 @@ use crate::{
     swarm_manager::{DirectMessage, Network},
     wallet::Wallet,
 };
-use protocol::oracle::Oracle;
 
 fn dkg_step_delay() -> Duration {
     std::env::var("DKG_STEP_DELAY_SECS")
@@ -22,9 +21,9 @@ fn dkg_step_delay() -> Duration {
 }
 
 impl DkgState {
-    pub async fn handle_dkg_start<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub async fn handle_dkg_start<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
     ) -> Result<(), NodeError> {
         if self.dkg_started {
             tracing::debug!("DKG already started, skipping DKG process");
@@ -108,9 +107,9 @@ impl DkgState {
         }
     }
 
-    pub fn handle_round1_payload<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn handle_round1_payload<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         sender_peer_id: PeerId,
         package: &[u8],
     ) -> Result<(), NodeError> {
@@ -139,9 +138,9 @@ impl DkgState {
         Ok(())
     }
 
-    pub fn try_enter_round2<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn try_enter_round2<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
     ) -> Result<(), NodeError> {
         if let Some(r1_secret_package) = self.r1_secret_package.as_ref() {
             if self.round1_peer_packages.len() + 1 == node.max_signers as usize {
@@ -213,9 +212,9 @@ impl DkgState {
         Ok(())
     }
 
-    pub fn handle_round2_payload<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn handle_round2_payload<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         sender_peer_id: PeerId,
         package: round2::Package,
     ) -> Result<(), NodeError> {

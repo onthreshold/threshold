@@ -5,8 +5,8 @@ mod utxo_spend_test {
     use node::key_manager::generate_keys_from_mnemonic;
     use node::wallet::TaprootWallet;
     use node::wallet::Wallet;
-    use protocol::oracle::EsploraOracle;
-    use protocol::oracle::Oracle;
+    use oracle::esplora::EsploraOracle;
+    use oracle::oracle::Oracle;
 
     #[tokio::test]
     pub async fn test_utxo_spend() {
@@ -25,15 +25,22 @@ mod utxo_spend_test {
         let (address, private_key, _) = generate_keys_from_mnemonic(&mnemonic);
         let (address_to, private_key_to, _) = generate_keys_from_mnemonic(&mnemonic_to);
 
-        let oracle = EsploraOracle::new(true);
+        let oracle = EsploraOracle::new(
+            bitcoin::network::Network::Testnet,
+            Some(100),
+            None,
+            None,
+            6,
+            -1,
+        );
 
         let mut wallet_one = TaprootWallet::new(
-            oracle.clone(),
+            Box::new(oracle.clone()),
             vec![address.clone()],
             bitcoin::network::Network::Testnet,
         );
         let mut wallet_two = TaprootWallet::new(
-            oracle.clone(),
+            Box::new(oracle.clone()),
             vec![address_to.clone()],
             bitcoin::network::Network::Testnet,
         );

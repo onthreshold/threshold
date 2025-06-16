@@ -10,18 +10,17 @@ use types::errors::NodeError;
 
 use crate::wallet::Wallet;
 use crate::{Network, NodeState, db::Db, swarm_manager::NetworkEvent};
-use protocol::oracle::Oracle;
 
 #[async_trait::async_trait]
-pub trait Handler<N: Network, D: Db, O: Oracle, W: Wallet<O>>: Send + Any {
+pub trait Handler<N: Network, D: Db, W: Wallet>: Send + Any {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), NodeError>;
 }
 
-impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> dyn Handler<N, D, O, W> {
+impl<N: Network, D: Db, W: Wallet> dyn Handler<N, D, W> {
     pub fn downcast_ref<T>(&self) -> Option<&T>
     where
         T: Any,

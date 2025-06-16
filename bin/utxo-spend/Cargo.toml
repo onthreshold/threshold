@@ -12,6 +12,7 @@ hex = "0.4"
 dotenvy = { workspace = true }
 node = { path = "../../crates/node" }
 protocol = { path = "../../crates/protocol" }
+oracle = { path = "../../crates/oracle" }
 
 [dev-dependencies]
 tempfile = "3.8"

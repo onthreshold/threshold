@@ -4,14 +4,13 @@ use crate::handlers::Handler;
 use crate::handlers::signing::SigningState;
 use crate::swarm_manager::{DirectMessage, Network, NetworkEvent, SelfRequest, SelfResponse};
 use crate::wallet::Wallet;
-use protocol::oracle::Oracle;
 use types::errors::NodeError;
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for SigningState {
+impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SigningState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), NodeError> {
         match message {

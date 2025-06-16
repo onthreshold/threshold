@@ -13,7 +13,7 @@ async-trait = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 futures = { workspace = true }
 esplora-client = { workspace = true }
-clients = { path = "../crates/clients" }
+oracle = { path = "../crates/oracle" }
 sha2 = { workspace = true }
 bincode = { workspace = true }
 log = "0.4.27"

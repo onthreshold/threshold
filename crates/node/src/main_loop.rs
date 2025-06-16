@@ -4,12 +4,9 @@ use crate::db::Db;
 use crate::swarm_manager::NetworkEvent;
 use crate::wallet::Wallet;
 use crate::{Network, NodeState};
-use protocol::oracle::Oracle;
 use types::errors::NodeError;
 
-impl<N: Network + 'static, D: Db + 'static, O: Oracle + 'static, W: Wallet<O> + 'static>
-    NodeState<N, D, O, W>
-{
+impl<N: Network + 'static, D: Db + 'static, W: Wallet + 'static> NodeState<N, D, W> {
     pub async fn try_poll(&mut self) -> Result<bool, NodeError> {
         let send_message = self.network_events_stream.try_recv().ok();
         if let Some(event) = send_message {

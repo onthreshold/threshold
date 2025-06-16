@@ -16,13 +16,12 @@ use crate::{
     wallet::Wallet,
 };
 use crate::{handlers::signing::SigningState, peer_id_to_identifier};
-use protocol::oracle::Oracle;
 use types::errors::NodeError;
 
 impl SigningState {
-    pub fn start_signing_session<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn start_signing_session<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         message_hex: &str,
     ) -> Result<Option<u64>, NodeError> {
         if node.private_key_package.is_none() || node.pubkey_package.is_none() {
@@ -116,9 +115,9 @@ impl SigningState {
     }
 
     /// Handle incoming SignRequest (participant side)
-    pub fn handle_sign_request<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn handle_sign_request<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         peer: PeerId,
         sign_id: u64,
         message: Vec<u8>,
@@ -175,9 +174,9 @@ impl SigningState {
     }
 
     /// Coordinator receives commitments responses
-    pub fn handle_commitments_response<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn handle_commitments_response<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         peer: PeerId,
         sign_id: u64,
         commitments_bytes: Vec<u8>,
@@ -255,9 +254,9 @@ impl SigningState {
     }
 
     /// Participant handles SignPackage request
-    pub fn handle_sign_package<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn handle_sign_package<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         peer: PeerId,
         sign_id: u64,
         package_bytes: Vec<u8>,
@@ -312,9 +311,9 @@ impl SigningState {
     }
 
     /// Coordinator handles incoming signature share
-    pub async fn handle_signature_share<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub async fn handle_signature_share<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         peer: PeerId,
         sign_id: u64,
         sig_bytes: Vec<u8>,

@@ -15,3 +15,4 @@ esplora-client = { workspace = true }
 types = { path = "../types" }
 dotenvy = { workspace = true }
 hex = { workspace = true }
+oracle = { path = "../oracle" }

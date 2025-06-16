@@ -8,8 +8,9 @@ use bitcoin::{
     Amount, Network, ScriptBuf, Sequence, Transaction, TxIn, TxOut, absolute::LockTime,
     transaction::Version, witness::Witness,
 };
-use protocol::oracle::{Oracle, Utxo};
+use oracle::oracle::Oracle;
 use types::errors::NodeError;
+use types::utxo::Utxo;
 
 use super::traits::Wallet;
 
@@ -19,16 +20,15 @@ pub struct TrackedUtxo {
     pub address: bitcoin::Address,
 }
 
-#[derive(Debug)]
-pub struct TaprootWallet<O: Oracle> {
+pub struct TaprootWallet {
     pub addresses: Vec<bitcoin::Address>,
     pub utxos: Vec<TrackedUtxo>,
-    pub oracle: O,
+    pub oracle: Box<dyn Oracle>,
     pub network: Network,
 }
 
-impl<O: Oracle> TaprootWallet<O> {
-    pub fn new(oracle: O, addresses: Vec<Address>, network: Network) -> Self {
+impl TaprootWallet {
+    pub fn new(oracle: Box<dyn Oracle>, addresses: Vec<Address>, network: Network) -> Self {
         Self {
             addresses,
             utxos: Vec::new(),
@@ -43,7 +43,7 @@ impl<O: Oracle> TaprootWallet<O> {
 }
 
 #[async_trait::async_trait]
-impl<O: Oracle + Send + Sync> Wallet<O> for TaprootWallet<O> {
+impl Wallet for TaprootWallet {
     async fn refresh_utxos(&mut self, allow_unconfirmed: Option<bool>) -> Result<(), NodeError> {
         self.utxos.clear();
         for addr in &self.addresses {

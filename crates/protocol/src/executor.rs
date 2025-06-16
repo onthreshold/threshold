@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use bitcoin::{Txid, hashes::Hash};
 
+use oracle::oracle::Oracle;
 use types::errors::NodeError;
 
 use crate::{
     chain_state::{Account, ChainState},
-    oracle::Oracle,
     transaction::{Operation, Transaction},
 };
 

@@ -13,14 +13,13 @@ use bitcoin::{
     secp256k1::{Message, PublicKey, ecdsa::Signature},
 };
 use libp2p::gossipsub;
-use protocol::oracle::Oracle;
 use sha2::{Digest, Sha256};
 use types::errors::NodeError;
 
 impl SpendIntentState {
-    pub async fn propose_withdrawal<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub async fn propose_withdrawal<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         withdrawal_intent: &SpendIntent,
     ) -> Result<(u64, String), NodeError> {
         let account = node.chain_state.get_account(&withdrawal_intent.public_key);
@@ -86,9 +85,9 @@ impl SpendIntentState {
         Ok(secp.verify_ecdsa(&message, &signature, &public_key).is_ok())
     }
 
-    pub async fn confirm_withdrawal<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub async fn confirm_withdrawal<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         challenge: &str,
         signature: &str,
     ) -> Result<(), NodeError> {
@@ -115,8 +114,8 @@ impl SpendIntentState {
         Ok(())
     }
 
-    pub async fn handle_signed_withdrawal<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
-        node: &mut NodeState<N, D, O, W>,
+    pub async fn handle_signed_withdrawal<N: Network, D: Db, W: Wallet>(
+        node: &mut NodeState<N, D, W>,
         tx: &Transaction,
         fee: u64,
         user_pubkey: String,
@@ -153,9 +152,9 @@ impl SpendIntentState {
         Ok(())
     }
 
-    pub async fn handle_withdrawl_message<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub async fn handle_withdrawl_message<N: Network, D: Db, W: Wallet>(
         &self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         pending: PendingSpend,
     ) -> Result<(), NodeError> {
         node.oracle.broadcast_transaction(&pending.tx).await?;

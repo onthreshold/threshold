@@ -1,7 +1,8 @@
 use bitcoin::Address;
 use node::key_manager::generate_keys_from_mnemonic;
 use node::wallet::{TaprootWallet, Wallet};
-use protocol::oracle::Oracle;
+use oracle::esplora::EsploraOracle;
+use oracle::oracle::Oracle;
 use std::str::FromStr;
 
 #[tokio::main]
@@ -34,9 +35,16 @@ async fn main() {
         generate_keys_from_mnemonic(mnemonic.as_str());
     println!("Sender address: {}. Loading wallet utxos...", address);
 
-    let oracle = protocol::oracle::EsploraOracle::new(true);
+    let oracle = EsploraOracle::new(
+        bitcoin::network::Network::Testnet,
+        Some(100),
+        None,
+        None,
+        6,
+        -1,
+    );
     let mut wallet = TaprootWallet::new(
-        oracle.clone(),
+        Box::new(oracle.clone()),
         vec![address],
         bitcoin::network::Network::Testnet,
     );

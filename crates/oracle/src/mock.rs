@@ -1,25 +1,27 @@
 use std::{collections::HashMap, str::FromStr};
 
-use bitcoin::{Address, Amount, OutPoint, ScriptBuf, Txid};
-use protocol::oracle::{Oracle, Utxo};
-use types::errors::NodeError;
+use crate::oracle::Oracle;
+use bitcoin::{hashes::Hash, Address, Amount, OutPoint, ScriptBuf, Transaction, Txid};
+use tokio::sync::broadcast;
+use types::{errors::NodeError, utxo::Utxo};
 
 #[derive(Clone)]
 pub struct MockOracle {
     // Map of tx_hash -> (address, amount, is_valid)
     pub transactions: HashMap<String, (String, u64, bool)>,
-}
-
-impl Default for MockOracle {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub tx_channel: broadcast::Sender<Transaction>,
+    pub deposit_intent_rx: Option<broadcast::Sender<String>>,
 }
 
 impl MockOracle {
-    pub fn new() -> Self {
+    pub fn new(
+        tx_channel: broadcast::Sender<Transaction>,
+        deposit_intent_rx: Option<broadcast::Sender<String>>,
+    ) -> Self {
         Self {
             transactions: HashMap::new(),
+            tx_channel,
+            deposit_intent_rx,
         }
     }
 
@@ -115,5 +117,70 @@ impl Oracle for MockOracle {
 
     async fn broadcast_transaction(&self, _tx: &bitcoin::Transaction) -> Result<String, NodeError> {
         Ok(String::new())
+    }
+
+    async fn get_confirmed_transactions(
+        &self,
+        _addresses: Vec<Address>,
+        _min_height: u32,
+        _max_height: u32,
+    ) -> Result<Vec<bitcoin::Transaction>, NodeError> {
+        Ok(vec![])
+    }
+
+    async fn poll_new_transactions(&mut self, _addresses: Vec<Address>) {
+        let Some(dep_tx_sender) = self.deposit_intent_rx.take() else {
+            return;
+        };
+
+        let mut deposit_rx = dep_tx_sender.subscribe();
+
+        loop {
+            match deposit_rx.recv().await {
+                Ok(addr_str) => {
+                    if let Ok(addr) = Address::from_str(&addr_str) {
+                        let tx = self.create_dummy_tx(addr.assume_checked(), 10_000);
+                        let _ = self.tx_channel.send(tx);
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue, // skip missed messages
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    }
+
+    async fn get_latest_block_height(&self) -> Result<u32, NodeError> {
+        // Return a constant dummy height
+        Ok(0)
+    }
+}
+
+impl MockOracle {
+    fn create_dummy_tx(&self, address: Address, value_sat: u64) -> Transaction {
+        use bitcoin::{
+            absolute::LockTime, transaction::Version, Amount, OutPoint, Sequence, TxIn, TxOut,
+        };
+
+        let tx_in = TxIn {
+            previous_output: OutPoint {
+                txid: Txid::from_slice(&[0u8; 32]).unwrap(),
+                vout: 0,
+            },
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::ZERO,
+            witness: bitcoin::witness::Witness::new(),
+        };
+
+        let tx_out = TxOut {
+            value: Amount::from_sat(value_sat),
+            script_pubkey: address.script_pubkey(),
+        };
+
+        Transaction {
+            version: Version::TWO,
+            lock_time: LockTime::ZERO,
+            input: vec![tx_in],
+            output: vec![tx_out],
+        }
     }
 }

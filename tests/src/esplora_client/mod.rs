@@ -1,13 +1,12 @@
 #[cfg(test)]
 mod esplora_client_test {
     use bitcoin::{Address, Network};
-    use clients::{EsploraApiClient, WindowedConfirmedTransactionProvider};
+    use oracle::{esplora::EsploraOracle, oracle::Oracle};
     use std::str::FromStr;
 
     #[tokio::test]
     async fn test_get_confirmed_transactions() {
-        let client =
-            EsploraApiClient::new_with_network(Network::Bitcoin, Some(100), None, None, 6, -1);
+        let client = EsploraOracle::new(Network::Bitcoin, Some(100), None, None, 6, -1);
         let address = Address::from_str("bc1qezwz3yt46nsgzcwlg0dsw680nryjpq5u8pvzts")
             .unwrap()
             .require_network(Network::Bitcoin)

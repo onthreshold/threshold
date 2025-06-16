@@ -156,6 +156,8 @@ enum Commands {
         confirmation_depth: Option<u32>,
         #[arg(short = 's', long)]
         monitor_start_block: Option<i32>,
+        #[arg(long)]
+        use_mock_oracle: Option<bool>,
     },
     Spend {
         amount: u64,
@@ -212,6 +214,7 @@ async fn main() -> Result<(), CliError> {
             min_signers,
             confirmation_depth,
             monitor_start_block,
+            use_mock_oracle,
         } => {
             start_node_cli(StartNodeConfigParams {
                 key_file_path,
@@ -225,6 +228,7 @@ async fn main() -> Result<(), CliError> {
                 min_signers,
                 confirmation_depth,
                 monitor_start_block,
+                use_mock_oracle,
             })
             .await
             .map_err(|e| CliError::NodeError(e.to_string()))?;
@@ -349,6 +353,7 @@ struct StartNodeConfigParams {
     min_signers: Option<u16>,
     confirmation_depth: Option<u32>,
     monitor_start_block: Option<i32>,
+    use_mock_oracle: Option<bool>,
 }
 
 async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> {
@@ -392,6 +397,7 @@ async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> 
         config,
         params.grpc_port,
         params.log_file.map(PathBuf::from),
+        params.use_mock_oracle,
     )
     .await?;
     Ok(())
