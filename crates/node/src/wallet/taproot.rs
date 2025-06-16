@@ -1,9 +1,10 @@
-use bitcoin::Address;
 use bitcoin::PublicKey;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Scalar;
 use bitcoin::secp256k1::Secp256k1;
+use bitcoin::sighash::Prevouts;
 use bitcoin::sighash::SighashCache;
+use bitcoin::{Address, EcdsaSighashType};
 use bitcoin::{
     Amount, Network, ScriptBuf, Sequence, Transaction, TxIn, TxOut, absolute::LockTime,
     transaction::Version, witness::Witness,
@@ -41,6 +42,16 @@ impl TaprootWallet {
         self.utxos
             .iter()
             .find(|t: &&TrackedUtxo| t.utxo.value.to_sat() >= target)
+    }
+
+    fn is_p2wpkh(script: &ScriptBuf) -> bool {
+        let bytes = script.as_bytes();
+        bytes.len() == 22 && bytes[0] == 0x00 && bytes[1] == 0x14
+    }
+
+    fn is_p2tr(script: &ScriptBuf) -> bool {
+        let bytes = script.as_bytes();
+        bytes.len() == 34 && bytes[0] == 0x51 && bytes[1] == 0x20
     }
 }
 
@@ -115,9 +126,14 @@ impl Wallet for TaprootWallet {
                 script_pubkey: change_address.script_pubkey(),
             });
             if !dry_run {
+                let change_outpoint = bitcoin::OutPoint {
+                    txid: utxo.outpoint.txid,
+                    vout: 1,
+                };
+
                 self.utxos.push(TrackedUtxo {
                     utxo: Utxo {
-                        outpoint: utxo.outpoint,
+                        outpoint: change_outpoint,
                         value: Amount::from_sat(change_sat),
                         script_pubkey: change_address.script_pubkey(),
                     },
@@ -133,19 +149,31 @@ impl Wallet for TaprootWallet {
             output: outputs,
         };
 
-        let prev_txout = bitcoin::TxOut {
-            value: utxo.value,
-            script_pubkey: utxo.script_pubkey.clone(),
-        };
-        let prevouts_single = [prev_txout];
-        let prevouts = bitcoin::sighash::Prevouts::All(&prevouts_single);
-
         let mut sighash_cache = SighashCache::new(&tx);
-        let sighash = sighash_cache
-            .taproot_key_spend_signature_hash(0, &prevouts, bitcoin::TapSighashType::All)
-            .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {}", e)))?;
+        let sighash = if Self::is_p2wpkh(&utxo.script_pubkey) {
+            sighash_cache
+                .p2wpkh_signature_hash(0, &utxo.script_pubkey, utxo.value, EcdsaSighashType::All)
+                .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {}", e)))?
+                .to_byte_array()
+        } else if Self::is_p2tr(&utxo.script_pubkey) {
+            let prev = bitcoin::TxOut {
+                value: utxo.value,
+                script_pubkey: utxo.script_pubkey.clone(),
+            };
+            let prevouts = [prev];
+            sighash_cache
+                .taproot_key_spend_signature_hash(
+                    0,
+                    &Prevouts::All(&prevouts),
+                    bitcoin::TapSighashType::All,
+                )
+                .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {}", e)))?
+                .to_byte_array()
+        } else {
+            return Err(NodeError::Error("Unsupported script type".into()));
+        };
 
-        Ok((tx, sighash.to_byte_array()))
+        Ok((tx, sighash))
     }
 
     fn sign(
