@@ -156,7 +156,7 @@ enum Commands {
         confirmation_depth: Option<u32>,
         #[arg(short = 's', long)]
         monitor_start_block: Option<i32>,
-        #[arg(long)]
+        #[arg(long, action = clap::ArgAction::SetTrue)]
         use_mock_oracle: Option<bool>,
     },
     Spend {
