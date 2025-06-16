@@ -1,4 +1,5 @@
 pub mod balance;
+pub mod consensus;
 pub mod deposit;
 pub mod dkg;
 pub mod signing;

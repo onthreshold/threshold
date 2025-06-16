@@ -19,6 +19,7 @@ use libp2p::{
     yamux,
 };
 use libp2p::{identity::Keypair, request_response::cbor};
+use protocol::transaction::Transaction;
 use tokio::{
     io,
     sync::{
@@ -27,12 +28,16 @@ use tokio::{
     },
 };
 
+use types::errors::{NetworkError, NodeError};
+use types::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
 use crate::PeerData;
-use types::network_event::{DirectMessage, SelfRequest, SelfResponse};
-use types::{
-    errors::{NetworkError, NodeError},
-    network_event::NetworkEvent,
-};
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ConsensusMessage {
+    Propose(Transaction),
+    Prevote(Transaction),
+    Precommit(Transaction),
+}
 
 #[derive(NetworkBehaviour)]
 pub struct MyBehaviour {
@@ -159,6 +164,7 @@ pub struct SwarmManager {
     pub start_dkg_topic: gossipsub::IdentTopic,
     pub deposit_intents_topic: gossipsub::IdentTopic,
     pub withdrawls_topic: gossipsub::IdentTopic,
+    pub leader_topic: gossipsub::IdentTopic,
 }
 
 impl SwarmManager {
@@ -214,6 +220,13 @@ impl SwarmManager {
             .subscribe(&withdrawls_topic)
             .map_err(|e| NodeError::Error(e.to_string()))?;
 
+        let leader_topic = gossipsub::IdentTopic::new("leader");
+        swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&leader_topic)
+            .map_err(|e| NodeError::Error(e.to_string()))?;
+
         Ok((
             Self {
                 round1_topic,
@@ -221,6 +234,7 @@ impl SwarmManager {
                 start_dkg_topic,
                 deposit_intents_topic,
                 withdrawls_topic,
+                leader_topic,
                 inner: swarm,
                 network_manager_rx: receiving_commands,
                 network_events: network_events_emitter,

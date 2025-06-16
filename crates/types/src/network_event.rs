@@ -82,6 +82,7 @@ pub enum SelfRequest {
     ConfirmDeposit {
         confirmed_tx: Transaction,
     },
+    Tick,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

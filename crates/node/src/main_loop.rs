@@ -1,10 +1,10 @@
 use tracing::{error, info};
 
 use crate::db::Db;
+use types::network_event::{NetworkEvent, SelfRequest};
 use crate::wallet::Wallet;
 use crate::{Network, NodeState};
 use types::errors::NodeError;
-use types::network_event::NetworkEvent;
 
 impl<N: Network + 'static, D: Db + 'static, W: Wallet + 'static> NodeState<N, D, W> {
     pub async fn try_poll(&mut self) -> Result<bool, NodeError> {
@@ -25,7 +25,16 @@ impl<N: Network + 'static, D: Db + 'static, W: Wallet + 'static> NodeState<N, D,
     pub async fn start(&mut self) {
         info!("Local peer id: {}", self.peer_id);
 
+        let mut round_time: tokio::time::Interval =
+            tokio::time::interval(std::time::Duration::from_secs(1));
+
         loop {
+            tokio::select! {
+                _ = round_time.tick() => {
+                    self.handle(Some(NetworkEvent::SelfRequest { request: SelfRequest::Tick, response_channel: None })).await.unwrap();
+                }
+                _ = self.poll() => {}
+            }
             if let Err(e) = self.poll().await {
                 error!("Error polling network events: {}", e);
             }

@@ -1,8 +1,8 @@
 use crate::{
     db::Db,
     handlers::{
-        Handler, balance::BalanceState, deposit::DepositIntentState, dkg::DkgState,
-        signing::SigningState, withdrawl::SpendIntentState,
+        Handler, balance::BalanceState, consensus::ConsensusState, deposit::DepositIntentState,
+        dkg::DkgState, signing::SigningState, withdrawl::SpendIntentState,
     },
     wallet::Wallet,
 };
@@ -292,6 +292,16 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
         let dkg_state = DkgState::new()?;
         let signing_state = SigningState::new()?;
+        let mut consensus_state = ConsensusState::new();
+
+        for peer in &config.allowed_peers {
+            if let Ok(peer_id) = peer.public_key.parse::<PeerId>() {
+                consensus_state.validators.insert(peer_id);
+            }
+        }
+
+        consensus_state.validators.insert(network_handle.peer_id());
+
         let mut deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
         let withdrawl_intent_state = SpendIntentState::new();
         let balance_state = BalanceState::new();
@@ -324,6 +334,7 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
             handlers: vec![
                 Box::new(dkg_state),
                 Box::new(signing_state),
+                Box::new(consensus_state),
                 Box::new(deposit_intent_state),
                 Box::new(withdrawl_intent_state),
                 Box::new(balance_state),
