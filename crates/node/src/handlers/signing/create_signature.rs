@@ -108,14 +108,14 @@ impl SigningState {
             node.network_handle
                 .send_private_message(*peer, req)
                 .map_err(|e| {
-                    NodeError::Error(format!("Failed to send private request: {:?}", e))
+                    NodeError::Error(format!("Failed to send private request: {e:?}"))
                 })?;
         }
 
         Ok(Some(sign_id))
     }
 
-    /// Handle incoming SignRequest (participant side)
+    /// Handle incoming `SignRequest` (participant side)
     pub fn handle_sign_request<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
         node: &mut NodeState<N, D, O, W>,
@@ -145,7 +145,7 @@ impl SigningState {
         // Save session (one at a time for simplicity)
         self.active_signing = Some(ActiveSigning {
             sign_id,
-            message: message.clone(),
+            message,
             selected_peers: Vec::new(),
             nonces,
             commitments: BTreeMap::new(), // not used for participant
@@ -244,7 +244,7 @@ impl SigningState {
                         .insert(peer_id_to_identifier(&node.peer_id), sig_share);
                 }
                 Err(e) => {
-                    return Err(NodeError::Error(format!("Failed to sign: {}", e)));
+                    return Err(NodeError::Error(format!("Failed to sign: {e}")));
                 }
             }
 
@@ -254,7 +254,7 @@ impl SigningState {
         Ok(())
     }
 
-    /// Participant handles SignPackage request
+    /// Participant handles `SignPackage` request
     pub fn handle_sign_package<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
         &mut self,
         node: &mut NodeState<N, D, O, W>,
@@ -298,7 +298,7 @@ impl SigningState {
                 let _ = node.network_handle.send_private_message(peer, resp);
             }
             Err(e) => {
-                return Err(NodeError::Error(format!("Failed to sign: {}", e)));
+                return Err(NodeError::Error(format!("Failed to sign: {e}")));
             }
         }
 

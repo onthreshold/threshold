@@ -43,7 +43,7 @@ impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for Deposit
                             deposit_tracking_id,
                             deposit_address,
                         })
-                        .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
+                        .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
                 }
             }
             Some(NetworkEvent::SelfRequest {
@@ -54,14 +54,14 @@ impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for Deposit
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::GetPendingDepositIntentsResponse { intents: response })
-                        .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
+                        .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
                 }
             }
             Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {
                 if topic == IdentTopic::new("deposit-intents").hash() {
                     let (deposit_intent, _) =
                         bincode::decode_from_slice(&data, bincode::config::standard()).map_err(
-                            |e| NodeError::Error(format!("Failed to parse deposit intent: {}", e)),
+                            |e| NodeError::Error(format!("Failed to parse deposit intent: {e}")),
                         )?;
 
                     if let Err(e) = self.create_deposit_from_intent(node, deposit_intent) {

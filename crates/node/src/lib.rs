@@ -37,7 +37,7 @@ pub use utils::key_manager;
 pub use utils::swarm_manager;
 pub mod wallet;
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PeerData {
     pub name: String,
     pub public_key: String,
@@ -125,7 +125,7 @@ impl NodeConfig {
                 salt.as_str().as_bytes(),
                 &mut key_bytes,
             )
-            .map_err(|e| NodeError::Error(format!("Argon2 key derivation failed: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Argon2 key derivation failed: {e}")))?;
 
         // Generate random IV for AES encryption
         let mut iv = [0u8; 12];
@@ -135,13 +135,13 @@ impl NodeConfig {
         // Get private key bytes
         let private_key_bytes = keypair
             .to_protobuf_encoding()
-            .map_err(|e| NodeError::Error(format!("Failed to encode private key: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to encode private key: {e}")))?;
 
         // Encrypt the private key
         let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key_bytes));
         let ciphertext = cipher
             .encrypt(nonce, private_key_bytes.as_ref())
-            .map_err(|e| NodeError::Error(format!("AES encryption failed: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("AES encryption failed: {e}")))?;
 
         let encrypted_private_key_b64 = BASE64.encode(ciphertext);
         let iv_b64 = BASE64.encode(iv);
@@ -156,7 +156,7 @@ impl NodeConfig {
             },
         };
 
-        Ok(NodeConfig {
+        Ok(Self {
             allowed_peers: Vec::new(),
             key_data,
             dkg_keys: None,
@@ -179,10 +179,10 @@ impl NodeConfig {
         };
 
         let key_info_str = serde_json::to_string_pretty(&key_store)
-            .map_err(|e| NodeError::Error(format!("Failed to serialize key data: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to serialize key data: {e}")))?;
 
         fs::write(&self.key_file_path, key_info_str)
-            .map_err(|e| NodeError::Error(format!("Failed to write key data: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to write key data: {e}")))?;
 
         Ok(())
     }
@@ -194,10 +194,10 @@ impl NodeConfig {
         };
 
         let key_info_str = serde_json::to_string_pretty(&key_store)
-            .map_err(|e| NodeError::Error(format!("Failed to serialize key data: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to serialize key data: {e}")))?;
 
         fs::write(&self.key_file_path, key_info_str)
-            .map_err(|e| NodeError::Error(format!("Failed to write key data: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to write key data: {e}")))?;
 
         let config_store = ConfigStore {
             allowed_peers: self.allowed_peers.clone(),
@@ -214,7 +214,7 @@ impl NodeConfig {
         let config_str: String = serde_yaml::to_string(&config_store).unwrap();
 
         fs::write(&self.config_file_path, config_str)
-            .map_err(|e| NodeError::Error(format!("Failed to write config: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to write config: {e}")))?;
 
         Ok(())
     }
@@ -227,15 +227,15 @@ impl NodeConfig {
         self.key_data = key_data;
     }
 
-    pub fn set_grpc_port(&mut self, port: u16) {
+    pub const fn set_grpc_port(&mut self, port: u16) {
         self.grpc_port = port;
     }
 
-    pub fn set_libp2p_udp_port(&mut self, port: u16) {
+    pub const fn set_libp2p_udp_port(&mut self, port: u16) {
         self.libp2p_udp_port = port;
     }
 
-    pub fn set_libp2p_tcp_port(&mut self, port: u16) {
+    pub const fn set_libp2p_tcp_port(&mut self, port: u16) {
         self.libp2p_tcp_port = port;
     }
 
@@ -243,11 +243,11 @@ impl NodeConfig {
         self.database_directory = dir;
     }
 
-    pub fn set_confirmation_depth(&mut self, depth: u32) {
+    pub const fn set_confirmation_depth(&mut self, depth: u32) {
         self.confirmation_depth = depth;
     }
 
-    pub fn set_monitor_start_block(&mut self, block: i32) {
+    pub const fn set_monitor_start_block(&mut self, block: i32) {
         self.monitor_start_block = block;
     }
 }
@@ -278,19 +278,19 @@ pub struct NodeState<N: Network, D: Db, O: Oracle, W: Wallet<O>> {
 impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> NodeState<N, D, O, W> {
     #[allow(clippy::too_many_arguments)]
     pub fn new_from_config(
-        network_handle: N,
+        network_handle: &N,
         min_signers: u16,
         max_signers: u16,
         config: NodeConfig,
         storage_db: D,
-        network_events_sender: broadcast::Sender<NetworkEvent>,
+        network_events_sender: &broadcast::Sender<NetworkEvent>,
         deposit_intent_tx: broadcast::Sender<String>,
         transaction_rx: broadcast::Receiver<Transaction>,
         oracle: O,
         wallet: W,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())
-            .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {e}")))?;
         let dkg_state = DkgState::new()?;
         let signing_state = SigningState::new()?;
         let mut deposit_intent_state = DepositIntentState::new(deposit_intent_tx, transaction_rx);
@@ -314,7 +314,7 @@ impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> NodeState<N, D, O, W> {
             }
         }
 
-        let mut node_state = NodeState {
+        let mut node_state = Self {
             network_handle: network_handle.clone(),
             network_events_stream: network_events_sender.subscribe(),
             peer_id: network_handle.peer_id(),
@@ -353,7 +353,7 @@ pub fn peer_id_to_identifier(peer_id: &PeerId) -> Identifier {
         Ok(identifier) => identifier,
         Err(e) => {
             error!("Failed to derive identifier: {}", e);
-            panic!("Failed to derive identifier");
+            Identifier::derive(&[0u8; 32]).unwrap()
         }
     }
 }

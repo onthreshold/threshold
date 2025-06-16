@@ -31,6 +31,6 @@ pub enum CliError {
 
 impl From<KeygenError> for CliError {
     fn from(error: KeygenError) -> Self {
-        CliError::KeygenError(error)
+        Self::KeygenError(error)
     }
 }

@@ -10,7 +10,7 @@ pub mod node_proto {
 
 use node_proto::{
     node_control_server::{NodeControl, NodeControlServer},
-    *,
+    CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest, ConfirmWithdrawalResponse, CreateDepositIntentRequest, CreateDepositIntentResponse, GetPendingDepositIntentsRequest, GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse, SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
 };
 
 pub struct NodeControlService {
@@ -18,11 +18,11 @@ pub struct NodeControlService {
 }
 
 impl NodeControlService {
-    pub fn new(network: NetworkHandle) -> Self {
+    #[must_use] pub const fn new(network: NetworkHandle) -> Self {
         Self { network }
     }
 
-    pub fn into_server(self) -> NodeControlServer<Self> {
+    #[must_use] pub fn into_server(self) -> NodeControlServer<Self> {
         NodeControlServer::new(self)
     }
 }

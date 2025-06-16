@@ -20,7 +20,7 @@ use types::errors::NodeError;
 
 impl DkgState {
     pub fn new() -> Result<Self, NodeError> {
-        Ok(DkgState {
+        Ok(Self {
             dkg_listeners: HashSet::new(),
             start_dkg_topic: gossipsub::IdentTopic::new("start-dkg"),
             round1_topic: gossipsub::IdentTopic::new("round1_topic"),
@@ -78,7 +78,7 @@ impl DkgState {
         // Serialize private key to bytes
         let private_key_bytes = private_key
             .serialize()
-            .map_err(|e| NodeError::Error(format!("Failed to serialize private key: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to serialize private key: {e}")))?;
 
         // Use existing salt from key_data, or generate a new one if empty
         let salt_b64 = if node.config.key_data.encryption_params.salt_b64.is_empty() {
@@ -94,12 +94,12 @@ impl DkgState {
         // Encrypt the private key package
         let (encrypted_private_key_b64, iv_b64) =
             encrypt_private_key(&private_key_bytes, &password, &salt_b64)
-                .map_err(|e| NodeError::Error(format!("Failed to encrypt private key: {}", e)))?;
+                .map_err(|e| NodeError::Error(format!("Failed to encrypt private key: {e}")))?;
 
         // Serialize and base64 encode the public key package
         let pubkey_bytes = pubkey
             .serialize()
-            .map_err(|e| NodeError::Error(format!("Failed to serialize public key: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to serialize public key: {e}")))?;
         let pubkey_package_b64 = BASE64.encode(pubkey_bytes);
 
         node.config.set_dkg_keys(DkgKeys {
@@ -136,7 +136,7 @@ impl DkgState {
             chain_config,
             pubkey
                 .serialize()
-                .map_err(|e| NodeError::Error(format!("Failed to serialize public key: {}", e)))?,
+                .map_err(|e| NodeError::Error(format!("Failed to serialize public key: {e}")))?,
         );
 
         node.db.insert_block(genesis_block.to_block())?;

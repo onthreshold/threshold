@@ -100,18 +100,18 @@ pub async fn start_node(
     let oracle = EsploraOracle::default();
 
     let mut node_state = NodeState::new_from_config(
-        network_handle,
+        &network_handle,
         min_signers,
         max_signers,
         config,
         RocksDb::new(config_database_path.to_str().unwrap()),
-        swarm.network_events.clone(),
+        &swarm.network_events,
         deposit_intent_tx,
         transaction_rx,
         oracle.clone(),
         TaprootWallet::new(oracle.clone(), Vec::new(), {
             let is_testnet: bool = std::env::var("IS_TESTNET")
-                .unwrap_or("false".to_string())
+                .unwrap_or_else(|_| "false".to_string())
                 .parse()
                 .unwrap_or(false);
             if is_testnet {
@@ -149,7 +149,7 @@ pub async fn start_node(
 
     let deposit_monitor_handle = tokio::spawn(async move {
         let is_testnet = dotenvy::var("IS_TESTNET")
-            .unwrap_or("false".to_string())
+            .unwrap_or_else(|_| "false".to_string())
             .parse()
             .unwrap();
 
@@ -173,26 +173,26 @@ pub async fn start_node(
     tokio::select! {
         result = grpc_handle => {
             match result {
-                Ok(_) => tracing::info!("gRPC server stopped"),
+                Ok(()) => tracing::info!("gRPC server stopped"),
                 Err(e) => tracing::error!("gRPC server error: {}", e),
             }
         }
         result = swarm_handle => {
             match result {
-                Ok(_) => tracing::info!("Swarm stopped"),
+                Ok(()) => tracing::info!("Swarm stopped"),
                 Err(e) => tracing::error!("Swarm error: {}", e),
             }
         }
         result = main_loop_handle => {
             match result {
-                Ok(Ok(_)) => tracing::info!("Main loop stopped"),
+                Ok(Ok(())) => tracing::info!("Main loop stopped"),
                 Ok(Err(e)) => tracing::error!("Main loop error: {}", e),
                 Err(e) => tracing::error!("Main loop task error: {}", e),
             }
         }
         result = deposit_monitor_handle => {
             match result {
-                Ok(_) => tracing::info!("Deposit monitor stopped"),
+                Ok(()) => tracing::info!("Deposit monitor stopped"),
                 Err(e) => tracing::error!("Deposit monitor error: {}", e),
             }
         }

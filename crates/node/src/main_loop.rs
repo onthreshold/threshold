@@ -29,14 +29,14 @@ impl<N: Network + 'static, D: Db + 'static, O: Oracle + 'static, W: Wallet<O> + 
         info!("Local peer id: {}", self.peer_id);
 
         loop {
-            self.poll().await?
+            self.poll().await?;
         }
     }
 
     pub async fn handle(&mut self, send_message: Option<NetworkEvent>) -> Result<(), NodeError> {
         let mut handlers = std::mem::take(&mut self.handlers);
 
-        for handler in handlers.iter_mut() {
+        for handler in &mut handlers {
             handler.handle(self, send_message.clone()).await?;
         }
 

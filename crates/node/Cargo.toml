@@ -7,6 +7,9 @@ edition = "2024"
 name = "node"
 path = "src/lib.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 libp2p = { workspace = true, features = [
     "noise",
@@ -33,11 +36,11 @@ frost-secp256k1 = { workspace = true }
 rand = { workspace = true }
 hex = { workspace = true }
 bitcoin = { workspace = true }
-tonic = "0.13"
+tonic = { workspace = true }
 prost = "0.13"
 aes-gcm = "0.10"
 argon2 = "0.5"
-base64 = "0.22"
+base64 = { workspace = true }
 rpassword = "7.3"
 uuid = { version = "1.17.0", features = ["v4"] }
 rocksdb = { workspace = true }

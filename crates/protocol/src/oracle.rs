@@ -43,7 +43,7 @@ impl Default for EsploraOracle {
 }
 
 impl EsploraOracle {
-    pub fn new(is_testnet: bool) -> Self {
+    #[must_use] pub fn new(is_testnet: bool) -> Self {
         let builder = Builder::new(if is_testnet {
             "https://blockstream.info/testnet/api"
         } else {
@@ -124,7 +124,7 @@ impl Oracle for EsploraOracle {
                 .scripthash_txs(&script, last_seen_txid)
                 .await
                 .map_err(|e| {
-                    NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
+                    NodeError::Error(format!("Cannot retrieve transactions for address: {e}"))
                 })?;
 
             if address_txs.is_empty() {
@@ -186,7 +186,7 @@ impl Oracle for EsploraOracle {
         self.esplora_client
             .broadcast(tx)
             .await
-            .map_err(|e| NodeError::Error(format!("Failed to broadcast transaction: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to broadcast transaction: {e}")))?;
 
         Ok(tx_hex)
     }

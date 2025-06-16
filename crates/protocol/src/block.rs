@@ -11,7 +11,7 @@ pub type BlockHash = [u8; 32];
 pub type StateRoot = [u8; 32];
 
 /// Block header containing all metadata
-#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BlockHeader {
     /// Version of the block structure
     pub version: u32,
@@ -75,13 +75,13 @@ pub struct BlockBody {
 }
 
 impl BlockBody {
-    pub fn new(transactions: Vec<Transaction>) -> Self {
+    #[must_use] pub const fn new(transactions: Vec<Transaction>) -> Self {
         Self { transactions }
     }
 }
 
 impl BlockHeader {
-    pub fn calculate_hash(&self) -> BlockHash {
+    #[must_use] pub fn calculate_hash(&self) -> BlockHash {
         let mut hasher = Sha256::new();
 
         hasher.update(self.version.to_le_bytes());
@@ -100,7 +100,7 @@ impl BlockHeader {
 
 impl Block {
     /// Create a new block
-    pub fn new(
+    #[must_use] pub const fn new(
         previous_block_hash: BlockHash,
         state_root: StateRoot,
         height: u64,
@@ -117,37 +117,37 @@ impl Block {
             proposer,
         };
 
-        Block {
+        Self {
             header,
             body: BlockBody { transactions },
         }
     }
 
-    pub fn hash(&self) -> BlockHash {
+    #[must_use] pub fn hash(&self) -> BlockHash {
         self.header.calculate_hash()
     }
 
     pub fn serialize(&self) -> Result<Vec<u8>, NodeError> {
         bincode::encode_to_vec(self, bincode::config::standard())
-            .map_err(|e| NodeError::Error(format!("Failed to serialize block: {}", e)))
+            .map_err(|e| NodeError::Error(format!("Failed to serialize block: {e}")))
     }
 
     pub fn deserialize(data: &[u8]) -> Result<Self, NodeError> {
         let (block, _): (Self, _) =
             bincode::decode_from_slice(data, bincode::config::standard())
-                .map_err(|e| NodeError::Error(format!("Failed to deserialize block: {}", e)))?;
+                .map_err(|e| NodeError::Error(format!("Failed to deserialize block: {e}")))?;
         Ok(block)
     }
 }
 
 impl GenesisBlock {
     /// Create a new genesis block
-    pub fn new(
+    #[must_use] pub fn new(
         validators: Vec<ValidatorInfo>,
         chain_config: ChainConfig,
         vault_pub_key: Vec<u8>,
     ) -> Self {
-        GenesisBlock {
+        Self {
             version: 1,
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -163,7 +163,7 @@ impl GenesisBlock {
         }
     }
 
-    pub fn to_block(&self) -> Block {
+    #[must_use] pub fn to_block(&self) -> Block {
         let mut hasher = Sha256::new();
         hasher.update(b"GENESIS");
         hasher.update(self.timestamp.to_le_bytes());
@@ -189,7 +189,7 @@ impl GenesisBlock {
     }
 
     /// Get hash of genesis block
-    pub fn hash(&self) -> BlockHash {
+    #[must_use] pub fn hash(&self) -> BlockHash {
         self.to_block().hash()
     }
 }

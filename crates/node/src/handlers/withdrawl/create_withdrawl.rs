@@ -74,7 +74,7 @@ impl SpendIntentState {
             Signature::from_der(&signature_bytes).map_err(|e| NodeError::Error(e.to_string()))?;
 
         let msg_bytes = hex::decode(message_hex)
-            .map_err(|e| NodeError::Error(format!("Invalid message hex: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Invalid message hex: {e}")))?;
         if msg_bytes.len() != 32 {
             return Err(NodeError::Error("Message must be 32 bytes".to_string()));
         }
@@ -106,11 +106,11 @@ impl SpendIntentState {
                     amount_sat: withdrawal_intent.amount_sat,
                     fee,
                     address_to: withdrawal_intent.address_to.clone(),
-                    user_pubkey: withdrawal_intent.public_key.clone(),
+                    user_pubkey: withdrawal_intent.public_key,
                 },
                 false,
             )
-            .map_err(|e| NodeError::Error(format!("Failed to send spend request: {:?}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to send spend request: {e:?}")))?;
 
         Ok(())
     }
@@ -148,7 +148,7 @@ impl SpendIntentState {
                 bincode::encode_to_vec(&spend_intent, bincode::config::standard())
                     .map_err(|x| NodeError::Error(x.to_string()))?,
             )
-            .map_err(|x| NodeError::Error(format!("Failed to send broadcast: {:?}", x)))?;
+            .map_err(|x| NodeError::Error(format!("Failed to send broadcast: {x:?}")))?;
 
         Ok(())
     }

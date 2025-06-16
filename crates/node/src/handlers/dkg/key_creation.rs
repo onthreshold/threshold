@@ -16,9 +16,7 @@ use protocol::oracle::Oracle;
 fn dkg_step_delay() -> Duration {
     std::env::var("DKG_STEP_DELAY_SECS")
         .ok()
-        .and_then(|v| v.parse::<u64>().ok())
-        .map(Duration::from_secs)
-        .unwrap_or_else(|| Duration::ZERO)
+        .and_then(|v| v.parse::<u64>().ok()).map_or_else(|| Duration::ZERO, Duration::from_secs)
 }
 
 impl DkgState {
@@ -74,11 +72,10 @@ impl DkgState {
             self.start_dkg_topic.clone(),
             start_message.as_bytes().to_vec(),
         ) {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(e) => {
                 return Err(NodeError::Error(format!(
-                    "Failed to send broadcast: {:?}",
-                    e
+                    "Failed to send broadcast: {e:?}"
                 )));
             }
         }
@@ -87,24 +84,23 @@ impl DkgState {
             .network_handle
             .send_broadcast(self.round1_topic.clone(), round1_package_bytes)
         {
-            Ok(_) => tracing::debug!("Broadcast round1"),
+            Ok(()) => tracing::debug!("Broadcast round1"),
             Err(e) => {
                 return Err(NodeError::Error(format!(
-                    "Failed to send broadcast: {:?}",
-                    e
+                    "Failed to send broadcast: {e:?}"
                 )));
             }
         }
 
         match self.try_enter_round2(node) {
-            Ok(_) => {
+            Ok(()) => {
                 tracing::debug!(
                     "Generated and published round1 package in response to DKG start signal from {}",
                     &node.peer_id
                 );
                 Ok(())
             }
-            Err(e) => Err(NodeError::Error(format!("Failed to enter round2: {}", e))),
+            Err(e) => Err(NodeError::Error(format!("Failed to enter round2: {e}"))),
         }
     }
 
@@ -119,8 +115,7 @@ impl DkgState {
             Ok(package) => package,
             Err(e) => {
                 return Err(NodeError::Error(format!(
-                    "Failed to deserialize round1 package: {}",
-                    e
+                    "Failed to deserialize round1 package: {e}"
                 )));
             }
         };
@@ -157,20 +152,16 @@ impl DkgState {
                         self.r1_secret_package = None;
                         self.r2_secret_package = Some(round2_secret_package);
 
-                        for peer_to_send_to in self.dkg_listeners.iter() {
+                        for peer_to_send_to in &self.dkg_listeners {
                             let identifier = peer_id_to_identifier(peer_to_send_to);
-                            let package_to_send = match round2_packages.get(&identifier) {
-                                Some(package) => package,
-                                None => {
-                                    tracing::warn!(
-                                        "Round2 package not found for {}",
-                                        peer_to_send_to
-                                    );
-                                    return Err(NodeError::Error(format!(
-                                        "Round2 package not found for {}",
-                                        peer_to_send_to
-                                    )));
-                                }
+                            let package_to_send = if let Some(package) = round2_packages.get(&identifier) { package } else {
+                                tracing::warn!(
+                                    "Round2 package not found for {}",
+                                    peer_to_send_to
+                                );
+                                return Err(NodeError::Error(format!(
+                                    "Round2 package not found for {peer_to_send_to}"
+                                )));
                             };
 
                             let request = DirectMessage::Round2Package(package_to_send.clone());
@@ -179,7 +170,7 @@ impl DkgState {
                                 .network_handle
                                 .send_private_message(*peer_to_send_to, request)
                             {
-                                Ok(_) => {
+                                Ok(()) => {
                                     tracing::debug!(
                                         "{} Sent round2 package to {}",
                                         node.peer_id,
@@ -192,8 +183,7 @@ impl DkgState {
                                         peer_to_send_to
                                     );
                                     return Err(NodeError::Error(format!(
-                                        "Failed to send private request: {:?}",
-                                        e
+                                        "Failed to send private request: {e:?}"
                                     )));
                                 }
                             }
@@ -204,7 +194,7 @@ impl DkgState {
                         std::thread::sleep(dkg_step_delay());
                     }
                     Err(e) => {
-                        return Err(NodeError::Error(format!("DKG round2 failed: {}", e)));
+                        return Err(NodeError::Error(format!("DKG round2 failed: {e}")));
                     }
                 }
             }
@@ -225,11 +215,10 @@ impl DkgState {
             .network_handle
             .send_private_message(sender_peer_id, DirectMessage::Pong)
         {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(e) => {
                 return Err(NodeError::Error(format!(
-                    "Failed to send private response: {:?}",
-                    e
+                    "Failed to send private response: {e:?}"
                 )));
             }
         }

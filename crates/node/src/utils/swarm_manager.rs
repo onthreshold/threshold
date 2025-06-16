@@ -425,7 +425,7 @@ pub fn build_swarm(
             noise::Config::new,
             yamux::Config::default,
         )
-        .map_err(|e| NodeError::Error(format!("Failed to add tcp {}", e)))?
+        .map_err(|e| NodeError::Error(format!("Failed to add tcp {e}")))?
         .with_quic()
         .with_behaviour(|key| {
             // To content-address message, we can take the hash of message and use it as an ID.
@@ -470,28 +470,28 @@ pub fn build_swarm(
                 request_response,
             })
         })
-        .map_err(|e| NodeError::Error(format!("Failed to add behaviour {}", e)))?
+        .map_err(|e| NodeError::Error(format!("Failed to add behaviour {e}")))?
         .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
 
     swarm
         .listen_on(
-            format!("/ip4/0.0.0.0/udp/{}/quic-v1", libp2p_udp_port)
+            format!("/ip4/0.0.0.0/udp/{libp2p_udp_port}/quic-v1")
                 .parse()
                 .expect("Failed to deserialize message"),
         )
-        .map_err(|e| NodeError::Error(format!("Failed to listen on quic {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Failed to listen on quic {e}")))?;
 
     swarm
         .listen_on(
-            format!("/ip4/0.0.0.0/tcp/{}", libp2p_tcp_port)
+            format!("/ip4/0.0.0.0/tcp/{libp2p_tcp_port}")
                 .parse()
                 .expect("Failed to deserialize message"),
         )
-        .map_err(|e| NodeError::Error(format!("Failed to listen on tcp {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Failed to listen on tcp {e}")))?;
 
     let (swarm_manager, network) = SwarmManager::new(swarm, peer_data)
-        .map_err(|e| NodeError::Error(format!("Failed to create swarm manager: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Failed to create swarm manager: {e}")))?;
 
     Ok((network, swarm_manager))
 }

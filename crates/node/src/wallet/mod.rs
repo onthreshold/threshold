@@ -40,7 +40,7 @@ impl<Context> Decode<Context> for PendingSpend {
         let user_pubkey = bincode::Decode::decode(decoder)?;
         let recipient_script = ScriptBuf::from_bytes(bincode::Decode::decode(decoder)?);
         let fee = bincode::Decode::decode(decoder)?;
-        Ok(PendingSpend {
+        Ok(Self {
             tx: raw_tx,
             user_pubkey,
             recipient_script,

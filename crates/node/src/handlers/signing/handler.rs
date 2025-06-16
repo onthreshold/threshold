@@ -44,7 +44,7 @@ impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for Signing
                         .send(SelfResponse::SpendRequestSent {
                             sighash: response.unwrap_or("No sighash".to_string()),
                         })
-                        .map_err(|e| NodeError::Error(format!("Failed to send response: {}", e)))?;
+                        .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
                 }
             }
             Some(NetworkEvent::MessageEvent((
@@ -70,7 +70,7 @@ impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for Signing
                 },
             ))) => {
                 self.handle_signature_share(node, peer, sign_id, signature_share)
-                    .await?
+                    .await?;
             }
             _ => (),
         }

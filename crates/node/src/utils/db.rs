@@ -29,7 +29,7 @@ pub struct RocksDb {
 }
 
 impl RocksDb {
-    pub fn new(path: &str) -> Self {
+    #[must_use] pub fn new(path: &str) -> Self {
         let mut opts = rocksdb::Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
@@ -45,7 +45,7 @@ impl Db for RocksDb {
     fn get_block_by_height(&self, height: u64) -> Result<Option<Block>, NodeError> {
         let block_hash = self.db.get_cf(
             self.db.cf_handle("blocks").unwrap(),
-            format!("h:{}", height),
+            format!("h:{height}"),
         )?;
         if let Some(block_hash) = block_hash {
             let block = self.db.get_cf(
@@ -97,7 +97,7 @@ impl Db for RocksDb {
                 format!("b:{}", hex::encode(block_hash)),
                 block.serialize()?,
             )
-            .map_err(|e| NodeError::Error(format!("Failed to insert block: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to insert block: {e}")))?;
 
         self.db
             .put_cf(
@@ -105,7 +105,7 @@ impl Db for RocksDb {
                 format!("h:{}", block.header.height),
                 block_hash,
             )
-            .map_err(|e| NodeError::Error(format!("Failed to insert block: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to insert block: {e}")))?;
 
         self.db
             .put_cf(self.db.cf_handle("blocks").unwrap(), "h:tip", block_hash)?;
@@ -118,7 +118,7 @@ impl Db for RocksDb {
         let key_da = format!("da:{}", intent.deposit_address);
 
         let value = bincode::encode_to_vec(&intent, bincode::config::standard())
-            .map_err(|e| NodeError::Error(format!("encode di: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("encode di: {e}")))?;
 
         // 1) store canonical row
         self.db.put_cf(
@@ -137,7 +137,7 @@ impl Db for RocksDb {
     }
 
     fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError> {
-        let key = format!("di:{}", tracking_id);
+        let key = format!("di:{tracking_id}");
         let value = self
             .db
             .get_cf(self.db.cf_handle("deposit_intents").unwrap(), key)?;
@@ -154,7 +154,7 @@ impl Db for RocksDb {
         address: &str,
     ) -> Result<Option<DepositIntent>, NodeError> {
         // Step 1: addr → tracking-id
-        let key_da = format!("da:{}", address);
+        let key_da = format!("da:{address}");
         let tracking_id = match self.db.get_cf(
             self.db.cf_handle("deposit_intents").unwrap(),
             key_da.as_bytes(),
@@ -162,11 +162,9 @@ impl Db for RocksDb {
             Some(bytes) => String::from_utf8(bytes).ok(),
             None => None,
         };
-        if let Some(id) = tracking_id {
-            self.get_deposit_intent(&id)
-        } else {
-            Ok(None)
-        }
+
+
+        tracking_id.map_or(Ok(None), |id| self.get_deposit_intent(&id))
     }
 
     fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError> {

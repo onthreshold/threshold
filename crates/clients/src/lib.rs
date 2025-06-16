@@ -46,7 +46,7 @@ impl Default for EsploraApiClient {
 }
 
 impl EsploraApiClient {
-    pub fn new(
+    #[must_use] pub fn new(
         client: AsyncClient,
         capacity: Option<usize>,
         tx_channel: Option<broadcast::Sender<Transaction>>,
@@ -63,7 +63,7 @@ impl EsploraApiClient {
         }
     }
 
-    pub fn new_with_network(
+    #[must_use] pub fn new_with_network(
         network: Network,
         capacity: Option<usize>,
         tx_channel: Option<broadcast::Sender<Transaction>>,
@@ -100,7 +100,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
         max_height: u32,
     ) -> Result<Vec<Transaction>, NodeError> {
         let blockchain_height = self.client.get_height().await.map_err(|e| {
-            NodeError::Error(format!("Cannot retrieve height of blockchain: {}", e))
+            NodeError::Error(format!("Cannot retrieve height of blockchain: {e}"))
         })?;
 
         let new_max_height = max_height.min(blockchain_height - self.confirmation_depth);
@@ -115,7 +115,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
                     .scripthash_txs(&address.script_pubkey(), last_seen_txid)
                     .await
                     .map_err(|e| {
-                        NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
+                        NodeError::Error(format!("Cannot retrieve transactions for address: {e}"))
                     })?;
 
                 if address_txs.is_empty() {
@@ -176,7 +176,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
 
         loop {
             tokio::select! {
-                _ = sleep(Duration::from_secs(30)) => {
+                () = sleep(Duration::from_secs(30)) => {
                     let current_height = match self.client.get_height().await {
                         Ok(height) => height,
                         Err(e) => {
@@ -244,7 +244,7 @@ impl WindowedConfirmedTransactionProvider for EsploraApiClient {
 
     async fn get_latest_block_height(&self) -> Result<u32, NodeError> {
         let height = self.client.get_height().await.map_err(|e| {
-            NodeError::Error(format!("Cannot retrieve height of blockchain: {}", e))
+            NodeError::Error(format!("Cannot retrieve height of blockchain: {e}"))
         })?;
         Ok(height)
     }

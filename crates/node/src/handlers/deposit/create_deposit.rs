@@ -18,7 +18,7 @@ use crate::{
 use protocol::oracle::Oracle;
 
 impl DepositIntentState {
-    pub fn new(
+    #[must_use] pub fn new(
         deposit_intent_tx: broadcast::Sender<String>,
         transaction_rx: broadcast::Receiver<Transaction>,
     ) -> Self {
@@ -44,7 +44,7 @@ impl DepositIntentState {
         {
             if let Err(e) = self
                 .deposit_intent_tx
-                .send(deposit_intent.deposit_address.clone())
+                .send(deposit_intent.deposit_address)
             {
                 error!("Failed to notify deposit monitor of new address: {}", e);
             }
@@ -68,10 +68,10 @@ impl DepositIntentState {
         let frost_public_key = frost_pubkey
             .verifying_key()
             .serialize()
-            .map_err(|x| NodeError::Error(format!("Failed to serialize public key: {:?}", x)))?;
+            .map_err(|x| NodeError::Error(format!("Failed to serialize public key: {x:?}")))?;
 
         let public_key = bitcoin::PublicKey::from_slice(&frost_public_key)
-            .map_err(|e| NodeError::Error(format!("Failed to parse public key: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to parse public key: {e}")))?;
 
         let tweak_scalar = Scalar::from_be_bytes(
             bitcoin::hashes::sha256::Hash::hash(deposit_tracking_id.as_bytes()).to_byte_array(),
@@ -158,7 +158,7 @@ impl DepositIntentState {
                     let user_account = node
                         .chain_state
                         .get_account(&intent.user_pubkey)
-                        .ok_or(NodeError::Error("User not found".into()))?;
+                        .ok_or_else(|| NodeError::Error("User not found".into()))?;
 
                     let updated = user_account.update_balance(output.value.to_sat() as i64);
                     node.chain_state

@@ -28,7 +28,7 @@ pub struct TaprootWallet<O: Oracle> {
 }
 
 impl<O: Oracle> TaprootWallet<O> {
-    pub fn new(oracle: O, addresses: Vec<Address>, network: Network) -> Self {
+    pub const fn new(oracle: O, addresses: Vec<Address>, network: Network) -> Self {
         Self {
             addresses,
             utxos: Vec::new(),
@@ -115,7 +115,7 @@ impl<O: Oracle + Send + Sync> Wallet<O> for TaprootWallet<O> {
                         value: Amount::from_sat(change_sat),
                         script_pubkey: change_address.script_pubkey(),
                     },
-                    address: change_address.clone(),
+                    address: change_address,
                 });
             }
         }
@@ -135,7 +135,7 @@ impl<O: Oracle + Send + Sync> Wallet<O> for TaprootWallet<O> {
                 utxo.value,
                 EcdsaSighashType::All,
             )
-            .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {e}")))?;
 
         Ok((tx, sighash.to_byte_array()))
     }
@@ -190,7 +190,7 @@ impl<O: Oracle + Send + Sync> Wallet<O> for TaprootWallet<O> {
                     utxo: Utxo {
                         outpoint: bitcoin::OutPoint {
                             txid: tx.compute_txid(),
-                            vout: idx as u32,
+                            vout: u32::try_from(idx).unwrap(),
                         },
                         value: out.value,
                         script_pubkey: out.script_pubkey.clone(),

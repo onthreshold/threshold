@@ -32,7 +32,7 @@ async fn main() {
     let mnemonic = std::env::var("MNEMONIC").expect("MNEMONIC env variable not set");
     let (address, private_key, compressed_public_key) =
         generate_keys_from_mnemonic(mnemonic.as_str());
-    println!("Sender address: {}. Loading wallet utxos...", address);
+    println!("Sender address: {address}. Loading wallet utxos...");
 
     let oracle = protocol::oracle::EsploraOracle::new(true);
     let mut wallet = TaprootWallet::new(
@@ -45,14 +45,13 @@ async fn main() {
         .create_spend(amount, fee, &address_to, false)
         .unwrap();
     println!(
-        "Created Transaction for amount: {} to address: {}",
-        amount, address_to
+        "Created Transaction for amount: {amount} to address: {address_to}"
     );
     let tx_id = tx.compute_txid();
 
     let signed_tx = wallet.sign(&tx, &private_key, sighash);
 
-    println!("Public key: {:?}", compressed_public_key);
+    println!("Public key: {compressed_public_key:?}");
     println!("Signed transaction");
 
     oracle
@@ -60,5 +59,5 @@ async fn main() {
         .await
         .expect("Failed to broadcast transaction");
 
-    println!("Broadcast Transaction txid: {:?}", tx_id);
+    println!("Broadcast Transaction txid: {tx_id:?}");
 }
