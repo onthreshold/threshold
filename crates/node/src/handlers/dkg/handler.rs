@@ -6,13 +6,12 @@ use crate::{
     swarm_manager::{DirectMessage, Network, NetworkEvent},
     wallet::Wallet,
 };
-use protocol::oracle::Oracle;
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for DkgState {
+impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DkgState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         match message {

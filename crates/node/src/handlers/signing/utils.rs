@@ -11,7 +11,6 @@ use crate::{
     swarm_manager::Network,
     wallet::{PendingSpend, Wallet},
 };
-use protocol::oracle::Oracle;
 
 impl SigningState {
     pub fn new() -> Result<Self, NodeError> {
@@ -38,9 +37,9 @@ impl SigningState {
             .map_err(|e| format!("Parse schnorr sig: {}", e))
     }
 
-    pub fn start_spend_request<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn start_spend_request<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         amount_sat: u64,
         estimated_fee_sat: u64,
         address: &str,

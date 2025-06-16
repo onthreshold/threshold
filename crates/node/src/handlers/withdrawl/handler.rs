@@ -3,14 +3,13 @@ use crate::wallet::PendingSpend;
 use crate::wallet::Wallet;
 use crate::{NodeState, db::Db, handlers::Handler, handlers::withdrawl::SpendIntentState};
 use libp2p::gossipsub::Message;
-use protocol::oracle::Oracle;
 use types::errors::NodeError;
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for SpendIntentState {
+impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SpendIntentState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), NodeError> {
         match message {

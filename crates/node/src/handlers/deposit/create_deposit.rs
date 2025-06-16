@@ -15,7 +15,6 @@ use crate::{
     swarm_manager::Network,
     wallet::Wallet,
 };
-use protocol::oracle::Oracle;
 
 impl DepositIntentState {
     pub fn new(
@@ -31,9 +30,9 @@ impl DepositIntentState {
         }
     }
 
-    pub fn create_deposit_from_intent<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn create_deposit_from_intent<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         deposit_intent: DepositIntent,
     ) -> Result<(), NodeError> {
         node.db.insert_deposit_intent(deposit_intent.clone())?;
@@ -53,9 +52,9 @@ impl DepositIntentState {
         Ok(())
     }
 
-    pub async fn create_deposit<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub async fn create_deposit<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         user_pubkey: String,
         amount_sat: u64,
     ) -> Result<(String, String), NodeError> {
@@ -123,9 +122,9 @@ impl DepositIntentState {
         Ok((deposit_tracking_id, deposit_address.to_string()))
     }
 
-    pub fn get_pending_deposit_intents<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn get_pending_deposit_intents<N: Network, D: Db, W: Wallet>(
         &self,
-        node: &NodeState<N, D, O, W>,
+        node: &NodeState<N, D, W>,
     ) -> Vec<DepositIntent> {
         match node.db.get_all_deposit_intents() {
             Ok(intents) => intents,
@@ -136,9 +135,9 @@ impl DepositIntentState {
         }
     }
 
-    pub fn update_user_balance<N: Network, D: Db, O: Oracle, W: Wallet<O>>(
+    pub fn update_user_balance<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         tx: Transaction,
     ) -> Result<(), NodeError> {
         if !self.processed_txids.insert(tx.compute_txid()) {
@@ -166,6 +165,8 @@ impl DepositIntentState {
                 }
             }
         }
+
+        node.wallet.ingest_external_tx(&tx)?;
 
         Ok(())
     }

@@ -49,7 +49,7 @@ async-trait = { workspace = true }
 protocol = { path = "../protocol" }
 types = { path = "../types" }
 serde_yaml = "0.9.34"
-clients = { path = "../clients" }
+oracle = { path = "../oracle" }
 dotenvy = { workspace = true }
 bip39 = { workspace = true }
 

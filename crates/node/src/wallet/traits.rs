@@ -1,9 +1,8 @@
 use bitcoin::{Address, PublicKey, Transaction, secp256k1::Scalar};
-use protocol::oracle::Oracle;
 use types::errors::NodeError;
 
 #[async_trait::async_trait]
-pub trait Wallet<O: Oracle>: Send + Sync {
+pub trait Wallet: Send + Sync {
     fn generate_new_address(&mut self, public_key: PublicKey, tweak: Scalar) -> Address;
 
     fn create_spend(

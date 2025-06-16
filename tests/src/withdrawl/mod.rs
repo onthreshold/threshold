@@ -11,9 +11,10 @@ mod withdrawl_tests {
 
     use crate::mocks::network::MockNodeCluster;
     use node::handlers::withdrawl::{SpendIntent, SpendIntentState};
-    use protocol::{chain_state::Account, oracle::Utxo};
+    use protocol::chain_state::Account;
     use std::collections::HashMap;
     use tokio::sync::mpsc::unbounded_channel;
+    use types::utxo::Utxo;
 
     #[tokio::test]
     async fn propose_withdrawal_returns_quote_and_challenge() {

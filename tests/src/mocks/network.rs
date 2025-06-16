@@ -7,6 +7,7 @@ use node::{
     swarm_manager::{DirectMessage, Network, NetworkEvent, NetworkResponseFuture, SelfResponse},
     wallet::TaprootWallet,
 };
+use oracle::mock::MockOracle;
 use tokio::sync::{
     broadcast,
     mpsc::{self, unbounded_channel},
@@ -15,11 +16,10 @@ use types::errors::{self, NetworkError};
 
 // Import MockDb from our mocks module
 use crate::mocks::db::MockDb;
-use crate::mocks::oracle::MockOracle;
 
 use crate::util::local_dkg::perform_distributed_key_generation;
 
-type MockNodeState = NodeState<MockNetwork, MockDb, MockOracle, TaprootWallet<MockOracle>>;
+type MockNodeState = NodeState<MockNetwork, MockDb, TaprootWallet>;
 
 #[derive(Debug)]
 pub struct SenderToNode {
@@ -488,15 +488,15 @@ pub fn create_node_network(
 ) -> Result<(MockNodeState, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(256);
     let (deposit_intent_tx, _) = broadcast::channel::<String>(100);
-    let (_, transaction_rx) = broadcast::channel::<Transaction>(100);
+    let (transaction_tx, transaction_rx) = broadcast::channel::<Transaction>(100);
 
     let network = MockNetwork::new(events_emitter_tx.clone(), peer_id, pending_events_tx);
 
     let mock_db = MockDb::new();
-    let oracle = MockOracle::new();
+    let oracle = MockOracle::new(transaction_tx, Some(deposit_intent_tx.clone()));
 
     let wallet = TaprootWallet::new(
-        oracle.clone(),
+        Box::new(oracle.clone()),
         Vec::new(),
         bitcoin::network::Network::Testnet,
     );
@@ -510,7 +510,7 @@ pub fn create_node_network(
         events_emitter_tx,
         deposit_intent_tx,
         transaction_rx,
-        oracle,
+        Box::new(oracle),
         wallet,
     )?;
 

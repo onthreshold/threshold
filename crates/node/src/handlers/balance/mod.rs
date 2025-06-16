@@ -5,7 +5,6 @@ use crate::{
     swarm_manager::{NetworkEvent, SelfRequest, SelfResponse},
     wallet::Wallet,
 };
-use protocol::oracle::Oracle;
 use types::errors::NodeError;
 
 #[derive(Default)]
@@ -18,10 +17,10 @@ impl BalanceState {
 }
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> Handler<N, D, O, W> for BalanceState {
+impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for BalanceState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, O, W>,
+        node: &mut NodeState<N, D, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), NodeError> {
         if let Some(NetworkEvent::SelfRequest {

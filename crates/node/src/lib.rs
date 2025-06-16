@@ -18,7 +18,8 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use bitcoin::Transaction;
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::{PeerId, identity::Keypair};
-use protocol::{chain_state::ChainState, oracle::Oracle};
+use oracle::oracle::Oracle;
+use protocol::chain_state::ChainState;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::{Network, NetworkEvent};
@@ -252,8 +253,8 @@ impl NodeConfig {
     }
 }
 
-pub struct NodeState<N: Network, D: Db, O: Oracle, W: Wallet<O>> {
-    pub handlers: Vec<Box<dyn Handler<N, D, O, W>>>,
+pub struct NodeState<N: Network, D: Db, W: Wallet> {
+    pub handlers: Vec<Box<dyn Handler<N, D, W>>>,
     pub db: D,
     pub chain_state: ChainState,
 
@@ -272,10 +273,10 @@ pub struct NodeState<N: Network, D: Db, O: Oracle, W: Wallet<O>> {
     pub network_handle: N,
     pub network_events_stream: broadcast::Receiver<NetworkEvent>,
 
-    pub oracle: O,
+    pub oracle: Box<dyn Oracle>,
 }
 
-impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> NodeState<N, D, O, W> {
+impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
     #[allow(clippy::too_many_arguments)]
     pub fn new_from_config(
         network_handle: N,
@@ -286,7 +287,7 @@ impl<N: Network, D: Db, O: Oracle, W: Wallet<O>> NodeState<N, D, O, W> {
         network_events_sender: broadcast::Sender<NetworkEvent>,
         deposit_intent_tx: broadcast::Sender<String>,
         transaction_rx: broadcast::Receiver<Transaction>,
-        oracle: O,
+        oracle: Box<dyn Oracle>,
         wallet: W,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())

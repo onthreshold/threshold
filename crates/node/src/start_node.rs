@@ -1,4 +1,4 @@
-use protocol::oracle::EsploraOracle;
+use oracle::{esplora::EsploraOracle, mock::MockOracle, oracle::Oracle};
 use types::errors::NodeError;
 
 use crate::{
@@ -6,7 +6,6 @@ use crate::{
     key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm, wallet::TaprootWallet,
 };
 use bitcoin::Network;
-use clients::{EsploraApiClient, WindowedConfirmedTransactionProvider};
 use std::path::{Path, PathBuf};
 use tokio::sync::broadcast;
 use tonic::transport::Server;
@@ -19,6 +18,7 @@ pub async fn start_node(
     config: NodeConfig,
     grpc_port: Option<u16>,
     log_file: Option<PathBuf>,
+    use_mock_oracle: Option<bool>,
 ) -> Result<(), NodeError> {
     // Initialize logging
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
@@ -95,9 +95,32 @@ pub async fn start_node(
     )
     .expect("Failed to build swarm");
 
-    let (deposit_intent_tx, deposit_intent_rx) = broadcast::channel(100);
+    let (deposit_intent_tx, _) = broadcast::channel(100);
     let (transaction_tx, transaction_rx) = broadcast::channel(1000);
-    let oracle = EsploraOracle::default();
+    let is_testnet = dotenvy::var("IS_TESTNET")
+        .unwrap_or("false".to_string())
+        .parse()
+        .unwrap();
+
+    let mut oracle: Box<dyn Oracle> = if use_mock_oracle.unwrap_or(false) {
+        Box::new(MockOracle::new(
+            transaction_tx,
+            Some(deposit_intent_tx.clone()),
+        ))
+    } else {
+        Box::new(EsploraOracle::new(
+            if is_testnet {
+                Network::Testnet
+            } else {
+                Network::Bitcoin
+            },
+            Some(100),
+            Some(transaction_tx),
+            Some(deposit_intent_tx.clone()),
+            confirmation_depth,
+            monitor_start_block,
+        ))
+    };
 
     let mut node_state = NodeState::new_from_config(
         network_handle,
@@ -148,25 +171,7 @@ pub async fn start_node(
     let main_loop_handle = tokio::spawn(async move { node_state.start().await });
 
     let deposit_monitor_handle = tokio::spawn(async move {
-        let is_testnet = dotenvy::var("IS_TESTNET")
-            .unwrap_or("false".to_string())
-            .parse()
-            .unwrap();
-
-        let mut client = EsploraApiClient::new_with_network(
-            if is_testnet {
-                Network::Testnet
-            } else {
-                Network::Bitcoin
-            },
-            Some(100),
-            Some(transaction_tx),
-            Some(deposit_intent_rx),
-            confirmation_depth,
-            monitor_start_block,
-        );
-
-        client.poll_new_transactions(vec![]).await;
+        oracle.poll_new_transactions(vec![]).await;
     });
 
     // Wait for either task to complete (they should run indefinitely)

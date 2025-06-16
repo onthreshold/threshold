@@ -7,7 +7,7 @@ members = [
     "crates/node",
     "crates/protocol",
     "crates/types",
-    "crates/clients",
+    "crates/oracle",
 ]
 resolver = "2"
 

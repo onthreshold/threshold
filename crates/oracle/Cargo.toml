@@ -1,5 +1,5 @@
 [package]
-name = "clients"
+name = "oracle"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,3 +9,6 @@ tokio = { workspace = true, features = ["full"] }
 esplora-client = { workspace = true }
 async-trait = "0.1.88"
 tracing = "0.1"
+types = { path = "../types" }
+hex = { workspace = true }
+dyn-clone = "1.0.19"
