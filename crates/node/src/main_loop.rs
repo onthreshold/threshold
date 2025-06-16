@@ -31,12 +31,15 @@ impl<N: Network + 'static, D: Db + 'static, W: Wallet + 'static> NodeState<N, D,
         loop {
             tokio::select! {
                 _ = round_time.tick() => {
-                    self.handle(Some(NetworkEvent::SelfRequest { request: SelfRequest::Tick, response_channel: None })).await.unwrap();
+                    if let Err(e) = self.handle(Some(NetworkEvent::SelfRequest { request: SelfRequest::Tick, response_channel: None })).await {
+                        error!("Error handling round tick: {}", e);
+                    }
                 }
-                _ = self.poll() => {}
-            }
-            if let Err(e) = self.poll().await {
-                error!("Error polling network events: {}", e);
+                result = self.poll() => {
+                    if let Err(e) = result {
+                        error!("Error polling network events: {}", e);
+                    }
+                }
             }
         }
     }
