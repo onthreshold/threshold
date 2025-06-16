@@ -13,6 +13,7 @@ use tokio::sync::{
 };
 use types::{
     errors::{self, NetworkError},
+    intents::DepositIntent,
     network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
 };
 
@@ -485,7 +486,7 @@ pub fn create_node_network(
     pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
 ) -> Result<(MockNodeState, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(256);
-    let (deposit_intent_tx, _) = broadcast::channel::<String>(100);
+    let (deposit_intent_tx, _) = broadcast::channel::<DepositIntent>(100);
 
     let network = MockNetwork::new(events_emitter_tx.clone(), peer_id, pending_events_tx);
 

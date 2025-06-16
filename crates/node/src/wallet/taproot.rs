@@ -1,9 +1,9 @@
+use bitcoin::Address;
 use bitcoin::PublicKey;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Scalar;
 use bitcoin::secp256k1::Secp256k1;
 use bitcoin::sighash::SighashCache;
-use bitcoin::{Address, EcdsaSighashType};
 use bitcoin::{
     Amount, Network, ScriptBuf, Sequence, Transaction, TxIn, TxOut, absolute::LockTime,
     transaction::Version, witness::Witness,
@@ -12,7 +12,7 @@ use oracle::oracle::Oracle;
 use types::errors::NodeError;
 use types::utxo::Utxo;
 
-use super::traits::Wallet;
+use super::Wallet;
 
 #[derive(Debug, Clone)]
 pub struct TrackedUtxo {
@@ -38,12 +38,18 @@ impl TaprootWallet {
     }
 
     fn select_single_utxo(&self, target: u64) -> Option<&TrackedUtxo> {
-        self.utxos.iter().find(|t| t.utxo.value.to_sat() >= target)
+        self.utxos
+            .iter()
+            .find(|t: &&TrackedUtxo| t.utxo.value.to_sat() >= target)
     }
 }
 
 #[async_trait::async_trait]
 impl Wallet for TaprootWallet {
+    fn add_address(&mut self, address: Address) {
+        self.addresses.push(address);
+    }
+
     async fn refresh_utxos(&mut self, allow_unconfirmed: Option<bool>) -> Result<(), NodeError> {
         self.utxos.clear();
         for addr in &self.addresses {
@@ -127,14 +133,16 @@ impl Wallet for TaprootWallet {
             output: outputs,
         };
 
+        let prev_txout = bitcoin::TxOut {
+            value: utxo.value,
+            script_pubkey: utxo.script_pubkey.clone(),
+        };
+        let prevouts_single = [prev_txout];
+        let prevouts = bitcoin::sighash::Prevouts::All(&prevouts_single);
+
         let mut sighash_cache = SighashCache::new(&tx);
         let sighash = sighash_cache
-            .p2wpkh_signature_hash(
-                0, // input index
-                &utxo.script_pubkey,
-                utxo.value,
-                EcdsaSighashType::All,
-            )
+            .taproot_key_spend_signature_hash(0, &prevouts, bitcoin::TapSighashType::All)
             .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {}", e)))?;
 
         Ok((tx, sighash.to_byte_array()))
@@ -200,5 +208,9 @@ impl Wallet for TaprootWallet {
             }
         }
         Ok(())
+    }
+
+    fn get_utxos(&self) -> Vec<TrackedUtxo> {
+        self.utxos.clone()
     }
 }

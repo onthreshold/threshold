@@ -1,11 +1,15 @@
 use std::{collections::HashMap, str::FromStr};
 
 use crate::oracle::Oracle;
-use bitcoin::{hashes::Hash, Address, Amount, OutPoint, ScriptBuf, Transaction, Txid};
+use bitcoin::{
+    absolute::LockTime, hashes::Hash, transaction::Version, Address, Amount, OutPoint, ScriptBuf,
+    Sequence, Transaction, TxIn, TxOut, Txid,
+};
 use tokio::sync::broadcast;
 use tracing::{error, info};
 use types::{
     errors::NodeError,
+    intents::DepositIntent,
     network_event::{NetworkEvent, SelfRequest},
     utxo::Utxo,
 };
@@ -15,13 +19,13 @@ pub struct MockOracle {
     // Map of tx_hash -> (address, amount, is_valid)
     pub transactions: HashMap<String, (String, u64, bool)>,
     pub tx_channel: broadcast::Sender<NetworkEvent>,
-    pub deposit_intent_rx: Option<broadcast::Sender<String>>,
+    pub deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
 }
 
 impl MockOracle {
     pub fn new(
         tx_channel: broadcast::Sender<NetworkEvent>,
-        deposit_intent_rx: Option<broadcast::Sender<String>>,
+        deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
     ) -> Self {
         Self {
             transactions: HashMap::new(),
@@ -143,10 +147,11 @@ impl Oracle for MockOracle {
 
         loop {
             match deposit_rx.recv().await {
-                Ok(addr_str) => {
-                    info!("Received new address: {}", addr_str);
-                    if let Ok(addr) = Address::from_str(&addr_str) {
-                        let tx = self.create_dummy_tx(addr.assume_checked(), 10_000);
+                Ok(deposit_intent) => {
+                    info!("Received new address: {}", deposit_intent.deposit_address);
+                    if let Ok(addr) = Address::from_str(&deposit_intent.deposit_address) {
+                        let tx =
+                            self.create_dummy_tx(addr.assume_checked(), deposit_intent.amount_sat);
                         if let Err(e) = self.tx_channel.send(NetworkEvent::SelfRequest {
                             request: SelfRequest::ConfirmDeposit { confirmed_tx: tx },
                             response_channel: None,
@@ -169,10 +174,6 @@ impl Oracle for MockOracle {
 
 impl MockOracle {
     fn create_dummy_tx(&self, address: Address, value_sat: u64) -> Transaction {
-        use bitcoin::{
-            absolute::LockTime, transaction::Version, Amount, OutPoint, Sequence, TxIn, TxOut,
-        };
-
         let tx_in = TxIn {
             previous_output: OutPoint {
                 txid: Txid::from_slice(&[0u8; 32]).unwrap(),

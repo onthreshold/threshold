@@ -24,7 +24,7 @@ use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::Network;
 use tokio::sync::broadcast;
 use tracing::{error, info};
-use types::{errors::NodeError, network_event::NetworkEvent};
+use types::{errors::NodeError, intents::DepositIntent, network_event::NetworkEvent};
 
 pub mod grpc;
 pub mod handlers;
@@ -284,7 +284,7 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
         config: NodeConfig,
         storage_db: D,
         network_events_sender: broadcast::Sender<NetworkEvent>,
-        deposit_intent_tx: broadcast::Sender<String>,
+        deposit_intent_tx: broadcast::Sender<DepositIntent>,
         oracle: Box<dyn Oracle>,
         wallet: W,
     ) -> Result<Self, NodeError> {
@@ -303,10 +303,7 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
                     .deposit_addresses
                     .insert(intent.deposit_address.clone())
                 {
-                    if let Err(e) = deposit_intent_state
-                        .deposit_intent_tx
-                        .send(intent.deposit_address.clone())
-                    {
+                    if let Err(e) = deposit_intent_state.deposit_intent_tx.send(intent.clone()) {
                         error!("Failed to notify deposit monitor of new address: {}", e);
                     }
                 }

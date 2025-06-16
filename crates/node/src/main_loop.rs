@@ -1,4 +1,4 @@
-use tracing::info;
+use tracing::{error, info};
 
 use crate::db::Db;
 use crate::wallet::Wallet;
@@ -22,11 +22,13 @@ impl<N: Network + 'static, D: Db + 'static, W: Wallet + 'static> NodeState<N, D,
         self.handle(send_message).await
     }
 
-    pub async fn start(&mut self) -> Result<(), NodeError> {
+    pub async fn start(&mut self) {
         info!("Local peer id: {}", self.peer_id);
 
         loop {
-            self.poll().await?
+            if let Err(e) = self.poll().await {
+                error!("Error polling network events: {}", e);
+            }
         }
     }
 

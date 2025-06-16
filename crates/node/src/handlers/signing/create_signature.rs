@@ -108,6 +108,7 @@ impl SigningState {
                 .map_err(|e| {
                     NodeError::Error(format!("Failed to send private request: {:?}", e))
                 })?;
+            debug!("🚀 Sent sign request to {}", peer);
         }
 
         Ok(Some(sign_id))

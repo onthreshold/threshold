@@ -3,6 +3,10 @@ name = "tests"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "integration-tests"
+path = "src/bin/integration-tests/main.rs"
+
 [dependencies]
 bitcoin = { workspace = true }
 protocol = { path = "../crates/protocol" }
@@ -25,3 +29,4 @@ serde_json = { workspace = true }
 uuid = "1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
 bip39 = { workspace = true, features = ["rand_core"] }
+clap = { version = "4.5.4", features = ["derive"] }
