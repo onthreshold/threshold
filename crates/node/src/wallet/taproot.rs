@@ -210,6 +210,7 @@ impl Wallet for TaprootWallet {
         response_tx
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn ingest_external_tx(&mut self, tx: &Transaction) -> Result<(), NodeError> {
         self.utxos.retain(|t| {
             !tx.input

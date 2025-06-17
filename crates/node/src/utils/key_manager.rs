@@ -14,6 +14,7 @@ use libp2p::identity::Keypair;
 use std::str::FromStr;
 use tracing::debug;
 use types::errors::NodeError;
+use frost::rand_core::RngCore;
 
 pub fn get_key_file_path() -> Result<PathBuf, NodeError> {
     let proj_dirs = ProjectDirs::from("", "", "TheVault")
@@ -66,7 +67,6 @@ pub fn encrypt_private_key(
 
     // Generate random IV
     let mut iv = [0u8; 12];
-    use frost::rand_core::RngCore;
     frost::rand_core::OsRng.fill_bytes(&mut iv);
     let nonce = Nonce::from_slice(&iv);
 

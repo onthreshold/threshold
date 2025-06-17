@@ -24,6 +24,7 @@ pub struct EsploraOracle {
 }
 
 impl EsploraOracle {
+    #[must_use]
     pub fn new(
         network: Network,
         capacity: Option<usize>,
@@ -43,7 +44,7 @@ impl EsploraOracle {
         let client = builder.build_async().unwrap();
         Self {
             client,
-            tx_channel: tx_channel.unwrap_or(broadcast::channel(capacity.unwrap_or(1000)).0),
+            tx_channel: tx_channel.unwrap_or_else(|| broadcast::channel(capacity.unwrap_or(1000)).0),
             deposit_intent_rx,
             confirmation_depth,
             monitor_start_block,
@@ -65,7 +66,7 @@ impl Oracle for EsploraOracle {
             .await
             .map_err(|e| NodeError::Error(e.to_string()))?;
 
-        let tx = tx.ok_or(NodeError::Error("Transaction not found".to_string()))?;
+        let tx = tx.ok_or_else(|| NodeError::Error("Transaction not found".to_string()))?;
 
         if !tx.status.confirmed {
             return Err(NodeError::Error("Transaction not confirmed".to_string()));
@@ -96,11 +97,12 @@ impl Oracle for EsploraOracle {
 
         let fee = fee
             .get(&priority)
-            .ok_or(NodeError::Error("Fee not found".to_string()))?;
+            .ok_or_else(|| NodeError::Error("Fee not found".to_string()))?;
 
         Ok(*fee)
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     async fn refresh_utxos(
         &self,
         address: Address,
@@ -117,9 +119,7 @@ impl Oracle for EsploraOracle {
                 .client
                 .scripthash_txs(&script, last_seen_txid)
                 .await
-                .map_err(|e| {
-                    NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
-                })?;
+                .map_err(|_| NodeError::Error("Cannot retrieve transactions for address".to_string()))?;
 
             if address_txs.is_empty() {
                 break;
@@ -177,10 +177,10 @@ impl Oracle for EsploraOracle {
         self.client
             .broadcast(tx)
             .await
-            .map_err(|e| NodeError::Error(format!("Failed to broadcast transaction: {}", e)))?;
+            .map_err(|_| NodeError::Error("Failed to broadcast transaction".to_string()))?;
 
         Ok(tx_hex)
-    }
+    }   
 
     async fn get_confirmed_transactions(
         &self,
@@ -188,8 +188,8 @@ impl Oracle for EsploraOracle {
         min_height: u32,
         max_height: u32,
     ) -> Result<Vec<Transaction>, NodeError> {
-        let blockchain_height = self.client.get_height().await.map_err(|e| {
-            NodeError::Error(format!("Cannot retrieve height of blockchain: {}", e))
+        let blockchain_height = self.client.get_height().await.map_err(|_| {
+            NodeError::Error("Cannot retrieve height of blockchain".to_string())
         })?;
 
         let new_max_height = max_height.min(blockchain_height - self.confirmation_depth);
@@ -203,9 +203,7 @@ impl Oracle for EsploraOracle {
                     .client
                     .scripthash_txs(&address.script_pubkey(), last_seen_txid)
                     .await
-                    .map_err(|e| {
-                        NodeError::Error(format!("Cannot retrieve transactions for address: {}", e))
-                    })?;
+                    .map_err(|_| NodeError::Error("Cannot retrieve transactions for address".to_string()))?;
 
                 if address_txs.is_empty() {
                     break;
@@ -242,6 +240,7 @@ impl Oracle for EsploraOracle {
         Ok(confirmed_txs)
     }
 
+    #[allow(clippy::cast_sign_loss)]
     async fn poll_new_transactions(&mut self, addresses: Vec<Address>) {
         let confirmation_depth = self.confirmation_depth;
 
@@ -265,7 +264,7 @@ impl Oracle for EsploraOracle {
 
         loop {
             tokio::select! {
-                _ = sleep(Duration::from_secs(30)) => {
+                () = sleep(Duration::from_secs(30)) => {
                     let current_height = match self.client.get_height().await {
                         Ok(height) => height,
                         Err(e) => {
@@ -273,7 +272,8 @@ impl Oracle for EsploraOracle {
                             continue;
                         }
                     };
-                    tracing::info!("Current height: {}", current_height);
+                    
+                    info!("Current height: {}", current_height);
 
                     let new_confirmed_height = current_height - confirmation_depth;
 
@@ -335,8 +335,8 @@ impl Oracle for EsploraOracle {
     }
 
     async fn get_latest_block_height(&self) -> Result<u32, NodeError> {
-        let height = self.client.get_height().await.map_err(|e| {
-            NodeError::Error(format!("Cannot retrieve height of blockchain: {}", e))
+        let height = self.client.get_height().await.map_err(|_| {
+            NodeError::Error("Cannot retrieve height of blockchain".to_string())
         })?;
         Ok(height)
     }

@@ -91,13 +91,13 @@ pub async fn start_node(
         keypair.clone(),
         config.libp2p_udp_port,
         config.libp2p_tcp_port,
-        allowed_peers.clone(),
+        &allowed_peers,
     )
     .expect("Failed to build swarm");
 
     let (deposit_intent_tx, _) = broadcast::channel::<DepositIntent>(100);
     let is_testnet = dotenvy::var("IS_TESTNET")
-        .unwrap_or("false".to_string())
+        .unwrap_or_else(|_| "false".to_string())
         .parse()
         .unwrap();
 
@@ -122,19 +122,20 @@ pub async fn start_node(
     };
 
     let mut node_state = NodeState::new_from_config(
-        network_handle,
+        &network_handle,
         min_signers,
         max_signers,
         config,
         RocksDb::new(config_database_path.to_str().unwrap()),
-        swarm.network_events.clone(),
+        &swarm.network_events,
         deposit_intent_tx,
         oracle.clone(),
         TaprootWallet::new(oracle.clone(), Vec::new(), {
             let is_testnet: bool = std::env::var("IS_TESTNET")
-                .unwrap_or("false".to_string())
+                .unwrap_or_else(|_| String::from("false"))
                 .parse()
                 .unwrap_or(false);
+            
             if is_testnet {
                 bitcoin::Network::Testnet
             } else {

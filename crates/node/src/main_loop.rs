@@ -38,7 +38,6 @@ impl<N: Network + 'static, D: Db + 'static, W: Wallet + 'static> NodeState<N, D,
                 result = self.poll() => {
                     if let Err(e) = result {
                         error!("Error polling network events: {}", e);
-                        continue;
                     }
                 }
             }

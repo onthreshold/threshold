@@ -142,6 +142,7 @@ impl Block {
 
 impl GenesisBlock {
     /// Create a new genesis block
+    #[must_use] 
     pub fn new(
         validators: Vec<ValidatorInfo>,
         chain_config: ChainConfig,
@@ -163,6 +164,7 @@ impl GenesisBlock {
         }
     }
 
+    #[must_use]
     pub fn to_block(&self) -> Block {
         let mut hasher = Sha256::new();
         hasher.update(b"GENESIS");

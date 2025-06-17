@@ -177,7 +177,7 @@ pub struct SwarmManager {
 impl SwarmManager {
     pub fn new(
         mut swarm: Swarm<MyBehaviour>,
-        peer_data: Vec<PeerData>,
+        peer_data: &[PeerData],
     ) -> Result<(Self, NetworkHandle), NodeError> {
         let (send_commands, receiving_commands) = unbounded_channel::<NetworkMessage>();
 
@@ -255,8 +255,7 @@ impl SwarmManager {
     pub fn peer_name(&self, peer_id: &PeerId) -> String {
         self.peers_to_names
             .get(peer_id)
-            .unwrap_or(&peer_id.to_string())
-            .clone()
+            .map_or_else(|| peer_id.to_string(), Clone::clone)
     }
 
     pub async fn start(&mut self) {
@@ -337,7 +336,7 @@ pub fn build_swarm(
     keypair: Keypair,
     libp2p_udp_port: u16,
     libp2p_tcp_port: u16,
-    peer_data: Vec<PeerData>,
+    peer_data: &[PeerData],
 ) -> Result<(NetworkHandle, SwarmManager), NodeError> {
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
