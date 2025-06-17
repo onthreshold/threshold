@@ -7,13 +7,22 @@ use types::network_event::DirectMessage;
 
 use crate::swarm_manager::Network;
 use crate::{NodeState, db::Db, handlers::dkg::DkgState, peer_id_to_identifier, wallet::Wallet};
-use serde_json;
 use types::proto::p2p_proto::dkg_message::Message;
 use types::proto::p2p_proto::{DkgMessage, StartDkgMessage};
 
-fn decode_dkg_message(data: &[u8]) -> Result<types::proto::p2p_proto::DkgMessage, String> {
-    <types::proto::p2p_proto::DkgMessage as ProstMessage>::decode(data)
-        .map_err(|e| format!("Failed to decode DKG message: {e}"))
+fn decode_gossipsub_dkg_message(
+    data: &[u8],
+) -> Result<types::proto::p2p_proto::DkgMessage, String> {
+    let gossipsub_msg = <types::proto::p2p_proto::GossipsubMessage as ProstMessage>::decode(data)
+        .map_err(|e| format!("Failed to decode GossipsubMessage: {e}"))?;
+
+    if let Some(types::proto::p2p_proto::gossipsub_message::Message::Dkg(dkg_msg)) =
+        gossipsub_msg.message
+    {
+        Ok(dkg_msg)
+    } else {
+        Err("Expected DKG message in GossipsubMessage".to_string())
+    }
 }
 
 fn dkg_step_delay() -> Duration {
@@ -66,15 +75,21 @@ impl DkgState {
         self.r1_secret_package = Some(round1_secret_package);
 
         // Broadcast START_DKG message to the network using protobuf
-        let start_message = DkgMessage {
+        let start_dkg_message = DkgMessage {
             message: Some(Message::StartDkg(StartDkgMessage {
                 peer_id: node.peer_id.to_string(),
             })),
         };
 
+        let gossipsub_message = types::proto::p2p_proto::GossipsubMessage {
+            message: Some(types::proto::p2p_proto::gossipsub_message::Message::Dkg(
+                start_dkg_message,
+            )),
+        };
+
         match node
             .network_handle
-            .send_broadcast(self.start_dkg_topic.clone(), start_message)
+            .send_broadcast(self.start_dkg_topic.clone(), gossipsub_message)
         {
             Ok(()) => (),
             Err(e) => {
@@ -83,10 +98,11 @@ impl DkgState {
         }
 
         // Broadcast round1 package using protobuf
-        let serialized_pkg = serde_json::to_vec(&round1_package)
+        let serialized_pkg = round1_package
+            .serialize()
             .map_err(|e| NodeError::Error(format!("Failed to serialize round1 package: {e}")))?;
 
-        let round1_message = DkgMessage {
+        let round1_dkg_message = DkgMessage {
             message: Some(Message::Round1Package(
                 types::proto::p2p_proto::Round1Package {
                     package_data: serialized_pkg,
@@ -94,9 +110,15 @@ impl DkgState {
             )),
         };
 
+        let round1_gossipsub_message = types::proto::p2p_proto::GossipsubMessage {
+            message: Some(types::proto::p2p_proto::gossipsub_message::Message::Dkg(
+                round1_dkg_message,
+            )),
+        };
+
         match node
             .network_handle
-            .send_broadcast(self.round1_topic.clone(), round1_message)
+            .send_broadcast(self.round1_topic.clone(), round1_gossipsub_message)
         {
             Ok(()) => tracing::debug!("Broadcast round1"),
             Err(e) => {
@@ -123,7 +145,7 @@ impl DkgState {
         protobuf_data: &[u8],
     ) -> Result<(), NodeError> {
         // Decode the protobuf message first
-        let dkg_message = decode_dkg_message(protobuf_data)
+        let dkg_message = decode_gossipsub_dkg_message(protobuf_data)
             .map_err(|e| NodeError::Error(format!("Failed to decode DKG message: {e}")))?;
 
         // Extract the round1 package from the protobuf message
