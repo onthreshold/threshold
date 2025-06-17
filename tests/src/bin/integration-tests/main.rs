@@ -121,7 +121,7 @@ async fn run_deposit_test(
     if use_testnet {
         println!("🔑 Sender address: {}. Refreshing UTXOs...", sender_address);
 
-        let oracle = EsploraOracle::new(bitcoin::Network::Testnet, Some(100), None, None, 6, -1);
+        let oracle = EsploraOracle::new(bitcoin::Network::Testnet, Some(100), None, None, 6, 0);
         let mut wallet = TaprootWallet::new(
             Box::new(oracle.clone()),
             vec![sender_address.clone()],

@@ -49,7 +49,7 @@ pub struct WithdrawlIntent {
     pub amount_sat: u64,
     pub address_to: String,
     pub public_key: String,
-    pub blocks_to_confirm: Option<u32>,
+    pub blocks_to_confirm: Option<u16>,
 }
 
 #[derive(Debug)]

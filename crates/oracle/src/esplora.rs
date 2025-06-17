@@ -20,7 +20,7 @@ pub struct EsploraOracle {
     pub tx_channel: broadcast::Sender<NetworkEvent>,
     pub deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
     pub confirmation_depth: u32,
-    pub monitor_start_block: i32,
+    pub monitor_start_block: u32,
 }
 
 impl EsploraOracle {
@@ -31,7 +31,7 @@ impl EsploraOracle {
         tx_channel: Option<broadcast::Sender<NetworkEvent>>,
         deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
         confirmation_depth: u32,
-        monitor_start_block: i32,
+        monitor_start_block: u32,
     ) -> Self {
         let url = match network {
             Network::Bitcoin => "https://blockstream.info/api",
@@ -103,7 +103,6 @@ impl Oracle for EsploraOracle {
         Ok(*fee)
     }
 
-    #[allow(clippy::cast_possible_truncation)]
     async fn refresh_utxos(
         &self,
         address: Address,
@@ -155,7 +154,7 @@ impl Oracle for EsploraOracle {
                     unspent_txs.push(Utxo {
                         outpoint: OutPoint {
                             txid: tx.txid,
-                            vout: vout as u32,
+                            vout: u32::try_from(vout).unwrap(),
                         },
                         value: Amount::from_sat(output.value.to_sat()),
                         script_pubkey: script.clone(),
@@ -246,7 +245,6 @@ impl Oracle for EsploraOracle {
         Ok(confirmed_txs)
     }
 
-    #[allow(clippy::cast_sign_loss)]
     async fn poll_new_transactions(&mut self, addresses: Vec<Address>) {
         let confirmation_depth = self.confirmation_depth;
 
@@ -284,8 +282,8 @@ impl Oracle for EsploraOracle {
                     let new_confirmed_height = current_height - confirmation_depth;
 
                     if new_confirmed_height > last_confirmed_height {
-                        let min_height: u32 = if self.monitor_start_block >= 0 {
-                            self.monitor_start_block as u32
+                        let min_height: u32 = if self.monitor_start_block > 0 {
+                            self.monitor_start_block
                         } else {
                             last_confirmed_height + 1
                         };

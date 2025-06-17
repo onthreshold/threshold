@@ -43,6 +43,6 @@ mod config_test {
         assert_eq!(config.libp2p_udp_port, 0);
         assert_eq!(config.libp2p_tcp_port, 0);
         assert_eq!(config.confirmation_depth, 6);
-        assert_eq!(config.monitor_start_block, -1);
+        assert_eq!(config.monitor_start_block, 0);
     }
 }
