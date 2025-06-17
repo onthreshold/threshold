@@ -10,10 +10,10 @@ pub async fn rpc_spend(
     amount: u64,
     address_to: String,
 ) -> Result<SpendFundsResponse, Status> {
-    println!("Spending {} satoshis", amount);
+    println!("Spending {amount} satoshis");
 
     let mut client =
-        NodeControlClient::connect(endpoint.unwrap_or("http://[::1]:50051".to_string()))
+        NodeControlClient::connect(endpoint.unwrap_or_else(|| "http://[::1]:50051".to_string()))
             .await
             .expect("Failed to connect");
 
@@ -24,7 +24,7 @@ pub async fn rpc_spend(
         }))
         .await?;
 
-    println!("Spent {:?} satoshis", spendfunds_response);
+    println!("Spent {spendfunds_response:?} satoshis");
 
     Ok(spendfunds_response.into_inner())
 }
@@ -33,10 +33,10 @@ pub async fn rpc_start_signing(
     endpoint: Option<String>,
     hex_message: String,
 ) -> Result<StartSigningResponse, Status> {
-    println!("Starting signing session for message: {}", hex_message);
+    println!("Starting signing session for message: {hex_message}");
 
     let mut client =
-        NodeControlClient::connect(endpoint.unwrap_or("http://[::1]:50051".to_string()))
+        NodeControlClient::connect(endpoint.unwrap_or_else(|| "http://[::1]:50051".to_string()))
             .await
             .expect("Failed to connect");
 
@@ -54,10 +54,10 @@ pub async fn rpc_create_deposit_intent(
     amount: u64,
     public_key: String,
 ) -> Result<CreateDepositIntentResponse, Status> {
-    println!("Creating deposit intent: {}", amount);
+    println!("Creating deposit intent: {amount}");
 
     let mut client =
-        NodeControlClient::connect(endpoint.unwrap_or("http://[::1]:50051".to_string()))
+        NodeControlClient::connect(endpoint.unwrap_or_else(|| "http://[::1]:50051".to_string()))
             .await
             .expect("Failed to connect");
 
@@ -77,7 +77,7 @@ pub async fn rpc_get_pending_deposit_intents(
     endpoint: Option<String>,
 ) -> Result<GetPendingDepositIntentsResponse, Status> {
     let mut client =
-        NodeControlClient::connect(endpoint.unwrap_or("http://[::1]:50051".to_string()))
+        NodeControlClient::connect(endpoint.unwrap_or_else(|| "http://[::1]:50051".to_string()))
             .await
             .expect("Failed to connect");
 
@@ -87,10 +87,7 @@ pub async fn rpc_get_pending_deposit_intents(
         ))
         .await?;
 
-    println!(
-        "Deposit intents: {:?}",
-        get_pending_deposit_intents_response
-    );
+    println!("Deposit intents: {get_pending_deposit_intents_response:?}");
 
     Ok(get_pending_deposit_intents_response.into_inner())
 }
@@ -100,7 +97,7 @@ pub async fn rpc_check_balance(
     address: String,
 ) -> Result<CheckBalanceResponse, Status> {
     let mut client =
-        NodeControlClient::connect(endpoint.unwrap_or("http://[::1]:50051".to_string()))
+        NodeControlClient::connect(endpoint.unwrap_or_else(|| "http://[::1]:50051".to_string()))
             .await
             .expect("Failed to connect");
 
@@ -110,7 +107,7 @@ pub async fn rpc_check_balance(
         }))
         .await?;
 
-    println!("Balance: {:?}", check_balance_response);
+    println!("Balance: {check_balance_response:?}");
 
     Ok(check_balance_response.into_inner())
 }

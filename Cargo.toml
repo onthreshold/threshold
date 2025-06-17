@@ -11,6 +11,16 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+name = "threshold"
+version = "0.1.0"
+edition = "2021"
+description = "building the best infrastructure for decentralized multisigs"
+license = "MIT"
+repository = "https://github.com/onthreshold/threshold/"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "multisig"]
+categories = ["cryptography", "blockchain"]
+
 [workspace.dependencies]
 tokio = { version = "1.37.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
