@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package node;
+package grpc;
 
 // The node control service
 service NodeControl {
