@@ -42,7 +42,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SigningState {
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::SpendRequestSent {
-                            sighash: response.unwrap_or("No sighash".to_string()),
+                            sighash: response.unwrap_or_else(|| "No sighash".to_string()),
                         })
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
                 }
@@ -54,14 +54,14 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SigningState {
             Some(NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::SignPackage { sign_id, package },
-            ))) => self.handle_sign_package(node, peer, sign_id, package)?,
+            ))) => self.handle_sign_package(node, peer, sign_id, &package)?,
             Some(NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::Commitments {
                     sign_id,
                     commitments,
                 },
-            ))) => self.handle_commitments_response(node, peer, sign_id, commitments)?,
+            ))) => self.handle_commitments_response(node, peer, sign_id, &commitments)?,
             Some(NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::SignatureShare {
@@ -69,7 +69,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SigningState {
                     signature_share,
                 },
             ))) => {
-                self.handle_signature_share(node, peer, sign_id, signature_share)
+                self.handle_signature_share(node, peer, sign_id, &signature_share)
                     .await?;
             }
             _ => (),

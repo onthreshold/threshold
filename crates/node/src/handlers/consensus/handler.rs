@@ -47,7 +47,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
                         self.validators.insert(peer_id);
 
                         if self.current_round == 0 {
-                            self.start_new_round(node).await?;
+                            self.start_new_round(node)?;
                         }
                     }
                 }
@@ -85,9 +85,9 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
 }
 
 impl ConsensusState {
-    async fn handle_new_round<N: Network, D: Db, W: Wallet>(
+    fn handle_new_round<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &NodeState<N, D, W>,
         sender: PeerId,
         round: u32,
     ) -> Result<(), types::errors::NodeError> {
@@ -107,12 +107,12 @@ impl ConsensusState {
         }
 
         self.current_round = round - 1;
-        self.start_new_round(node).await
+        self.start_new_round(node)
     }
 
-    async fn start_new_round<N: Network, D: Db, W: Wallet>(
+    fn start_new_round<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &NodeState<N, D, W>,
     ) -> Result<(), types::errors::NodeError> {
         self.current_round += 1;
 

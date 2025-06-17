@@ -26,7 +26,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DepositIntentState {
                 response_channel,
             }) => {
                 let (deposit_tracking_id, deposit_address) =
-                    self.create_deposit(node, user_pubkey, amount_sat).await?;
+                    self.create_deposit(node, &user_pubkey, amount_sat)?;
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::CreateDepositResponse {
@@ -51,7 +51,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DepositIntentState {
                 request: SelfRequest::ConfirmDeposit { confirmed_tx },
                 ..
             }) => {
-                if let Err(e) = self.update_user_balance(node, confirmed_tx) {
+                if let Err(e) = self.update_user_balance(node, &    confirmed_tx) {
                     info!("Failed to update user balance: {}", e);
                 }
             }

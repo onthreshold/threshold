@@ -23,6 +23,7 @@ pub struct MockOracle {
 }
 
 impl MockOracle {
+    #[must_use]
     pub fn new(
         tx_channel: broadcast::Sender<NetworkEvent>,
         deposit_intent_rx: Option<broadcast::Sender<DepositIntent>>,
@@ -54,15 +55,13 @@ impl Oracle for MockOracle {
             Some((expected_address, expected_amount, is_valid)) => {
                 if expected_address != address {
                     return Err(NodeError::Error(format!(
-                        "Address mismatch: expected {}, got {}",
-                        expected_address, address
+                        "Address mismatch: expected {expected_address}, got {address}"
                     )));
                 }
 
                 if *expected_amount != amount {
                     return Err(NodeError::Error(format!(
-                        "Amount mismatch: expected {}, got {}",
-                        expected_amount, amount
+                        "Amount mismatch: expected {expected_amount}, got {amount}"
                     )));
                 }
 
@@ -118,7 +117,7 @@ impl Oracle for MockOracle {
                     .unwrap(),
                     0,
                 ),
-                value: Amount::from_sat(100000),
+                value: Amount::from_sat(100_000),
                 script_pubkey: ScriptBuf::new(),
             },
         ])
@@ -151,7 +150,7 @@ impl Oracle for MockOracle {
                     info!("Received new address: {}", deposit_intent.deposit_address);
                     if let Ok(addr) = Address::from_str(&deposit_intent.deposit_address) {
                         let tx =
-                            self.create_dummy_tx(addr.assume_checked(), deposit_intent.amount_sat);
+                            Self::create_dummy_tx(&addr.assume_checked(), deposit_intent.amount_sat);
                         if let Err(e) = self.tx_channel.send(NetworkEvent::SelfRequest {
                             request: SelfRequest::ConfirmDeposit { confirmed_tx: tx },
                             response_channel: None,
@@ -160,7 +159,7 @@ impl Oracle for MockOracle {
                         }
                     }
                 }
-                Err(broadcast::error::RecvError::Lagged(_)) => continue, // skip missed messages
+                Err(broadcast::error::RecvError::Lagged(_)) => (), // skip missed messages
                 Err(broadcast::error::RecvError::Closed) => break,
             }
         }
@@ -173,7 +172,7 @@ impl Oracle for MockOracle {
 }
 
 impl MockOracle {
-    fn create_dummy_tx(&self, address: Address, value_sat: u64) -> Transaction {
+    fn create_dummy_tx(address: &Address, value_sat: u64) -> Transaction {
         let tx_in = TxIn {
             previous_output: OutPoint {
                 txid: Txid::from_slice(&[0u8; 32]).unwrap(),

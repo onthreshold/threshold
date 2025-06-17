@@ -278,12 +278,12 @@ pub struct NodeState<N: Network, D: Db, W: Wallet> {
 impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
     #[allow(clippy::too_many_arguments)]
     pub fn new_from_config(
-        network_handle: N,
+        network_handle: &N,
         min_signers: u16,
         max_signers: u16,
         config: NodeConfig,
         storage_db: D,
-        network_events_sender: broadcast::Sender<NetworkEvent>,
+        network_events_sender: &broadcast::Sender<NetworkEvent>,
         deposit_intent_tx: broadcast::Sender<DepositIntent>,
         oracle: Box<dyn Oracle>,
         wallet: W,

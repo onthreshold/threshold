@@ -29,11 +29,13 @@ impl SpendIntentState {
             return Err(NodeError::Error("Insufficient balance".to_string()));
         }
 
+        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss)]
         let current_fee_per_vb = node
             .oracle
             .get_current_fee_per_vb(withdrawal_intent.blocks_to_confirm.map(|b| b as u16))
             .await?;
 
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let (tx, _) = node.wallet.create_spend(
             withdrawal_intent.amount_sat,
             (current_fee_per_vb * 120.0) as u64, // Just estimate for now this doesnt affect vsize
@@ -44,6 +46,7 @@ impl SpendIntentState {
         )?;
 
         let vsize = tx.vsize();
+        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss)]
         let fee = (current_fee_per_vb * vsize as f64) as u64 * 2;
         let total_amount = withdrawal_intent.amount_sat + fee;
 
@@ -83,7 +86,7 @@ impl SpendIntentState {
         Ok(secp.verify_ecdsa(&message, &signature, &public_key).is_ok())
     }
 
-    pub async fn confirm_withdrawal<N: Network, D: Db, W: Wallet>(
+    pub fn confirm_withdrawal<N: Network, D: Db, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, D, W>,
         challenge: &str,
@@ -122,10 +125,12 @@ impl SpendIntentState {
         let user_account = node
             .chain_state
             .get_account(&user_pubkey)
-            .ok_or(NodeError::Error("User not found".to_string()))?;
+            .ok_or_else(|| NodeError::Error("User not found".to_string()))?;
 
+        #[allow(clippy::cast_possible_wrap)]
         let updated_account =
             user_account.update_balance(-((tx.output[0].value.to_sat() + fee) as i64));
+
         info!(
             "🚀 Updated account balance: account: {}, balance: {}",
             user_pubkey, updated_account.balance
@@ -153,6 +158,7 @@ impl SpendIntentState {
         Ok(())
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     pub async fn handle_withdrawl_message<N: Network, D: Db, W: Wallet>(
         &self,
         node: &mut NodeState<N, D, W>,
@@ -167,15 +173,16 @@ impl SpendIntentState {
             .output
             .iter()
             .find(|o| o.script_pubkey == pending.recipient_script)
-            .ok_or(NodeError::Error("payment output not found".into()))?;
+            .ok_or_else(|| NodeError::Error("payment output not found".into()))?;
 
         let debit = pay_out.value.to_sat() + pending.fee;
 
         let mut acct = node
             .chain_state
             .get_account(&pending.user_pubkey)
-            .ok_or(NodeError::Error("user missing".into()))?
+            .ok_or_else(|| NodeError::Error("user missing".into()))?
             .clone();
+
         acct = acct.update_balance(-(debit as i64));
         node.chain_state.upsert_account(&pending.user_pubkey, acct);
 

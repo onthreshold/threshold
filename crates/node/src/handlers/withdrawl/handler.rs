@@ -37,8 +37,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SpendIntentState {
                     },
                 response_channel,
             }) => {
-                self.confirm_withdrawal(node, &challenge, &signature)
-                    .await?;
+                self.confirm_withdrawal(node, &challenge, &signature)?;
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::ConfirmWithdrawalResponse { success: true })

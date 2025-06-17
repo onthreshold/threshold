@@ -51,10 +51,10 @@ impl DepositIntentState {
         Ok(())
     }
 
-    pub async fn create_deposit<N: Network, D: Db, W: Wallet>(
+    pub fn create_deposit<N: Network, D: Db, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, D, W>,
-        user_pubkey: String,
+        user_pubkey: &str,
         amount_sat: u64,
     ) -> Result<(String, String), NodeError> {
         let deposit_tracking_id = Uuid::new_v4().to_string();
@@ -80,19 +80,19 @@ impl DepositIntentState {
 
         let deposit_intent = DepositIntent {
             amount_sat,
-            user_pubkey: user_pubkey.clone(),
+            user_pubkey: user_pubkey.to_string(),
             deposit_tracking_id: deposit_tracking_id.clone(),
             deposit_address: deposit_address.to_string(),
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_else(|_| std::time::Duration::from_secs(0))
                 .as_secs(),
         };
 
-        if node.chain_state.get_account(&user_pubkey).is_none() {
+        if node.chain_state.get_account(user_pubkey).is_none() {
             node.chain_state.upsert_account(
-                &user_pubkey,
-                protocol::chain_state::Account::new(user_pubkey.clone(), 0),
+                user_pubkey,
+                protocol::chain_state::Account::new(user_pubkey.to_string(), 0),
             );
         }
 
@@ -133,7 +133,7 @@ impl DepositIntentState {
     pub fn update_user_balance<N: Network, D: Db, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, D, W>,
-        tx: Transaction,
+        tx: &Transaction,
     ) -> Result<(), NodeError> {
         if !self.processed_txids.insert(tx.compute_txid()) {
             return Ok(());
@@ -156,18 +156,21 @@ impl DepositIntentState {
                     );
                     let user_account = node
                         .chain_state
-                        .get_account(&intent.user_pubkey.clone())
+                        .get_account(&intent.user_pubkey)
                         .cloned()
-                        .unwrap_or(Account::new(intent.user_pubkey.clone(), 0));
+                        .unwrap_or_else(|| Account::new(intent.user_pubkey.to_string(), 0));
 
+                    #[allow(clippy::cast_possible_wrap)]
                     let updated = user_account.update_balance(output.value.to_sat() as i64);
                     node.chain_state
                         .upsert_account(&intent.user_pubkey, updated);
+
+                    todo!("update balance should be seperated into decrement and increment balance functions");
                 }
             }
         }
 
-        node.wallet.ingest_external_tx(&tx)?;
+        node.wallet.ingest_external_tx(tx)?;
 
         Ok(())
     }

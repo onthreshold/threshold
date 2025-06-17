@@ -67,12 +67,6 @@ impl SigningState {
 
         let selected_peers: Vec<PeerId> = peer_pool.into_iter().take(required).collect();
 
-        let mut participants: Vec<_> = Vec::new();
-        participants.push(self_identifier);
-        for peer in &selected_peers {
-            participants.push(peer_id_to_identifier(peer));
-        }
-
         // Generate nonces & commitments for self
         let key_pkg = match node.private_key_package.as_ref() {
             Some(key_pkg) => key_pkg.clone(),
@@ -177,7 +171,7 @@ impl SigningState {
         node: &mut NodeState<N, D, W>,
         peer: PeerId,
         sign_id: u64,
-        commitments_bytes: Vec<u8>,
+        commitments_bytes: &[u8],
     ) -> Result<(), NodeError> {
         let Some(active) = self.active_signing.as_mut() else {
             return Err(NodeError::Error("No active session".to_string()));
@@ -186,7 +180,7 @@ impl SigningState {
             return Err(NodeError::Error("Session id mismatch".to_string()));
         }
 
-        let Ok(commitments) = frost::round1::SigningCommitments::deserialize(&commitments_bytes)
+        let Ok(commitments) = frost::round1::SigningCommitments::deserialize(commitments_bytes)
         else {
             warn!("Failed to deserialize commitments from {}", peer);
             return Err(NodeError::Error(
@@ -257,7 +251,7 @@ impl SigningState {
         node: &mut NodeState<N, D, W>,
         peer: PeerId,
         sign_id: u64,
-        package_bytes: Vec<u8>,
+        package_bytes: &[u8],
     ) -> Result<(), NodeError> {
         let Some(active) = self.active_signing.as_ref() else {
             warn!("No active session to sign");
@@ -268,7 +262,7 @@ impl SigningState {
             return Err(NodeError::Error("Session id mismatch".to_string()));
         }
 
-        let Ok(signing_package) = frost::SigningPackage::deserialize(&package_bytes) else {
+        let Ok(signing_package) = frost::SigningPackage::deserialize(package_bytes) else {
             warn!("Failed to deserialize signing package");
             return Err(NodeError::Error(
                 "Failed to deserialize signing package".to_string(),
@@ -314,7 +308,7 @@ impl SigningState {
         node: &mut NodeState<N, D, W>,
         peer: PeerId,
         sign_id: u64,
-        sig_bytes: Vec<u8>,
+        sig_bytes: &[u8],
     ) -> Result<(), NodeError> {
         let Some(active) = self.active_signing.as_mut() else {
             return Err(NodeError::Error("No active session".to_string()));
@@ -323,7 +317,7 @@ impl SigningState {
             return Err(NodeError::Error("Session id mismatch".to_string()));
         }
 
-        let Ok(sig_share) = frost::round2::SignatureShare::deserialize(&sig_bytes) else {
+        let Ok(sig_share) = frost::round2::SignatureShare::deserialize(sig_bytes) else {
             warn!("Failed to deserialize signature share from {}", peer);
             return Err(NodeError::Error(
                 "Failed to deserialize signature share".to_string(),
@@ -339,12 +333,9 @@ impl SigningState {
         );
 
         if active.signature_shares.len() == node.min_signers as usize {
-            let signing_package = match active.signing_package.clone() {
-                Some(signing_package) => signing_package,
-                None => {
-                    return Err(NodeError::Error("No signing package found".to_string()));
-                }
-            };
+            let signing_package = active.signing_package.clone().ok_or_else(|| {
+                NodeError::Error("No signing package found".to_string())
+            })?;
             let group_sig = frost::aggregate(
                 &signing_package,
                 &active.signature_shares,
