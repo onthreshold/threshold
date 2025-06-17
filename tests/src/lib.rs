@@ -7,5 +7,4 @@ pub mod mocks;
 pub mod protocol;
 pub mod signing;
 pub mod util;
-pub mod wallet;
 pub mod withdrawl;
