@@ -62,8 +62,6 @@ base64 = "0.22.1"
 tonic = "0.13"
 prost = "0.13"
 
-
-
 [workspace.lints.rust]
 unsafe_code = "warn"
 

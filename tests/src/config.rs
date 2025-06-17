@@ -25,7 +25,7 @@ mod config_test {
             "libp2p_udp_port": 0,
             "libp2p_tcp_port": 0,
             "confirmation_depth": 6,
-            "monitor_start_block": -1
+            "monitor_start_block": 0
         }"#;
 
         let config: NodeConfig = serde_json::from_str(json_str).expect("Failed to deserialize");
