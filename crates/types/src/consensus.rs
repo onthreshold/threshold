@@ -1,6 +1,6 @@
 use prost::Message;
 
-use crate::proto::p2p_proto;
+use crate::proto::{ProtoDecode, ProtoEncode, p2p_proto};
 
 #[derive(Debug, Clone)]
 pub enum ConsensusMessage {
@@ -14,9 +14,9 @@ pub struct LeaderAnnouncement {
     pub round: u32,
 }
 
-impl ConsensusMessage {
-    pub fn encode(msg: &Self) -> Result<Vec<u8>, String> {
-        let proto_msg = match msg {
+impl ProtoEncode for ConsensusMessage {
+    fn encode(&self) -> Result<Vec<u8>, String> {
+        let proto_msg = match self {
             Self::LeaderAnnouncement(announcement) => {
                 p2p_proto::consensus_message::Message::LeaderAnnouncement(
                     p2p_proto::LeaderAnnouncement {
@@ -41,8 +41,10 @@ impl ConsensusMessage {
             .map_err(|e| format!("Failed to encode consensus message: {e}"))?;
         Ok(buf)
     }
+}
 
-    pub fn decode(data: &[u8]) -> Result<Self, String> {
+impl ProtoDecode for ConsensusMessage {
+    fn decode(data: &[u8]) -> Result<Self, String> {
         let proto_msg = p2p_proto::ConsensusMessage::decode(data)
             .map_err(|e| format!("Failed to decode consensus message: {e}"))?;
 

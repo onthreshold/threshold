@@ -1,11 +1,20 @@
 use frost_secp256k1::{self as frost, keys::dkg::round2};
 use libp2p::PeerId;
+use prost::Message as ProstMessage;
 use std::time::Duration;
 use types::errors::NodeError;
 use types::network_event::DirectMessage;
 
 use crate::swarm_manager::Network;
 use crate::{NodeState, db::Db, handlers::dkg::DkgState, peer_id_to_identifier, wallet::Wallet};
+use serde_json;
+use types::proto::p2p_proto::dkg_message::Message;
+use types::proto::p2p_proto::{DkgMessage, StartDkgMessage};
+
+fn decode_dkg_message(data: &[u8]) -> Result<types::proto::p2p_proto::DkgMessage, String> {
+    <types::proto::p2p_proto::DkgMessage as ProstMessage>::decode(data)
+        .map_err(|e| format!("Failed to decode DKG message: {e}"))
+}
 
 fn dkg_step_delay() -> Duration {
     std::env::var("DKG_STEP_DELAY_SECS")
@@ -56,26 +65,38 @@ impl DkgState {
 
         self.r1_secret_package = Some(round1_secret_package);
 
-        let round1_package_bytes = round1_package
-            .serialize()
-            .expect("Failed to serialize round1 package");
+        // Broadcast START_DKG message to the network using protobuf
+        let start_message = DkgMessage {
+            message: Some(Message::StartDkg(StartDkgMessage {
+                peer_id: node.peer_id.to_string(),
+            })),
+        };
 
-        // Broadcast START_DKG message to the network,
-        let start_message = format!("START_DKG:{}", node.peer_id);
-
-        match node.network_handle.send_broadcast(
-            self.start_dkg_topic.clone(),
-            start_message.as_bytes().to_vec(),
-        ) {
+        match node
+            .network_handle
+            .send_broadcast(self.start_dkg_topic.clone(), start_message)
+        {
             Ok(()) => (),
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to send broadcast: {e:?}")));
             }
         }
 
+        // Broadcast round1 package using protobuf
+        let serialized_pkg = serde_json::to_vec(&round1_package)
+            .map_err(|e| NodeError::Error(format!("Failed to serialize round1 package: {e}")))?;
+
+        let round1_message = DkgMessage {
+            message: Some(Message::Round1Package(
+                types::proto::p2p_proto::Round1Package {
+                    package_data: serialized_pkg,
+                },
+            )),
+        };
+
         match node
             .network_handle
-            .send_broadcast(self.round1_topic.clone(), round1_package_bytes)
+            .send_broadcast(self.round1_topic.clone(), round1_message)
         {
             Ok(()) => tracing::debug!("Broadcast round1"),
             Err(e) => {
@@ -99,10 +120,24 @@ impl DkgState {
         &mut self,
         node: &mut NodeState<N, D, W>,
         sender_peer_id: PeerId,
-        package: &[u8],
+        protobuf_data: &[u8],
     ) -> Result<(), NodeError> {
+        // Decode the protobuf message first
+        let dkg_message = decode_dkg_message(protobuf_data)
+            .map_err(|e| NodeError::Error(format!("Failed to decode DKG message: {e}")))?;
+
+        // Extract the round1 package from the protobuf message
+        let Some(types::proto::p2p_proto::dkg_message::Message::Round1Package(round1_pkg)) =
+            dkg_message.message
+        else {
+            return Err(NodeError::Error(
+                "Expected Round1Package in DKG message".to_string(),
+            ));
+        };
+
         let identifier = peer_id_to_identifier(&sender_peer_id);
-        let package = match frost::keys::dkg::round1::Package::deserialize(package) {
+        let package = match frost::keys::dkg::round1::Package::deserialize(&round1_pkg.package_data)
+        {
             Ok(package) => package,
             Err(e) => {
                 return Err(NodeError::Error(format!(

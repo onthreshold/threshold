@@ -8,7 +8,7 @@ use crate::{
 };
 use libp2p::PeerId;
 use tracing::info;
-use types::network_event::NetworkEvent;
+use types::{network_event::NetworkEvent, proto::ProtoDecode};
 
 #[async_trait::async_trait]
 impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
@@ -22,16 +22,9 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
                 info!("Round timeout reached. I am current leader. Proposing new round.");
                 let next_round = self.current_round + 1;
                 let new_round_message = types::consensus::ConsensusMessage::NewRound(next_round);
-                let data = types::consensus::ConsensusMessage::encode(&new_round_message).map_err(
-                    |e| {
-                        types::errors::NodeError::Error(format!(
-                            "Failed to encode new round message: {e}"
-                        ))
-                    },
-                )?;
 
                 node.network_handle
-                    .send_broadcast(self.leader_topic.clone(), data)
+                    .send_broadcast(self.leader_topic.clone(), new_round_message)
                     .map_err(|e| {
                         types::errors::NodeError::Error(format!(
                             "Failed to broadcast new round message: {e:?}"
@@ -126,13 +119,8 @@ impl ConsensusState {
                 };
                 let message = types::consensus::ConsensusMessage::LeaderAnnouncement(announcement);
 
-                let leader_data =
-                    types::consensus::ConsensusMessage::encode(&message).map_err(|e| {
-                        types::errors::NodeError::Error(format!("Failed to encode leader: {e}"))
-                    })?;
-
                 node.network_handle
-                    .send_broadcast(self.leader_topic.clone(), leader_data)
+                    .send_broadcast(self.leader_topic.clone(), message)
                     .map_err(|e| {
                         types::errors::NodeError::Error(format!("Failed to publish leader: {e:?}"))
                     })?;

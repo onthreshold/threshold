@@ -3,7 +3,7 @@ use bitcoin::{ScriptBuf, Transaction};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::proto::p2p_proto;
+use crate::proto::{ProtoDecode, ProtoEncode, p2p_proto};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct DepositIntent {
@@ -14,14 +14,14 @@ pub struct DepositIntent {
     pub timestamp: u64,
 }
 
-impl DepositIntent {
-    pub fn encode(intent: &Self) -> Result<Vec<u8>, String> {
+impl ProtoEncode for DepositIntent {
+    fn encode(&self) -> Result<Vec<u8>, String> {
         let proto_intent = p2p_proto::DepositIntent {
-            amount_sat: intent.amount_sat,
-            user_pubkey: intent.user_pubkey.clone(),
-            deposit_tracking_id: intent.deposit_tracking_id.clone(),
-            deposit_address: intent.deposit_address.clone(),
-            timestamp: intent.timestamp,
+            amount_sat: self.amount_sat,
+            user_pubkey: self.user_pubkey.clone(),
+            deposit_tracking_id: self.deposit_tracking_id.clone(),
+            deposit_address: self.deposit_address.clone(),
+            timestamp: self.timestamp,
         };
 
         let mut buf = Vec::new();
@@ -29,8 +29,10 @@ impl DepositIntent {
             .map_err(|e| format!("Failed to encode deposit intent: {e}"))?;
         Ok(buf)
     }
+}
 
-    pub fn decode(data: &[u8]) -> Result<Self, String> {
+impl ProtoDecode for DepositIntent {
+    fn decode(data: &[u8]) -> Result<Self, String> {
         let proto_intent = p2p_proto::DepositIntent::decode(data)
             .map_err(|e| format!("Failed to decode deposit intent: {e}"))?;
 
@@ -93,16 +95,16 @@ impl<Context> Decode<Context> for PendingSpend {
     }
 }
 
-impl PendingSpend {
-    pub fn encode(intent: &Self) -> Result<Vec<u8>, String> {
-        let transaction_bytes = bitcoin::consensus::encode::serialize(&intent.tx);
-        let script_bytes = intent.recipient_script.to_bytes();
+impl ProtoEncode for PendingSpend {
+    fn encode(&self) -> Result<Vec<u8>, String> {
+        let transaction_bytes = bitcoin::consensus::encode::serialize(&self.tx);
+        let script_bytes = self.recipient_script.to_bytes();
 
         let proto_intent = p2p_proto::PendingSpend {
             transaction: transaction_bytes,
-            user_pubkey: intent.user_pubkey.clone(),
+            user_pubkey: self.user_pubkey.clone(),
             recipient_script: script_bytes,
-            fee: intent.fee,
+            fee: self.fee,
         };
 
         let mut buf = Vec::new();
@@ -110,8 +112,10 @@ impl PendingSpend {
             .map_err(|e| format!("Failed to encode pending spend: {e}"))?;
         Ok(buf)
     }
+}
 
-    pub fn decode(data: &[u8]) -> Result<Self, String> {
+impl ProtoDecode for PendingSpend {
+    fn decode(data: &[u8]) -> Result<Self, String> {
         let proto_intent = p2p_proto::PendingSpend::decode(data)
             .map_err(|e| format!("Failed to decode pending spend: {e}"))?;
 

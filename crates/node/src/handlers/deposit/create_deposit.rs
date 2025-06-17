@@ -107,10 +107,10 @@ impl DepositIntentState {
             }
         }
 
-        if let Err(e) = node.network_handle.send_broadcast(
-            IdentTopic::new("deposit-intents"),
-            DepositIntent::encode(&deposit_intent).map_err(NodeError::Error)?,
-        ) {
+        if let Err(e) = node
+            .network_handle
+            .send_broadcast(IdentTopic::new("deposit-intents"), deposit_intent)
+        {
             info!("Failed to broadcast new deposit address: {e:?}");
         }
 

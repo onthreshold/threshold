@@ -3,6 +3,7 @@ use tracing::info;
 use types::errors::NodeError;
 use types::intents::DepositIntent;
 use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
+use types::proto::ProtoDecode;
 
 use crate::swarm_manager::Network;
 use crate::{

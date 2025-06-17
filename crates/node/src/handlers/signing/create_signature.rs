@@ -57,9 +57,22 @@ impl SigningState {
         // Select participants: self + first (min_signers -1) peers
         let required = (node.min_signers - 1) as usize;
         if node.peers.len() < required {
-            error!("❌ Not enough peers – need at least {} others", required);
+            error!(
+                "❌ Not enough peers – need at least {} others, have {}",
+                required,
+                node.peers.len()
+            );
+            error!("Available peers: {:?}", node.peers);
             return Err(NodeError::Error("Not enough peers".to_string()));
         }
+
+        debug!(
+            "✅ Starting signing with {} peers (need {})",
+            node.peers.len(),
+            required
+        );
+        debug!("Selected peers: {:?}", node.peers);
+
         // Randomly shuffle peers and pick required number
         let mut rng_rand = rand::rng();
         let mut peer_pool = node.peers.clone().into_iter().collect::<Vec<_>>();
