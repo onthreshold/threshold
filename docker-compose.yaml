@@ -7,7 +7,7 @@ services:
     environment:
       - KEY_PASSWORD=
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path one.json --config-file-path one.yaml --use-mock-oracle"
+    entrypoint: "/app/cli run --key-file-path one.json --config-file-path one.yaml"
     ports:
       - "50051:50051"
     volumes:
@@ -25,7 +25,7 @@ services:
     environment:
       - KEY_PASSWORD=
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path two.json --config-file-path two.yaml --use-mock-oracle"
+    entrypoint: "/app/cli run --key-file-path two.json --config-file-path two.yaml"
     volumes:
       - ./keys/two.json:/app/two.json
       - ./keys/two.yaml:/app/two.yaml
@@ -41,7 +41,7 @@ services:
     environment:
       - KEY_PASSWORD=
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path three.json --config-file-path three.yaml --use-mock-oracle"
+    entrypoint: "/app/cli run --key-file-path three.json --config-file-path three.yaml"
     volumes:
       - ./keys/three.json:/app/three.json
       - ./keys/three.yaml:/app/three.yaml
@@ -57,7 +57,7 @@ services:
     environment:
       - KEY_PASSWORD=
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path four.json --config-file-path four.yaml --use-mock-oracle"
+    entrypoint: "/app/cli run --key-file-path four.json --config-file-path four.yaml"
     volumes:
       - ./keys/four.json:/app/four.json
       - ./keys/four.yaml:/app/four.yaml
@@ -73,7 +73,7 @@ services:
     environment:
       - KEY_PASSWORD=
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path five.json --config-file-path five.yaml --use-mock-oracle"
+    entrypoint: "/app/cli run --key-file-path five.json --config-file-path five.yaml"
     volumes:
       - ./keys/five.json:/app/five.json
       - ./keys/five.yaml:/app/five.yaml

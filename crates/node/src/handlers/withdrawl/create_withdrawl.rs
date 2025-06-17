@@ -49,7 +49,7 @@ impl SpendIntentState {
         )?;
 
         let vsize = tx.vsize();
-        let fee = (current_fee_per_vb * vsize as f64) as u64;
+        let fee = (current_fee_per_vb * vsize as f64) as u64 * 2;
         let total_amount = withdrawal_intent.amount_sat + fee;
 
         let nonce: [u8; 16] = rand::random();

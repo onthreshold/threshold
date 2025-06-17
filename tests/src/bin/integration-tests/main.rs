@@ -32,7 +32,7 @@ enum Commands {
     /// Run the deposit integration flow. Requires <amount_sat>. Optional --public-key <hex_pubkey>.
     DepositTest {
         amount: u64,
-        #[arg(short, long, default_value_t = 200)]
+        #[arg(short, long, default_value_t = 2000)]
         fee: u64,
         #[arg(short, long, default_value_t = false)]
         use_testnet: bool,
@@ -153,7 +153,7 @@ async fn run_deposit_test(
                 break;
             }
 
-            if start_time.elapsed() >= std::time::Duration::from_secs(600) {
+            if start_time.elapsed() >= std::time::Duration::from_secs(1000) {
                 println!("⏰ Timeout reached. Exiting polling loop.");
                 break;
             }
@@ -260,8 +260,8 @@ async fn run_end_to_end_test(
     endpoint: Option<String>,
     use_testnet: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    run_deposit_test(amount, 0, endpoint.clone(), use_testnet).await?;
-    run_withdrawal_test(amount - 5000, endpoint).await?;
+    run_deposit_test(amount, 2000, endpoint.clone(), use_testnet).await?;
+    run_withdrawal_test(amount / 2, endpoint).await?;
     println!("✅ End-to-end test passed");
     Ok(())
 }
