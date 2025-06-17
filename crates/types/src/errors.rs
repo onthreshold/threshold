@@ -15,7 +15,7 @@ pub enum NetworkError {
 
 impl From<rocksdb::Error> for NodeError {
     fn from(e: rocksdb::Error) -> Self {
-        NodeError::Error(e.to_string())
+        Self::Error(e.to_string())
     }
 }
 

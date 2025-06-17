@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 
 pub type TransactionId = [u8; 32];
 
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq, Eq)]
 pub struct Transaction {
     pub version: u32,
     pub timestamp: u64,
@@ -12,12 +12,12 @@ pub struct Transaction {
     pub operations: Vec<Operation>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq, Eq)]
 pub enum TransactionType {
     Deposit,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq, Eq)]
 pub enum Operation {
     /// Push a value to the stack in bytes
     /// Data types:
@@ -46,8 +46,9 @@ pub enum Operation {
 }
 
 impl Transaction {
+    #[must_use]
     pub fn new(r#type: TransactionType, operations: Vec<Operation>) -> Self {
-        Transaction {
+        Self {
             version: 1,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -58,6 +59,7 @@ impl Transaction {
         }
     }
 
+    #[must_use]
     pub fn id(&self) -> TransactionId {
         let mut hasher = Sha256::new();
         hasher.update(self.version.to_le_bytes());

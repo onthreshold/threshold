@@ -44,7 +44,7 @@ impl<O: Oracle> TransactionExecutor<O> {
                     self.op_check_oracle().await?;
                 }
                 Operation::OpIncrementBalance => {
-                    self.op_increment_balance().await?;
+                    self.op_increment_balance()?;
                 }
             }
         }
@@ -109,7 +109,7 @@ impl<O: Oracle> TransactionExecutor<O> {
         Ok(())
     }
 
-    pub async fn op_increment_balance(&mut self) -> Result<(), NodeError> {
+    pub fn op_increment_balance(&mut self) -> Result<(), NodeError> {
         let address = self
             .pop_from_stack()
             .ok_or_else(|| self.signal_error(NodeError::Error("Missing address".to_string())))?;
@@ -145,7 +145,7 @@ impl<O: Oracle> TransactionExecutor<O> {
             .new_chain_state
             .get_account(&address)
             .cloned()
-            .unwrap_or(Account {
+            .unwrap_or_else(|| Account {
                 address: address.clone(),
                 balance: 0,
             });

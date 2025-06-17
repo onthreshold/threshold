@@ -13,7 +13,8 @@ impl Default for ProposedBlock {
 }
 
 impl ProposedBlock {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             block_body: BlockBody::new(vec![]),
         }
