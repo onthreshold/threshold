@@ -1,0 +1,56 @@
+name: Integration Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  e2e-tests:
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    env:
+      MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
+      MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
+      IS_TESTNET: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Set up Rust toolchain
+        run: |
+          rustup update 1.87
+          rustup default 1.87
+
+      - name: Build & start 5-node stack (docker-compose)
+        run: |
+          docker compose -f docker-compose.yaml up -d --build
+
+      - name: Wait for gRPC endpoint
+        run: |
+          echo "Waiting for node to expose port 50051..."
+          for i in {1..30}; do
+            if nc -z localhost 50051; then
+              echo "Port 50051 is open."
+              break
+            fi
+            echo "Port not ready yet – retry #$i"
+            sleep 5
+          done
+
+      - name: Run end-to-end integration tests
+        run: cargo run --bin integration-tests end-to-end-test 10000
+
+      - name: Shutdown stack & print logs (always)
+        if: always()
+        run: |
+          docker compose -f docker-compose.yaml logs --no-color || true
+          docker compose -f docker-compose.yaml down --volumes --remove-orphans || true
