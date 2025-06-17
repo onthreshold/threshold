@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package consensus;
+
+import "google/protobuf/timestamp.proto";
+
+enum SignedMsgType {
+  UNKNOWN        = 0;
+  PREVOTE        = 1;
+  PRECOMMIT      = 2;
+  PROPOSAL       = 32;
+}
+
+message BlockID {
+  bytes hash = 1;
+}
+
+message Block {
+  // For early dev, just use a blob for the block data.
+  bytes data = 1;
+}
+
+// ----- Proposal Message -----
+
+message Proposal {
+  SignedMsgType type = 1; // Should always be PROPOSAL (32)
+  int64 height = 2;
+  int32 round = 3;
+  int32 pol_round = 4;
+  BlockID block_id = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  bytes signature = 7; // Proposer's signature
+  Block block = 8; // The full block proposed (for early dev)
+}
+
+// ----- Vote Message -----
+
+message Vote {
+  SignedMsgType type = 1; // PREVOTE or PRECOMMIT
+  int64 height = 2;
+  int32 round = 3;
+  BlockID block_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  bytes validator_address = 6;
+  int32 validator_index = 7;
+  bytes signature = 8;
+}
+
+// ----- Envelope -----
+
+message ConsensusMessage {
+  oneof sum {
+    Proposal proposal = 1;
+    Vote vote = 2;
+  }
+}

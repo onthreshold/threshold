@@ -9,6 +9,10 @@ pub mod node_proto {
     tonic::include_proto!("grpc");
 }
 
+pub mod consensus_proto {
+    tonic::include_proto!("consensus");
+}
+
 use p2p_proto::direct_message::Message;
 use prost::Message as ProstMessage;
 
