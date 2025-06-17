@@ -109,9 +109,9 @@ impl DepositIntentState {
 
         if let Err(e) = node.network_handle.send_broadcast(
             IdentTopic::new("deposit-intents"),
-            DepositIntent::encode(&deposit_intent).map_err(|x| NodeError::Error(x.to_string()))?,
+            DepositIntent::encode(&deposit_intent).map_err(NodeError::Error)?,
         ) {
-            info!("Failed to broadcast new deposit address: {:?}", e);
+            info!("Failed to broadcast new deposit address: {e:?}");
         }
 
         Ok((deposit_tracking_id, deposit_address.to_string()))
@@ -165,7 +165,9 @@ impl DepositIntentState {
                     node.chain_state
                         .upsert_account(&intent.user_pubkey, updated);
 
-                    todo!("update balance should be seperated into decrement and increment balance functions");
+                    todo!(
+                        "update balance should be seperated into decrement and increment balance functions"
+                    );
                 }
             }
         }

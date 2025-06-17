@@ -47,7 +47,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SpendIntentState {
             Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {
                 if topic.as_str() == "withdrawls" {
                     let spend_intent: PendingSpend =
-                        PendingSpend::decode(&data).map_err(|e| NodeError::Error(e.to_string()))?;
+                        PendingSpend::decode(&data).map_err(NodeError::Error)?;
                     self.handle_withdrawl_message(node, spend_intent).await?;
                 }
             }

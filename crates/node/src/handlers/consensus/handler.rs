@@ -58,8 +58,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
                                 types::consensus::ConsensusMessage::decode(&message.data).map_err(
                                     |e| {
                                         types::errors::NodeError::Error(format!(
-                                            "Failed to decode consensus message: {}",
-                                            e
+                                            "Failed to decode consensus message: {e}"
                                         ))
                                     },
                                 )?;
@@ -68,10 +67,10 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
                                 types::consensus::ConsensusMessage::LeaderAnnouncement(
                                     announcement,
                                 ) => {
-                                    self.handle_leader_announcement(node, announcement)?;
+                                    self.handle_leader_announcement(node, &announcement)?;
                                 }
                                 types::consensus::ConsensusMessage::NewRound(round) => {
-                                    self.handle_new_round(node, peer, round).await?;
+                                    self.handle_new_round(node, peer, round)?;
                                 }
                             }
                         }
@@ -129,7 +128,7 @@ impl ConsensusState {
 
                 let leader_data =
                     types::consensus::ConsensusMessage::encode(&message).map_err(|e| {
-                        types::errors::NodeError::Error(format!("Failed to encode leader: {}", e))
+                        types::errors::NodeError::Error(format!("Failed to encode leader: {e}"))
                     })?;
 
                 node.network_handle
@@ -153,8 +152,8 @@ impl ConsensusState {
 
     fn handle_leader_announcement<N: Network, D: Db, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
-        announcement: types::consensus::LeaderAnnouncement,
+        node: &NodeState<N, D, W>,
+        announcement: &types::consensus::LeaderAnnouncement,
     ) -> Result<(), types::errors::NodeError> {
         let leader = PeerId::from_bytes(&announcement.leader).map_err(|e| {
             types::errors::NodeError::Error(format!("Failed to decode leader bytes: {e}"))

@@ -190,8 +190,7 @@ mod withdrawl_tests {
 
         // Now attempt to confirm with an obviously invalid signature
         let result = spend_state
-            .confirm_withdrawal(node, &challenge, "deadbeef")
-            .await;
+            .confirm_withdrawal(node, &challenge, "deadbeef");
 
         // Expect error
         assert!(result.is_err());

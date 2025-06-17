@@ -155,10 +155,13 @@ impl Db for RocksDb {
     ) -> Result<Option<DepositIntent>, NodeError> {
         // Step 1: addr → tracking-id
         let key_da = format!("da:{address}");
-        let tracking_id = self.db.get_cf(
-            self.db.cf_handle("deposit_intents").unwrap(),
-            key_da.as_bytes(),
-        )?.and_then(|bytes| String::from_utf8(bytes).ok());
+        let tracking_id = self
+            .db
+            .get_cf(
+                self.db.cf_handle("deposit_intents").unwrap(),
+                key_da.as_bytes(),
+            )?
+            .and_then(|bytes| String::from_utf8(bytes).ok());
 
         tracking_id.map_or(Ok(None), |id| self.get_deposit_intent(&id))
     }

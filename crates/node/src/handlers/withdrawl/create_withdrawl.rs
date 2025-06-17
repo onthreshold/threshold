@@ -29,13 +29,21 @@ impl SpendIntentState {
             return Err(NodeError::Error("Insufficient balance".to_string()));
         }
 
-        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss)]
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_precision_loss,
+            clippy::cast_sign_loss
+        )]
         let current_fee_per_vb = node
             .oracle
             .get_current_fee_per_vb(withdrawal_intent.blocks_to_confirm.map(|b| b as u16))
             .await?;
 
-        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        #[allow(
+            clippy::cast_possible_wrap,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
         let (tx, _) = node.wallet.create_spend(
             withdrawal_intent.amount_sat,
             (current_fee_per_vb * 120.0) as u64, // Just estimate for now this doesnt affect vsize
@@ -46,7 +54,11 @@ impl SpendIntentState {
         )?;
 
         let vsize = tx.vsize();
-        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss)]
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_precision_loss,
+            clippy::cast_sign_loss
+        )]
         let fee = (current_fee_per_vb * vsize as f64) as u64 * 2;
         let total_amount = withdrawal_intent.amount_sat + fee;
 
@@ -151,7 +163,7 @@ impl SpendIntentState {
         node.network_handle
             .send_broadcast(
                 gossipsub::IdentTopic::new("withdrawls"),
-                PendingSpend::encode(&spend_intent).map_err(|x| NodeError::Error(x.to_string()))?,
+                PendingSpend::encode(&spend_intent).map_err(NodeError::Error)?,
             )
             .map_err(|x| NodeError::Error(format!("Failed to send broadcast: {x:?}")))?;
 
