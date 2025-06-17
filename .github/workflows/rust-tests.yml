@@ -38,6 +38,7 @@ jobs:
         run: cargo build --all
 
   cargo-test:
+    needs: cargo-build
     runs-on: blacksmith-16vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +62,7 @@ jobs:
         run: cargo test --all
 
   clippy_check:
+    needs: cargo-build
     runs-on: blacksmith-16vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
