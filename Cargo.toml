@@ -61,6 +61,7 @@ bip39 = { version = "2.1.0", features = ["rand", "rand_core"] }
 base64 = "0.22.1"
 tonic = "0.13"
 prost = "0.13"
+prost-types = "0.13.5"
 
 [workspace.lints.rust]
 unsafe_code = "warn"

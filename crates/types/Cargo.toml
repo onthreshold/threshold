@@ -20,9 +20,11 @@ bincode = { workspace = true }
 prost = { workspace = true }
 tonic = { workspace = true }
 serde_json = { workspace = true }
+prost-types = { workspace = true }
 
 [build-dependencies]
 tonic-build = "0.13"
+
 
 [lints]
 workspace = true
