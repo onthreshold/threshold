@@ -49,7 +49,7 @@ impl ChainState {
             accounts: HashMap::new(),
             block_height: 0,
         }
-        }
+    }
 
     #[must_use]
     pub const fn new_with_accounts(accounts: HashMap<String, Account>, block_height: u64) -> Self {

@@ -47,7 +47,7 @@ impl From<crate::network_event::DirectMessage> for p2p_proto::DirectMessage {
             }),
         };
 
-        p2p_proto::DirectMessage {
+        Self {
             message: Some(message),
         }
     }
@@ -60,37 +60,31 @@ impl TryFrom<p2p_proto::DirectMessage> for crate::network_event::DirectMessage {
         let message = proto_msg.message.ok_or("Missing message field")?;
 
         match message {
-            Message::Ping(ping) => Ok(crate::network_event::DirectMessage::Ping(
-                crate::network_event::PingBody {
-                    message: ping.message,
-                },
-            )),
-            Message::Pong(_) => Ok(crate::network_event::DirectMessage::Pong),
+            Message::Ping(ping) => Ok(Self::Ping(crate::network_event::PingBody {
+                message: ping.message,
+            })),
+            Message::Pong(_) => Ok(Self::Pong),
             Message::Round2Package(package) => {
                 let round2_package = serde_json::from_slice(&package.package_data)
-                    .map_err(|e| format!("Failed to deserialize round2 package: {}", e))?;
-                Ok(crate::network_event::DirectMessage::Round2Package(
-                    round2_package,
-                ))
+                    .map_err(|e| format!("Failed to deserialize round2 package: {e}"))?;
+                Ok(Self::Round2Package(round2_package))
             }
-            Message::SignRequest(req) => Ok(crate::network_event::DirectMessage::SignRequest {
+            Message::SignRequest(req) => Ok(Self::SignRequest {
                 sign_id: req.sign_id,
                 message: req.message,
             }),
-            Message::SignPackage(pkg) => Ok(crate::network_event::DirectMessage::SignPackage {
+            Message::SignPackage(pkg) => Ok(Self::SignPackage {
                 sign_id: pkg.sign_id,
                 package: pkg.package,
             }),
-            Message::Commitments(comm) => Ok(crate::network_event::DirectMessage::Commitments {
+            Message::Commitments(comm) => Ok(Self::Commitments {
                 sign_id: comm.sign_id,
                 commitments: comm.commitments,
             }),
-            Message::SignatureShare(share) => {
-                Ok(crate::network_event::DirectMessage::SignatureShare {
-                    sign_id: share.sign_id,
-                    signature_share: share.signature_share,
-                })
-            }
+            Message::SignatureShare(share) => Ok(Self::SignatureShare {
+                sign_id: share.sign_id,
+                signature_share: share.signature_share,
+            }),
         }
     }
 }
