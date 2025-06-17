@@ -1,8 +1,9 @@
 [package]
 name = "cli"
-version = "0.1.0"
-edition = "2021"
 description = "Command-line interface for the Threshold network"
+version = "0.1.0"
+edition = "2024"
+repository = "https://github.com/onthreshold/threshold/"
 license = "MIT"
 keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
 categories = ["cryptography", "blockchain"]
@@ -11,7 +12,7 @@ categories = ["cryptography", "blockchain"]
 tokio = { workspace = true, features = ["full", "macros", "rt-multi-thread"] }
 node = { path = "../../crates/node" }
 types = { path = "../../crates/types" }
-libp2p = { workspace = true, features = ["ed25519"] }
+libp2p = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

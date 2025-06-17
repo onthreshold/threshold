@@ -1,7 +1,12 @@
 [package]
 name = "protocol"
+description = "Protocol for the Threshold network"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/onthreshold/threshold/"
+license = "MIT"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
+categories = ["cryptography", "blockchain"]
 
 [dependencies]
 serde = { workspace = true }
@@ -13,7 +18,6 @@ tokio = { workspace = true }
 async-trait = { workspace = true }
 esplora-client = { workspace = true }
 types = { path = "../types" }
-dotenvy = { workspace = true }
 hex = { workspace = true }
 oracle = { path = "../oracle" }
 

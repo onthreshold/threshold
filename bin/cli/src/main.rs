@@ -1,20 +1,18 @@
-#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
-
 mod errors;
 mod rpc_client;
 
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Key, Nonce,
+    aead::{Aead, KeyInit},
 };
 use argon2::{
-    password_hash::{
-        rand_core::{OsRng, RngCore},
-        SaltString,
-    },
     Argon2,
+    password_hash::{
+        SaltString,
+        rand_core::{OsRng, RngCore},
+    },
 };
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use libp2p::identity::Keypair;
@@ -26,7 +24,7 @@ use crate::{
     rpc_client::rpc_get_pending_deposit_intents,
 };
 use node::{
-    key_manager::get_config, start_node::start_node, EncryptionParams, KeyData, NodeConfig,
+    EncryptionParams, KeyData, NodeConfig, key_manager::get_config, start_node::start_node,
 };
 use types::errors::NodeError;
 

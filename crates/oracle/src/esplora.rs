@@ -1,10 +1,10 @@
 use crate::oracle::Oracle;
-use bitcoin::{consensus, Address, Amount, Network, OutPoint, Transaction, Txid};
+use bitcoin::{Address, Amount, Network, OutPoint, Transaction, Txid, consensus};
 use esplora_client::{AsyncClient, Builder};
 use std::{collections::HashSet, str::FromStr};
 use tokio::{
     sync::broadcast,
-    time::{sleep, Duration},
+    time::{Duration, sleep},
 };
 use tracing::{error, info};
 use types::{

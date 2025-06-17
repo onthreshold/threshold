@@ -1,12 +1,16 @@
 [package]
 name = "withdrawal"
+description = "Withdrawal service for the Threshold network"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+repository = "https://github.com/onthreshold/threshold/"
+license = "MIT"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
+categories = ["cryptography", "blockchain"]
 
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
-tonic = "0.10"
 node = { path = "../../crates/node" } 
 
 [lints]

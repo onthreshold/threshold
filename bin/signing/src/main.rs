@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use node::grpc::grpc_handler::node_proto::{
-    node_control_client::NodeControlClient, ConfirmWithdrawalRequest, ProposeWithdrawalRequest,
+    ConfirmWithdrawalRequest, ProposeWithdrawalRequest, node_control_client::NodeControlClient,
 };
 
 #[derive(Parser)]
