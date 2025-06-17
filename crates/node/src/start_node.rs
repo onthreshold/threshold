@@ -135,7 +135,7 @@ pub async fn start_node(
                 .unwrap_or_else(|_| String::from("false"))
                 .parse()
                 .unwrap_or(false);
-            
+
             if is_testnet {
                 bitcoin::Network::Testnet
             } else {

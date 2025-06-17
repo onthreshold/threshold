@@ -500,12 +500,12 @@ pub fn create_node_network(
     );
 
     let nodes_state = NodeState::new_from_config(
-        network.clone(),
+        &network,
         min_signers,
         max_signers,
         node_config,
         mock_db,
-        events_emitter_tx,
+        &events_emitter_tx,
         deposit_intent_tx,
         Box::new(oracle),
         wallet,

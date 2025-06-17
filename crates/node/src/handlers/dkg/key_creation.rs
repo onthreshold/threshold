@@ -145,12 +145,16 @@ impl DkgState {
 
                         for peer_to_send_to in &self.dkg_listeners {
                             let identifier = peer_id_to_identifier(peer_to_send_to);
-                            let package_to_send = round2_packages.get(&identifier).ok_or_else(|| {
-                                tracing::warn!("Round2 package not found for {}", peer_to_send_to);
-                                NodeError::Error(format!(
-                                    "Round2 package not found for {peer_to_send_to}"
-                                ))
-                            })?;
+                            let package_to_send =
+                                round2_packages.get(&identifier).ok_or_else(|| {
+                                    tracing::warn!(
+                                        "Round2 package not found for {}",
+                                        peer_to_send_to
+                                    );
+                                    NodeError::Error(format!(
+                                        "Round2 package not found for {peer_to_send_to}"
+                                    ))
+                                })?;
 
                             let request = DirectMessage::Round2Package(package_to_send.clone());
 

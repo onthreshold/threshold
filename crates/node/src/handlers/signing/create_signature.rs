@@ -333,9 +333,10 @@ impl SigningState {
         );
 
         if active.signature_shares.len() == node.min_signers as usize {
-            let signing_package = active.signing_package.clone().ok_or_else(|| {
-                NodeError::Error("No signing package found".to_string())
-            })?;
+            let signing_package = active
+                .signing_package
+                .clone()
+                .ok_or_else(|| NodeError::Error("No signing package found".to_string()))?;
             let group_sig = frost::aggregate(
                 &signing_package,
                 &active.signature_shares,

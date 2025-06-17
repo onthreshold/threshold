@@ -51,15 +51,14 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DepositIntentState {
                 request: SelfRequest::ConfirmDeposit { confirmed_tx },
                 ..
             }) => {
-                if let Err(e) = self.update_user_balance(node, &    confirmed_tx) {
+                if let Err(e) = self.update_user_balance(node, &confirmed_tx) {
                     info!("Failed to update user balance: {}", e);
                 }
             }
             Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {
                 if topic == IdentTopic::new("deposit-intents").hash() {
-
                     let deposit_intent = DepositIntent::decode(&data).map_err(|e| {
-                        NodeError::Error(format!("Failed to parse deposit intent: {}", e))
+                        NodeError::Error(format!("Failed to parse deposit intent: {e}"))
                     })?;
 
                     if let Err(e) = self.create_deposit_from_intent(node, deposit_intent) {

@@ -137,10 +137,9 @@ mod deposit_tests {
         let (tracking_id, deposit_address) = state
             .create_deposit(
                 node,
-                "020202020202020202020202020202020202020202020202020202020202020202".to_string(),
+                "020202020202020202020202020202020202020202020202020202020202020202",
                 amount_sat,
             )
-            .await
             .expect("create_deposit should succeed");
 
         // Assert: DB contains the new intent
@@ -289,7 +288,7 @@ mod deposit_tests {
             .balance;
 
         state
-            .update_user_balance(node, tx.clone())
+            .update_user_balance(node, &tx)
             .expect("balance update failed");
 
         // --- Assert wallet updated with the new UTXO ---
@@ -363,7 +362,7 @@ mod deposit_tests {
 
         // ----- Call update_user_balance -----
         state
-            .update_user_balance(node, tx.clone())
+            .update_user_balance(node, &tx)
             .expect("balance update failed");
 
         // Assert: balance should not have changed
