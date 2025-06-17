@@ -14,7 +14,7 @@ mod withdrawl_tests {
     use protocol::chain_state::Account;
     use std::collections::HashMap;
     use tokio::sync::mpsc::unbounded_channel;
-    use types::intents::SpendIntent;
+    use types::intents::WithdrawlIntent;
     use types::utxo::Utxo;
 
     #[tokio::test]
@@ -118,7 +118,7 @@ mod withdrawl_tests {
             pending_intents: HashMap::new(),
         };
 
-        let withdrawal_intent = SpendIntent {
+        let withdrawal_intent = WithdrawlIntent {
             amount_sat: 50_000,
             address_to: address.to_string(),
             public_key: hex::encode(public_key.serialize()),
@@ -178,7 +178,7 @@ mod withdrawl_tests {
             pending_intents: HashMap::new(),
         };
 
-        let withdrawal_intent = SpendIntent {
+        let withdrawal_intent = WithdrawlIntent {
             amount_sat: 50_000,
             address_to: address.to_string(),
             public_key: hex::encode(public_key.serialize()),

@@ -11,7 +11,7 @@ pub struct DepositIntent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpendIntent {
+pub struct WithdrawlIntent {
     pub amount_sat: u64,
     pub address_to: String,
     pub public_key: String,

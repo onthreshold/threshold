@@ -6,7 +6,7 @@ use libp2p::{
 };
 use tokio::sync::mpsc;
 
-use crate::intents::{DepositIntent, SpendIntent};
+use crate::intents::{DepositIntent, WithdrawlIntent};
 
 #[derive(Debug, Clone)]
 pub enum NetworkEvent {
@@ -70,7 +70,7 @@ pub enum SelfRequest {
         user_pubkey: String,
     },
     ProposeWithdrawal {
-        withdrawal_intent: SpendIntent,
+        withdrawal_intent: WithdrawlIntent,
     },
     ConfirmWithdrawal {
         challenge: String,

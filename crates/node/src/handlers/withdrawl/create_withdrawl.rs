@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use crate::handlers::withdrawl::handler::encode_withdrawal_intent;
 use crate::swarm_manager::Network;
 use crate::{
     NodeState,
@@ -16,14 +17,14 @@ use libp2p::gossipsub;
 use sha2::{Digest, Sha256};
 use tracing::info;
 use types::errors::NodeError;
-use types::intents::SpendIntent;
+use types::intents::WithdrawlIntent;
 use types::network_event::SelfRequest;
 
 impl SpendIntentState {
     pub async fn propose_withdrawal<N: Network, D: Db, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, D, W>,
-        withdrawal_intent: &SpendIntent,
+        withdrawal_intent: &WithdrawlIntent,
     ) -> Result<(u64, String), NodeError> {
         let account = node.chain_state.get_account(&withdrawal_intent.public_key);
         let Some(account) = account else {
@@ -151,7 +152,7 @@ impl SpendIntentState {
         node.network_handle
             .send_broadcast(
                 gossipsub::IdentTopic::new("withdrawls"),
-                bincode::encode_to_vec(&spend_intent, bincode::config::standard())
+                encode_withdrawal_intent(&spend_intent)
                     .map_err(|x| NodeError::Error(x.to_string()))?,
             )
             .map_err(|x| NodeError::Error(format!("Failed to send broadcast: {:?}", x)))?;

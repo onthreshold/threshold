@@ -10,7 +10,10 @@ use types::errors::NodeError;
 use uuid::Uuid;
 
 use crate::{
-    NodeState, db::Db, handlers::deposit::DepositIntentState, swarm_manager::Network,
+    NodeState,
+    db::Db,
+    handlers::deposit::{DepositIntentState, handler::encode_deposit_intent},
+    swarm_manager::Network,
     wallet::Wallet,
 };
 use types::intents::DepositIntent;
@@ -108,8 +111,7 @@ impl DepositIntentState {
 
         if let Err(e) = node.network_handle.send_broadcast(
             IdentTopic::new("deposit-intents"),
-            bincode::encode_to_vec(&deposit_intent, bincode::config::standard())
-                .map_err(|x| NodeError::Error(x.to_string()))?,
+            encode_deposit_intent(&deposit_intent).map_err(|x| NodeError::Error(x.to_string()))?,
         ) {
             info!("Failed to broadcast new deposit address: {:?}", e);
         }
