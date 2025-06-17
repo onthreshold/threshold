@@ -484,9 +484,7 @@ impl libp2p::request_response::Codec for ProtobufCodec {
         <p2p_proto::DirectMessage as ProstMessage>::encode(&proto_msg, &mut buf)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
 
-        // Write length prefix
-        #[allow(clippy::cast_possible_truncation)]
-        let len = buf.len() as u32;
+        let len = buf.len();
         io.write_all(&len.to_be_bytes()).await?;
 
         // Write the message

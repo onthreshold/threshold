@@ -32,7 +32,7 @@ mod utxo_spend_test {
             None,
             None,
             6,
-            -1,
+            0,
         );
 
         let mut wallet_one = TaprootWallet::new(

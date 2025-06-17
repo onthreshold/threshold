@@ -210,7 +210,6 @@ impl Wallet for TaprootWallet {
         response_tx
     }
 
-    #[allow(clippy::cast_possible_truncation)]
     fn ingest_external_tx(&mut self, tx: &Transaction) -> Result<(), NodeError> {
         self.utxos.retain(|t| {
             !tx.input
@@ -228,7 +227,7 @@ impl Wallet for TaprootWallet {
                     utxo: Utxo {
                         outpoint: bitcoin::OutPoint {
                             txid: tx.compute_txid(),
-                            vout: idx as u32,
+                            vout: u32::try_from(idx).unwrap(),
                         },
                         value: out.value,
                         script_pubkey: out.script_pubkey.clone(),

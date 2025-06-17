@@ -165,7 +165,7 @@ pub async fn propose_withdrawal(
         amount_sat,
         address_to: request.address_to,
         public_key: request.public_key,
-        blocks_to_confirm: request.blocks_to_confirm,
+        blocks_to_confirm: request.blocks_to_confirm.map(|b| u16::try_from(b).unwrap()),
     };
 
     let response = network

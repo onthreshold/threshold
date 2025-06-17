@@ -160,14 +160,9 @@ impl DepositIntentState {
                         .cloned()
                         .unwrap_or_else(|| Account::new(intent.user_pubkey.to_string(), 0));
 
-                    #[allow(clippy::cast_possible_wrap)]
-                    let updated = user_account.update_balance(output.value.to_sat() as i64);
+                    let updated = user_account.increment_balance(output.value.to_sat());
                     node.chain_state
                         .upsert_account(&intent.user_pubkey, updated);
-
-                    todo!(
-                        "update balance should be seperated into decrement and increment balance functions"
-                    );
                 }
             }
         }

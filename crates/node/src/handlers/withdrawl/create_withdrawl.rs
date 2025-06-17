@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::swarm_manager::Network;
 use crate::{NodeState, db::Db, handlers::withdrawl::SpendIntentState, wallet::Wallet};
 use bitcoin::{
@@ -8,7 +6,9 @@ use bitcoin::{
     secp256k1::{Message, PublicKey, ecdsa::Signature},
 };
 use libp2p::gossipsub;
+use num_traits::cast::ToPrimitive;
 use sha2::{Digest, Sha256};
+use std::str::FromStr;
 use tracing::info;
 use types::errors::NodeError;
 use types::intents::{PendingSpend, WithdrawlIntent};
@@ -29,24 +29,14 @@ impl SpendIntentState {
             return Err(NodeError::Error("Insufficient balance".to_string()));
         }
 
-        #[allow(
-            clippy::cast_possible_truncation,
-            clippy::cast_precision_loss,
-            clippy::cast_sign_loss
-        )]
         let current_fee_per_vb = node
             .oracle
-            .get_current_fee_per_vb(withdrawal_intent.blocks_to_confirm.map(|b| b as u16))
+            .get_current_fee_per_vb(withdrawal_intent.blocks_to_confirm)
             .await?;
 
-        #[allow(
-            clippy::cast_possible_wrap,
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss
-        )]
         let (tx, _) = node.wallet.create_spend(
             withdrawal_intent.amount_sat,
-            (current_fee_per_vb * 120.0) as u64, // Just estimate for now this doesnt affect vsize
+            (current_fee_per_vb * 120.0).round().to_u64().unwrap(), // Just estimate for now this doesnt affect vsize
             &bitcoin::Address::from_str(&withdrawal_intent.address_to)
                 .unwrap()
                 .assume_checked(),
@@ -54,12 +44,12 @@ impl SpendIntentState {
         )?;
 
         let vsize = tx.vsize();
-        #[allow(
-            clippy::cast_possible_truncation,
-            clippy::cast_precision_loss,
-            clippy::cast_sign_loss
-        )]
-        let fee = (current_fee_per_vb * vsize as f64) as u64 * 2;
+
+        let fee = (current_fee_per_vb * vsize.to_f64().unwrap())
+            .round()
+            .to_u64()
+            .unwrap()
+            * 2;
         let total_amount = withdrawal_intent.amount_sat + fee;
 
         let nonce: [u8; 16] = rand::random();
@@ -139,9 +129,7 @@ impl SpendIntentState {
             .get_account(&user_pubkey)
             .ok_or_else(|| NodeError::Error("User not found".to_string()))?;
 
-        #[allow(clippy::cast_possible_wrap)]
-        let updated_account =
-            user_account.update_balance(-((tx.output[0].value.to_sat() + fee) as i64));
+        let updated_account = user_account.decrement_balance(tx.output[0].value.to_sat() + fee);
 
         info!(
             "🚀 Updated account balance: account: {}, balance: {}",
@@ -170,7 +158,6 @@ impl SpendIntentState {
         Ok(())
     }
 
-    #[allow(clippy::cast_possible_wrap)]
     pub async fn handle_withdrawl_message<N: Network, D: Db, W: Wallet>(
         &self,
         node: &mut NodeState<N, D, W>,
@@ -195,7 +182,7 @@ impl SpendIntentState {
             .ok_or_else(|| NodeError::Error("user missing".into()))?
             .clone();
 
-        acct = acct.update_balance(-(debit as i64));
+        acct = acct.decrement_balance(debit);
         node.chain_state.upsert_account(&pending.user_pubkey, acct);
 
         Ok(())

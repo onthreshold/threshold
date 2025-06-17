@@ -17,13 +17,21 @@ impl Account {
     }
 
     #[must_use]
-    #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
-    pub fn update_balance(&self, amount: i64) -> Self {
-        let new_balance = self.balance as i64 + amount;
+    pub fn increment_balance(&self, amount: u64) -> Self {
+        let new_balance = self.balance + amount;
 
         Self {
             address: self.address.clone(),
-            balance: new_balance as u64,
+            balance: new_balance,
+        }
+    }
+
+    #[must_use]
+    pub fn decrement_balance(&self, amount: u64) -> Self {
+        let new_balance = self.balance.saturating_sub(amount);
+        Self {
+            address: self.address.clone(),
+            balance: new_balance,
         }
     }
 }

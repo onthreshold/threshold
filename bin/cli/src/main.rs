@@ -155,7 +155,7 @@ enum Commands {
         #[arg(short = 'f', long)]
         confirmation_depth: Option<u32>,
         #[arg(short = 's', long)]
-        monitor_start_block: Option<i32>,
+        monitor_start_block: Option<u32>,
         #[arg(long, action = clap::ArgAction::SetTrue)]
         use_mock_oracle: Option<bool>,
     },
@@ -352,7 +352,7 @@ struct StartNodeConfigParams {
     max_signers: Option<u16>,
     min_signers: Option<u16>,
     confirmation_depth: Option<u32>,
-    monitor_start_block: Option<i32>,
+    monitor_start_block: Option<u32>,
     use_mock_oracle: Option<bool>,
 }
 

@@ -79,7 +79,7 @@ pub struct NodeConfig {
     pub libp2p_udp_port: u16,
     pub libp2p_tcp_port: u16,
     pub confirmation_depth: u32,
-    pub monitor_start_block: i32,
+    pub monitor_start_block: u32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -98,7 +98,7 @@ pub struct ConfigStore {
     libp2p_udp_port: u16,
     libp2p_tcp_port: u16,
     confirmation_depth: u32,
-    monitor_start_block: i32,
+    monitor_start_block: u32,
 }
 
 impl NodeConfig {
@@ -168,7 +168,7 @@ impl NodeConfig {
             libp2p_udp_port: 0,
             libp2p_tcp_port: 0,
             confirmation_depth: 6,
-            monitor_start_block: -1,
+            monitor_start_block: 0,
         })
     }
 
@@ -247,7 +247,7 @@ impl NodeConfig {
         self.confirmation_depth = depth;
     }
 
-    pub const fn set_monitor_start_block(&mut self, block: i32) {
+    pub const fn set_monitor_start_block(&mut self, block: u32) {
         self.monitor_start_block = block;
     }
 }

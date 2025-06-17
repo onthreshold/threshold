@@ -41,7 +41,7 @@ async fn main() {
         None,
         None,
         6,
-        -1,
+        0,
     );
     let mut wallet = TaprootWallet::new(
         Box::new(oracle.clone()),
