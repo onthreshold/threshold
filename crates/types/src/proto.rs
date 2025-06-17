@@ -1,3 +1,5 @@
+#![allow(clippy::all, clippy::pedantic, clippy::nursery)]
+
 pub mod p2p_proto {
     tonic::include_proto!("p2p");
 }
