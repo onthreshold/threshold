@@ -16,6 +16,7 @@ impl Default for SpendIntentState {
 }
 
 impl SpendIntentState {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             pending_intents: HashMap::new(),

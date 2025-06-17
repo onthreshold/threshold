@@ -5,7 +5,7 @@ use tokio::time::Instant;
 
 pub mod handler;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConsensusPhase {
     WaitingForPropose,
     Propose,
@@ -33,6 +33,7 @@ impl Default for ConsensusState {
 }
 
 impl ConsensusState {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             current_state: ConsensusPhase::WaitingForPropose,
@@ -47,12 +48,13 @@ impl ConsensusState {
         }
     }
 
+    #[must_use]
     pub fn select_leader(&self, round: u32) -> Option<PeerId> {
         if self.validators.is_empty() {
             return None;
         }
 
-        let mut sorted_validators: Vec<PeerId> = self.validators.iter().cloned().collect();
+        let mut sorted_validators: Vec<PeerId> = self.validators.iter().copied().collect();
         sorted_validators.sort();
 
         let index = (round as usize) % self.validators.len();

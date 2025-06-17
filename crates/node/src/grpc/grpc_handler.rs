@@ -4,8 +4,11 @@ use tonic::{Request, Response, Status};
 use crate::grpc::grpc_operator;
 
 use types::proto::node_proto::{
+    CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest, ConfirmWithdrawalResponse,
+    CreateDepositIntentRequest, CreateDepositIntentResponse, GetPendingDepositIntentsRequest,
+    GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
+    SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
     node_control_server::{NodeControl, NodeControlServer},
-    *,
 };
 
 pub struct NodeControlService {
@@ -13,10 +16,12 @@ pub struct NodeControlService {
 }
 
 impl NodeControlService {
-    pub fn new(network: NetworkHandle) -> Self {
+    #[must_use]
+    pub const fn new(network: NetworkHandle) -> Self {
         Self { network }
     }
 
+    #[must_use]
     pub fn into_server(self) -> NodeControlServer<Self> {
         NodeControlServer::new(self)
     }

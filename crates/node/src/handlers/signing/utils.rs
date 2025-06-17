@@ -9,8 +9,8 @@ use crate::{
 };
 
 impl SigningState {
-    pub fn new() -> Result<Self, NodeError> {
-        Ok(SigningState {
+    pub const fn new() -> Result<Self, NodeError> {
+        Ok(Self {
             active_signing: None,
             pending_spends: BTreeMap::new(),
         })
@@ -21,7 +21,7 @@ impl SigningState {
     ) -> Result<bitcoin::secp256k1::schnorr::Signature, String> {
         let sig_bytes = frost_sig
             .serialize()
-            .map_err(|e| format!("Serialize frost sig: {}", e))?;
+            .map_err(|e| format!("Serialize frost sig: {e}"))?;
 
         let schnorr_bytes = match sig_bytes.len() {
             64 => sig_bytes,
@@ -30,7 +30,7 @@ impl SigningState {
         };
 
         bitcoin::secp256k1::schnorr::Signature::from_slice(&schnorr_bytes)
-            .map_err(|e| format!("Parse schnorr sig: {}", e))
+            .map_err(|e| format!("Parse schnorr sig: {e}"))
     }
 
     pub fn start_spend_request<N: Network, D: Db, W: Wallet>(
@@ -69,8 +69,8 @@ impl SigningState {
             self.pending_spends.insert(
                 active.sign_id,
                 PendingSpend {
-                    tx: tx.clone(),
-                    user_pubkey: user_pubkey.clone(),
+                    tx,
+                    user_pubkey,
                     recipient_script,
                     fee: estimated_fee_sat,
                 },

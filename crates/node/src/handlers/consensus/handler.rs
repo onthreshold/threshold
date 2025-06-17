@@ -25,8 +25,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
                 let data = types::consensus::ConsensusMessage::encode(&new_round_message).map_err(
                     |e| {
                         types::errors::NodeError::Error(format!(
-                            "Failed to encode new round message: {}",
-                            e
+                            "Failed to encode new round message: {e}"
                         ))
                     },
                 )?;
@@ -35,8 +34,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
                     .send_broadcast(self.leader_topic.clone(), data)
                     .map_err(|e| {
                         types::errors::NodeError::Error(format!(
-                            "Failed to broadcast new round message: {:?}",
-                            e
+                            "Failed to broadcast new round message: {e:?}"
                         ))
                     })?;
             }
@@ -137,10 +135,7 @@ impl ConsensusState {
                 node.network_handle
                     .send_broadcast(self.leader_topic.clone(), leader_data)
                     .map_err(|e| {
-                        types::errors::NodeError::Error(format!(
-                            "Failed to publish leader: {:?}",
-                            e
-                        ))
+                        types::errors::NodeError::Error(format!("Failed to publish leader: {e:?}"))
                     })?;
             }
 
@@ -162,7 +157,7 @@ impl ConsensusState {
         announcement: types::consensus::LeaderAnnouncement,
     ) -> Result<(), types::errors::NodeError> {
         let leader = PeerId::from_bytes(&announcement.leader).map_err(|e| {
-            types::errors::NodeError::Error(format!("Failed to decode leader bytes: {}", e))
+            types::errors::NodeError::Error(format!("Failed to decode leader bytes: {e}"))
         })?;
 
         if announcement.round >= self.current_round {

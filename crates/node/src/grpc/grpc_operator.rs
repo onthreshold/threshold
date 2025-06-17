@@ -24,14 +24,14 @@ pub async fn spend_funds(
                 amount_sat,
                 fee: 200,
                 address_to,
-                user_pubkey: "".to_string(),
+                user_pubkey: String::new(),
             },
             true,
         )
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?
         .ok_or(Status::internal("No response from node"))?
         .await
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
 
     let SelfResponse::SpendRequestSent { sighash } = response else {
         return Err(Status::internal("Invalid response from node"));
@@ -39,8 +39,8 @@ pub async fn spend_funds(
 
     Ok(SpendFundsResponse {
         success: true,
-        message: format!("Spending {} satoshis", amount_sat),
-        sighash: sighash.to_string(),
+        message: format!("Spending {amount_sat} satoshis"),
+        sighash,
     })
 }
 
@@ -56,15 +56,14 @@ pub async fn start_signing(
 
     let response = network
         .send_self_request(network_request, true)
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?
         .ok_or(Status::internal("No response from node"))?
         .await
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
 
     let SelfResponse::StartSigningSessionResponse { sign_id } = response else {
         return Err(Status::internal(format!(
-            "Invalid response from node {:?}",
-            response
+            "Invalid response from node {response:?}"
         )));
     };
 
@@ -97,10 +96,10 @@ pub async fn create_deposit_intent(
             },
             true,
         )
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?
         .ok_or(Status::internal("No response from node"))?
         .await
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
 
     let SelfResponse::CreateDepositResponse {
         deposit_tracking_id,
@@ -112,16 +111,14 @@ pub async fn create_deposit_intent(
 
     info!(
         "Received request to create deposit intent with amount {}. Tracking ID: {}. Deposit Address: {}",
-        amount_sat,
-        deposit_tracking_id.clone(),
-        deposit_address.clone().to_string()
+        amount_sat, deposit_tracking_id, deposit_address
     );
 
     Ok(CreateDepositIntentResponse {
         success: true,
         message: "Deposit intent created".to_string(),
         deposit_tracking_id,
-        deposit_address: deposit_address.to_string(),
+        deposit_address,
     })
 }
 
@@ -130,10 +127,10 @@ pub async fn get_pending_deposit_intents(
 ) -> Result<GetPendingDepositIntentsResponse, Status> {
     let intents = network
         .send_self_request(SelfRequest::GetPendingDepositIntents, true)
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?
         .ok_or(Status::internal("No response from node"))?
         .await
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
 
     let SelfResponse::GetPendingDepositIntentsResponse { intents } = intents else {
         return Err(Status::internal("Invalid response from node"));
@@ -173,10 +170,10 @@ pub async fn propose_withdrawal(
 
     let response = network
         .send_self_request(SelfRequest::ProposeWithdrawal { withdrawal_intent }, true)
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?
         .ok_or(Status::internal("No response from node"))?
         .await
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
 
     let SelfResponse::ProposeWithdrawalResponse {
         quote_satoshis,
@@ -207,10 +204,10 @@ pub async fn confirm_withdrawal(
             },
             true,
         )
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?
         .ok_or(Status::internal("No response from node"))?
         .await
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
 
     let SelfResponse::ConfirmWithdrawalResponse { success } = response else {
         return Err(Status::internal("Invalid response from node"));
@@ -227,10 +224,10 @@ pub async fn check_balance(
 
     let response = network
         .send_self_request(SelfRequest::CheckBalance { address }, true)
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?
         .ok_or(Status::internal("No response from node"))?
         .await
-        .map_err(|e| Status::internal(format!("Network error: {:?}", e)))?;
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
 
     let SelfResponse::CheckBalanceResponse { balance_satoshis } = response else {
         return Err(Status::internal("Invalid response from node"));

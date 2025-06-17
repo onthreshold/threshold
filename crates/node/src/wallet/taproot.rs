@@ -29,6 +29,7 @@ pub struct TaprootWallet {
 }
 
 impl TaprootWallet {
+    #[must_use]
     pub fn new(oracle: Box<dyn Oracle>, addresses: Vec<Address>, network: Network) -> Self {
         Self {
             addresses,
@@ -137,7 +138,7 @@ impl Wallet for TaprootWallet {
                         value: Amount::from_sat(change_sat),
                         script_pubkey: change_address.script_pubkey(),
                     },
-                    address: change_address.clone(),
+                    address: change_address,
                 });
             }
         }
@@ -153,7 +154,7 @@ impl Wallet for TaprootWallet {
         let sighash = if Self::is_p2wpkh(&utxo.script_pubkey) {
             sighash_cache
                 .p2wpkh_signature_hash(0, &utxo.script_pubkey, utxo.value, EcdsaSighashType::All)
-                .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {}", e)))?
+                .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {e}")))?
                 .to_byte_array()
         } else if Self::is_p2tr(&utxo.script_pubkey) {
             let prev = bitcoin::TxOut {
@@ -167,7 +168,7 @@ impl Wallet for TaprootWallet {
                     &Prevouts::All(&prevouts),
                     bitcoin::TapSighashType::All,
                 )
-                .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {}", e)))?
+                .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {e}")))?
                 .to_byte_array()
         } else {
             return Err(NodeError::Error("Unsupported script type".into()));
