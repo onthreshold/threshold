@@ -30,9 +30,25 @@ jobs:
           rustup update 1.87
           rustup default 1.87
 
-      - name: Build & start 5-node stack (docker-compose)
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build vault-node image (cached)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          tags: vault-node:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start 5-node stack (docker-compose)
         run: |
-          docker compose -f docker-compose.yaml up -d --build
+          docker compose -f docker-compose.yaml up -d
 
       - name: Wait for gRPC endpoint
         run: |
