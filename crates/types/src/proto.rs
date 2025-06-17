@@ -111,6 +111,15 @@ impl ProtoEncode for p2p_proto::DkgMessage {
     }
 }
 
+impl ProtoEncode for p2p_proto::GossipsubMessage {
+    fn encode(&self) -> Result<Vec<u8>, String> {
+        let mut buf = Vec::new();
+        <p2p_proto::GossipsubMessage as ProstMessage>::encode(self, &mut buf)
+            .map_err(|e| e.to_string())?;
+        Ok(buf)
+    }
+}
+
 // Convenience implementation for string slices used in tests/mocks
 impl ProtoEncode for &str {
     fn encode(&self) -> Result<Vec<u8>, String> {
