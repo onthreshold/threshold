@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use types::intents::SpendIntent;
+use types::intents::WithdrawlIntent;
 
 pub mod create_withdrawl;
 pub mod handler;
 
 pub struct SpendIntentState {
-    pub pending_intents: HashMap<String, (SpendIntent, u64)>,
+    pub pending_intents: HashMap<String, (WithdrawlIntent, u64)>,
 }
 
 impl Default for SpendIntentState {

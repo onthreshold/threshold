@@ -14,14 +14,21 @@ use std::{
 };
 use tracing::info;
 
+// Include the generated P2P proto code
+pub mod p2p_proto {
+    tonic::include_proto!("p2p");
+}
+
+use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use libp2p::identity::Keypair;
 use libp2p::{
     StreamProtocol, Swarm, gossipsub, mdns, noise, request_response, swarm::NetworkBehaviour, tcp,
     yamux,
 };
-use libp2p::{identity::Keypair, request_response::cbor};
+use prost::Message as ProstMessage;
 use protocol::transaction::Transaction;
 use tokio::{
-    io,
+    io::{self},
     sync::{
         broadcast,
         mpsc::{self, unbounded_channel},
@@ -43,7 +50,7 @@ pub enum ConsensusMessage {
 pub struct MyBehaviour {
     pub gossipsub: gossipsub::Behaviour,
     pub mdns: mdns::tokio::Behaviour,
-    pub request_response: cbor::Behaviour<DirectMessage, ()>,
+    pub request_response: request_response::Behaviour<ProtobufCodec>,
 }
 
 #[derive(Clone, Debug)]
@@ -370,7 +377,8 @@ pub fn build_swarm(
             let mdns =
                 mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())?;
 
-            let request_response = cbor::Behaviour::new(
+            let request_response = request_response::Behaviour::with_codec(
+                ProtobufCodec,
                 [(
                     StreamProtocol::new("/direct-message/1.0.0"),
                     request_response::ProtocolSupport::Full,
@@ -408,4 +416,181 @@ pub fn build_swarm(
         .map_err(|e| NodeError::Error(format!("Failed to create swarm manager: {}", e)))?;
 
     Ok((network, swarm_manager))
+}
+
+// Conversion functions between DirectMessage and protobuf
+impl From<types::network_event::DirectMessage> for p2p_proto::DirectMessage {
+    fn from(msg: types::network_event::DirectMessage) -> Self {
+        use p2p_proto::direct_message::Message;
+        use types::network_event::DirectMessage::*;
+
+        let message = match msg {
+            Ping(ping_body) => Message::Ping(p2p_proto::PingMessage {
+                message: ping_body.message,
+            }),
+            Pong => Message::Pong(p2p_proto::PongMessage {}),
+            Round2Package(package) => {
+                let serialized =
+                    serde_json::to_vec(&package).expect("Failed to serialize round2 package");
+                Message::Round2Package(p2p_proto::Round2Package {
+                    package_data: serialized,
+                })
+            }
+            SignRequest { sign_id, message } => {
+                Message::SignRequest(p2p_proto::SignRequest { sign_id, message })
+            }
+            SignPackage { sign_id, package } => {
+                Message::SignPackage(p2p_proto::SignPackage { sign_id, package })
+            }
+            Commitments {
+                sign_id,
+                commitments,
+            } => Message::Commitments(p2p_proto::Commitments {
+                sign_id,
+                commitments,
+            }),
+            SignatureShare {
+                sign_id,
+                signature_share,
+            } => Message::SignatureShare(p2p_proto::SignatureShare {
+                sign_id,
+                signature_share,
+            }),
+        };
+
+        p2p_proto::DirectMessage {
+            message: Some(message),
+        }
+    }
+}
+
+impl TryFrom<p2p_proto::DirectMessage> for types::network_event::DirectMessage {
+    type Error = String;
+
+    fn try_from(proto_msg: p2p_proto::DirectMessage) -> Result<Self, Self::Error> {
+        use p2p_proto::direct_message::Message;
+        use types::network_event::{DirectMessage, PingBody};
+
+        let message = proto_msg.message.ok_or("Missing message field")?;
+
+        match message {
+            Message::Ping(ping) => Ok(DirectMessage::Ping(PingBody {
+                message: ping.message,
+            })),
+            Message::Pong(_) => Ok(DirectMessage::Pong),
+            Message::Round2Package(package) => {
+                let round2_package = serde_json::from_slice(&package.package_data)
+                    .map_err(|e| format!("Failed to deserialize round2 package: {}", e))?;
+                Ok(DirectMessage::Round2Package(round2_package))
+            }
+            Message::SignRequest(req) => Ok(DirectMessage::SignRequest {
+                sign_id: req.sign_id,
+                message: req.message,
+            }),
+            Message::SignPackage(pkg) => Ok(DirectMessage::SignPackage {
+                sign_id: pkg.sign_id,
+                package: pkg.package,
+            }),
+            Message::Commitments(comm) => Ok(DirectMessage::Commitments {
+                sign_id: comm.sign_id,
+                commitments: comm.commitments,
+            }),
+            Message::SignatureShare(share) => Ok(DirectMessage::SignatureShare {
+                sign_id: share.sign_id,
+                signature_share: share.signature_share,
+            }),
+        }
+    }
+}
+
+// Custom protobuf codec for request-response
+#[derive(Debug, Clone)]
+pub struct ProtobufCodec;
+
+#[async_trait::async_trait]
+impl libp2p::request_response::Codec for ProtobufCodec {
+    type Protocol = libp2p::StreamProtocol;
+    type Request = types::network_event::DirectMessage;
+    type Response = ();
+
+    async fn read_request<T>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+    ) -> std::io::Result<Self::Request>
+    where
+        T: AsyncRead + Unpin + Send,
+    {
+        // Read length prefix (4 bytes)
+        let mut len_bytes = [0u8; 4];
+        io.read_exact(&mut len_bytes).await?;
+        let len = u32::from_be_bytes(len_bytes) as usize;
+
+        // Read the protobuf message
+        let mut buf = vec![0u8; len];
+        io.read_exact(&mut buf).await?;
+
+        // Decode protobuf
+        let proto_msg = <p2p_proto::DirectMessage as ProstMessage>::decode(&buf[..])
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+        // Convert to DirectMessage
+        let direct_msg = types::network_event::DirectMessage::try_from(proto_msg)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+        Ok(direct_msg)
+    }
+
+    async fn read_response<T>(
+        &mut self,
+        _: &Self::Protocol,
+        _io: &mut T,
+    ) -> std::io::Result<Self::Response>
+    where
+        T: AsyncRead + Unpin + Send,
+    {
+        // We don't use responses for direct messages
+        Ok(())
+    }
+
+    async fn write_request<T>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+        req: Self::Request,
+    ) -> std::io::Result<()>
+    where
+        T: AsyncWrite + Unpin + Send,
+    {
+        // Convert to protobuf
+        let proto_msg = p2p_proto::DirectMessage::from(req);
+
+        // Encode protobuf
+        let mut buf = Vec::new();
+        <p2p_proto::DirectMessage as ProstMessage>::encode(&proto_msg, &mut buf)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+        // Write length prefix
+        let len = buf.len() as u32;
+        io.write_all(&len.to_be_bytes()).await?;
+
+        // Write the message
+        io.write_all(&buf).await?;
+        io.flush().await?;
+
+        Ok(())
+    }
+
+    async fn write_response<T>(
+        &mut self,
+        _: &Self::Protocol,
+        _io: &mut T,
+        _res: Self::Response,
+    ) -> std::io::Result<()>
+    where
+        T: AsyncWrite + Unpin + Send,
+    {
+        // We don't use responses for direct messages
+        Ok(())
+    }
 }

@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package p2p;
+
+// ========== Direct P2P Messages (Request-Response) ==========
+
+message DirectMessage {
+  oneof message {
+    PingMessage ping = 1;
+    PongMessage pong = 2;
+    Round2Package round2_package = 3;
+    SignRequest sign_request = 4;
+    SignPackage sign_package = 5;
+    Commitments commitments = 6;
+    SignatureShare signature_share = 7;
+  }
+}
+
+message PingMessage {
+  string message = 1;
+}
+
+message PongMessage {}
+
+message Round2Package {
+  bytes package_data = 1;
+}
+
+message SignRequest {
+  uint64 sign_id = 1;
+  bytes message = 2;
+}
+
+message SignPackage {
+  uint64 sign_id = 1;
+  bytes package = 2;
+}
+
+message Commitments {
+  uint64 sign_id = 1;
+  bytes commitments = 2;
+}
+
+message SignatureShare {
+  uint64 sign_id = 1;
+  bytes signature_share = 2;
+}
+
+// ========== Gossipsub Messages ==========
+
+message GossipsubMessage {
+  oneof message {
+    ConsensusMessage consensus = 1;
+    DepositIntent deposit_intent = 2;
+    PendingSpend pending_spend = 3;
+  }
+}
+
+// ========== Consensus Messages ==========
+
+message ConsensusMessage {
+  oneof message {
+    LeaderAnnouncement leader_announcement = 1;
+    NewRound new_round = 2;
+  }
+}
+
+message LeaderAnnouncement {
+  bytes leader = 1;
+  uint32 round = 2;
+}
+
+message NewRound {
+  uint32 round = 1;
+}
+
+// ========== Intent Messages ==========
+
+message DepositIntent {
+  uint64 amount_sat = 1;
+  string user_pubkey = 2;
+  string deposit_tracking_id = 3;
+  string deposit_address = 4;
+  uint64 timestamp = 5;
+}
+
+message PendingSpend {
+  bytes transaction = 1;
+  string user_pubkey = 2;
+  bytes recipient_script = 3;
+  uint64 fee = 4;
+}
+
+// ========== Bitcoin Transaction Wrapper ==========
+
+message BitcoinTransaction {
+  bytes raw_transaction = 1;
+}

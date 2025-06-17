@@ -7,7 +7,7 @@ use crate::grpc::grpc_handler::node_proto::{
 use crate::swarm_manager::{Network, NetworkHandle};
 use tonic::Status;
 use tracing::{debug, info};
-use types::intents::SpendIntent;
+use types::intents::WithdrawlIntent;
 use types::network_event::{SelfRequest, SelfResponse};
 
 pub async fn spend_funds(
@@ -164,7 +164,7 @@ pub async fn propose_withdrawal(
         ));
     };
 
-    let withdrawal_intent = SpendIntent {
+    let withdrawal_intent = WithdrawlIntent {
         amount_sat,
         address_to: request.address_to,
         public_key: request.public_key,
