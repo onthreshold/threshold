@@ -146,7 +146,7 @@ impl Block {
 
 impl GenesisBlock {
     /// Create a new genesis block
-    #[must_use] 
+    #[must_use]
     pub fn new(
         validators: Vec<ValidatorInfo>,
         chain_config: ChainConfig,

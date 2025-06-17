@@ -26,15 +26,15 @@ impl DepositIntent {
 
         let mut buf = Vec::new();
         p2p_proto::DepositIntent::encode(&proto_intent, &mut buf)
-            .map_err(|e| format!("Failed to encode deposit intent: {}", e))?;
+            .map_err(|e| format!("Failed to encode deposit intent: {e}"))?;
         Ok(buf)
     }
 
     pub fn decode(data: &[u8]) -> Result<Self, String> {
         let proto_intent = p2p_proto::DepositIntent::decode(data)
-            .map_err(|e| format!("Failed to decode deposit intent: {}", e))?;
+            .map_err(|e| format!("Failed to decode deposit intent: {e}"))?;
 
-        Ok(DepositIntent {
+        Ok(Self {
             amount_sat: proto_intent.amount_sat,
             user_pubkey: proto_intent.user_pubkey,
             deposit_tracking_id: proto_intent.deposit_tracking_id,
@@ -84,7 +84,7 @@ impl<Context> Decode<Context> for PendingSpend {
         let user_pubkey = bincode::Decode::decode(decoder)?;
         let recipient_script = ScriptBuf::from_bytes(bincode::Decode::decode(decoder)?);
         let fee = bincode::Decode::decode(decoder)?;
-        Ok(PendingSpend {
+        Ok(Self {
             tx: raw_tx,
             user_pubkey,
             recipient_script,
@@ -94,7 +94,7 @@ impl<Context> Decode<Context> for PendingSpend {
 }
 
 impl PendingSpend {
-    pub fn encode(intent: &PendingSpend) -> Result<Vec<u8>, String> {
+    pub fn encode(intent: &Self) -> Result<Vec<u8>, String> {
         let transaction_bytes = bitcoin::consensus::encode::serialize(&intent.tx);
         let script_bytes = intent.recipient_script.to_bytes();
 
@@ -107,20 +107,20 @@ impl PendingSpend {
 
         let mut buf = Vec::new();
         p2p_proto::PendingSpend::encode(&proto_intent, &mut buf)
-            .map_err(|e| format!("Failed to encode pending spend: {}", e))?;
+            .map_err(|e| format!("Failed to encode pending spend: {e}"))?;
         Ok(buf)
     }
 
-    pub fn decode(data: &[u8]) -> Result<PendingSpend, String> {
+    pub fn decode(data: &[u8]) -> Result<Self, String> {
         let proto_intent = p2p_proto::PendingSpend::decode(data)
-            .map_err(|e| format!("Failed to decode pending spend: {}", e))?;
+            .map_err(|e| format!("Failed to decode pending spend: {e}"))?;
 
         let tx = bitcoin::consensus::encode::deserialize(&proto_intent.transaction)
-            .map_err(|e| format!("Failed to deserialize transaction: {}", e))?;
+            .map_err(|e| format!("Failed to deserialize transaction: {e}"))?;
 
         let recipient_script = bitcoin::ScriptBuf::from_bytes(proto_intent.recipient_script);
 
-        Ok(PendingSpend {
+        Ok(Self {
             tx,
             user_pubkey: proto_intent.user_pubkey,
             recipient_script,

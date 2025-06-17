@@ -149,8 +149,10 @@ impl Oracle for MockOracle {
                 Ok(deposit_intent) => {
                     info!("Received new address: {}", deposit_intent.deposit_address);
                     if let Ok(addr) = Address::from_str(&deposit_intent.deposit_address) {
-                        let tx =
-                            Self::create_dummy_tx(&addr.assume_checked(), deposit_intent.amount_sat);
+                        let tx = Self::create_dummy_tx(
+                            &addr.assume_checked(),
+                            deposit_intent.amount_sat,
+                        );
                         if let Err(e) = self.tx_channel.send(NetworkEvent::SelfRequest {
                             request: SelfRequest::ConfirmDeposit { confirmed_tx: tx },
                             response_channel: None,
