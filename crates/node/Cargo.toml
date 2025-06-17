@@ -38,8 +38,8 @@ frost-secp256k1 = { workspace = true }
 rand = { workspace = true }
 hex = { workspace = true }
 bitcoin = { workspace = true }
-tonic = "0.13"
-prost = "0.13"
+tonic = { workspace = true }
+prost = { workspace = true }
 aes-gcm = "0.10"
 argon2 = "0.5"
 base64 = "0.22"
@@ -63,8 +63,7 @@ tempfile = "3.8"
 assert_cmd = "2.0"
 predicates = "3.0"
 
-[build-dependencies]
-tonic-build = "0.13"
+
 
 [lints]
 workspace = true

@@ -1,22 +1,18 @@
 use std::str::FromStr;
 
-// use bitcoin::Address;
 use bitcoin::Address;
 use bitcoin::secp256k1::{Message, Secp256k1};
 use clap::{Parser, Subcommand};
 use hex::decode;
-use node::grpc::grpc_handler::node_proto::{
-    CheckBalanceRequest, ConfirmWithdrawalRequest, CreateDepositIntentRequest,
-    ProposeWithdrawalRequest, node_control_client::NodeControlClient,
-};
 use node::key_manager::generate_keys_from_mnemonic;
 use node::wallet::{TaprootWallet, Wallet};
 use oracle::esplora::EsploraOracle;
 use oracle::oracle::Oracle;
-// use node::wallet::{TaprootWallet, Wallet};
-// use oracle::esplora::EsploraOracle;
-// use oracle::oracle::Oracle;
-// use std::str::FromStr;
+use types::proto::node_proto::node_control_client::NodeControlClient;
+use types::proto::node_proto::{
+    CheckBalanceRequest, ConfirmWithdrawalRequest, CreateDepositIntentRequest,
+    ProposeWithdrawalRequest,
+};
 
 #[derive(Parser)]
 #[command(name = "integration-tests")]

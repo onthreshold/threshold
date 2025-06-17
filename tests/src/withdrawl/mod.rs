@@ -1,12 +1,9 @@
 #[cfg(test)]
 mod withdrawl_tests {
     use bitcoin::{Address, Amount, CompressedPublicKey, OutPoint, Txid, hashes::Hash};
-    use node::{
-        grpc::{
-            grpc_handler::node_proto::{ProposeWithdrawalRequest, ProposeWithdrawalResponse},
-            grpc_operator,
-        },
-        wallet::TrackedUtxo,
+    use node::{grpc::grpc_operator, wallet::TrackedUtxo};
+    use types::proto::node_proto::{
+        ConfirmWithdrawalRequest, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
     };
 
     use crate::mocks::network::MockNodeCluster;
@@ -296,7 +293,7 @@ mod withdrawl_tests {
         tokio::spawn(async move {
             let _ = node::grpc::grpc_operator::confirm_withdrawal(
                 &network_clone2,
-                node::grpc::grpc_handler::node_proto::ConfirmWithdrawalRequest {
+                ConfirmWithdrawalRequest {
                     challenge: challenge_hex.clone(),
                     signature: signature_hex,
                 },

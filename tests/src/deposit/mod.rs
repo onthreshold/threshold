@@ -6,17 +6,12 @@ mod deposit_tests {
     use bitcoin::Address;
     use bitcoin::hashes::Hash;
     use node::{
-        db::Db,
-        grpc::{
-            grpc_handler::node_proto::{CreateDepositIntentRequest, CreateDepositIntentResponse},
-            grpc_operator,
-        },
-        handlers::deposit::DepositIntentState,
-        wallet::Wallet,
+        db::Db, grpc::grpc_operator, handlers::deposit::DepositIntentState, wallet::Wallet,
     };
     use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;
     use types::intents::DepositIntent;
+    use types::proto::node_proto::{CreateDepositIntentRequest, CreateDepositIntentResponse};
     use uuid::Uuid;
 
     #[tokio::test]

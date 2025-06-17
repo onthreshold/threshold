@@ -15,9 +15,6 @@ use std::{
 use tracing::info;
 
 // Include the generated P2P proto code
-pub mod p2p_proto {
-    tonic::include_proto!("p2p");
-}
 
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use libp2p::identity::Keypair;
@@ -36,8 +33,11 @@ use tokio::{
 };
 
 use crate::PeerData;
-use types::errors::{NetworkError, NodeError};
 use types::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
+use types::{
+    errors::{NetworkError, NodeError},
+    proto::p2p_proto,
+};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ConsensusMessage {
@@ -416,91 +416,6 @@ pub fn build_swarm(
         .map_err(|e| NodeError::Error(format!("Failed to create swarm manager: {}", e)))?;
 
     Ok((network, swarm_manager))
-}
-
-// Conversion functions between DirectMessage and protobuf
-impl From<types::network_event::DirectMessage> for p2p_proto::DirectMessage {
-    fn from(msg: types::network_event::DirectMessage) -> Self {
-        use p2p_proto::direct_message::Message;
-        use types::network_event::DirectMessage::*;
-
-        let message = match msg {
-            Ping(ping_body) => Message::Ping(p2p_proto::PingMessage {
-                message: ping_body.message,
-            }),
-            Pong => Message::Pong(p2p_proto::PongMessage {}),
-            Round2Package(package) => {
-                let serialized =
-                    serde_json::to_vec(&package).expect("Failed to serialize round2 package");
-                Message::Round2Package(p2p_proto::Round2Package {
-                    package_data: serialized,
-                })
-            }
-            SignRequest { sign_id, message } => {
-                Message::SignRequest(p2p_proto::SignRequest { sign_id, message })
-            }
-            SignPackage { sign_id, package } => {
-                Message::SignPackage(p2p_proto::SignPackage { sign_id, package })
-            }
-            Commitments {
-                sign_id,
-                commitments,
-            } => Message::Commitments(p2p_proto::Commitments {
-                sign_id,
-                commitments,
-            }),
-            SignatureShare {
-                sign_id,
-                signature_share,
-            } => Message::SignatureShare(p2p_proto::SignatureShare {
-                sign_id,
-                signature_share,
-            }),
-        };
-
-        p2p_proto::DirectMessage {
-            message: Some(message),
-        }
-    }
-}
-
-impl TryFrom<p2p_proto::DirectMessage> for types::network_event::DirectMessage {
-    type Error = String;
-
-    fn try_from(proto_msg: p2p_proto::DirectMessage) -> Result<Self, Self::Error> {
-        use p2p_proto::direct_message::Message;
-        use types::network_event::{DirectMessage, PingBody};
-
-        let message = proto_msg.message.ok_or("Missing message field")?;
-
-        match message {
-            Message::Ping(ping) => Ok(DirectMessage::Ping(PingBody {
-                message: ping.message,
-            })),
-            Message::Pong(_) => Ok(DirectMessage::Pong),
-            Message::Round2Package(package) => {
-                let round2_package = serde_json::from_slice(&package.package_data)
-                    .map_err(|e| format!("Failed to deserialize round2 package: {}", e))?;
-                Ok(DirectMessage::Round2Package(round2_package))
-            }
-            Message::SignRequest(req) => Ok(DirectMessage::SignRequest {
-                sign_id: req.sign_id,
-                message: req.message,
-            }),
-            Message::SignPackage(pkg) => Ok(DirectMessage::SignPackage {
-                sign_id: pkg.sign_id,
-                package: pkg.package,
-            }),
-            Message::Commitments(comm) => Ok(DirectMessage::Commitments {
-                sign_id: comm.sign_id,
-                commitments: comm.commitments,
-            }),
-            Message::SignatureShare(share) => Ok(DirectMessage::SignatureShare {
-                sign_id: share.sign_id,
-                signature_share: share.signature_share,
-            }),
-        }
-    }
 }
 
 // Custom protobuf codec for request-response

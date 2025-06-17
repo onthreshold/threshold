@@ -3,12 +3,7 @@ use tonic::{Request, Response, Status};
 
 use crate::grpc::grpc_operator;
 
-// Include the generated proto code
-pub mod node_proto {
-    tonic::include_proto!("grpc");
-}
-
-use node_proto::{
+use types::proto::node_proto::{
     node_control_server::{NodeControl, NodeControlServer},
     *,
 };

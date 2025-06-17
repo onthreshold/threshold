@@ -2,14 +2,10 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use frost_secp256k1::{self as frost};
 use tracing::{error, info};
-use types::errors::NodeError;
+use types::{errors::NodeError, intents::PendingSpend};
 
 use crate::{
-    NodeState,
-    db::Db,
-    handlers::signing::SigningState,
-    swarm_manager::Network,
-    wallet::{PendingSpend, Wallet},
+    NodeState, db::Db, handlers::signing::SigningState, swarm_manager::Network, wallet::Wallet,
 };
 
 impl SigningState {

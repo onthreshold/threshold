@@ -1,5 +1,4 @@
 use libp2p::gossipsub::{IdentTopic, Message};
-use prost::Message as ProstMessage;
 use tracing::info;
 use types::errors::NodeError;
 use types::intents::DepositIntent;
@@ -9,39 +8,6 @@ use crate::swarm_manager::Network;
 use crate::{
     NodeState, db::Db, handlers::Handler, handlers::deposit::DepositIntentState, wallet::Wallet,
 };
-
-// Protobuf conversion functions for deposit intents
-pub fn encode_deposit_intent(intent: &DepositIntent) -> Result<Vec<u8>, String> {
-    let proto_intent = crate::swarm_manager::p2p_proto::DepositIntent {
-        amount_sat: intent.amount_sat,
-        user_pubkey: intent.user_pubkey.clone(),
-        deposit_tracking_id: intent.deposit_tracking_id.clone(),
-        deposit_address: intent.deposit_address.clone(),
-        timestamp: intent.timestamp,
-    };
-
-    let mut buf = Vec::new();
-    <crate::swarm_manager::p2p_proto::DepositIntent as ProstMessage>::encode(
-        &proto_intent,
-        &mut buf,
-    )
-    .map_err(|e| format!("Failed to encode deposit intent: {}", e))?;
-    Ok(buf)
-}
-
-fn decode_deposit_intent(data: &[u8]) -> Result<DepositIntent, String> {
-    let proto_intent =
-        <crate::swarm_manager::p2p_proto::DepositIntent as ProstMessage>::decode(data)
-            .map_err(|e| format!("Failed to decode deposit intent: {}", e))?;
-
-    Ok(DepositIntent {
-        amount_sat: proto_intent.amount_sat,
-        user_pubkey: proto_intent.user_pubkey,
-        deposit_tracking_id: proto_intent.deposit_tracking_id,
-        deposit_address: proto_intent.deposit_address,
-        timestamp: proto_intent.timestamp,
-    })
-}
 
 #[async_trait::async_trait]
 impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DepositIntentState {
@@ -91,7 +57,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DepositIntentState {
             }
             Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {
                 if topic == IdentTopic::new("deposit-intents").hash() {
-                    let deposit_intent = decode_deposit_intent(&data).map_err(|e| {
+                    let deposit_intent = DepositIntent::decode(&data).map_err(|e| {
                         NodeError::Error(format!("Failed to parse deposit intent: {}", e))
                     })?;
 
