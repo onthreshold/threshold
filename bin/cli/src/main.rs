@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+
 mod errors;
 mod rpc_client;
 
@@ -198,7 +200,7 @@ async fn main() -> Result<(), CliError> {
             file_name,
         } => {
             setup_config(output_dir, file_name).map_err(|e| {
-                println!("Keygen Error: {}", e);
+                println!("Keygen Error: {e}");
                 CliError::KeygenError(e)
             })?;
         }
@@ -259,7 +261,7 @@ async fn main() -> Result<(), CliError> {
                 .await
                 .map_err(CliError::RpcError)?;
 
-            println!("Deposit intent created: {:?}", response);
+            println!("Deposit intent created: {response:?}");
         }
         Commands::GetPendingDepositIntents { endpoint } => {
             rpc_get_pending_deposit_intents(endpoint)
@@ -296,11 +298,11 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
             VaultConfigPath {
                 key_file_path: path.join(format!(
                     "{}.json",
-                    file_name.clone().unwrap_or("key".to_string())
+                    file_name.clone().unwrap_or_else(|| "key".to_string())
                 )),
                 config_file_path: path.join(format!(
                     "{}.yaml",
-                    file_name.clone().unwrap_or("config".to_string())
+                    file_name.unwrap_or_else(|| "config".to_string())
                 )),
             }
         } else {
@@ -363,7 +365,7 @@ async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> 
     ) {
         Ok(config) => config,
         Err(e) => {
-            return Err(NodeError::Error(format!("Failed to get config: {}", e)));
+            return Err(NodeError::Error(format!("Failed to get config: {e}")));
         }
     };
 

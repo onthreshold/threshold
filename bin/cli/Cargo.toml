@@ -2,6 +2,10 @@
 name = "cli"
 version = "0.1.0"
 edition = "2021"
+description = "Command-line interface for the Threshold network"
+license = "MIT"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
+categories = ["cryptography", "blockchain"]
 
 [dependencies]
 tokio = { workspace = true, features = ["full", "macros", "rt-multi-thread"] }
@@ -20,7 +24,7 @@ base64 = "0.22.1"
 rpassword = "7.2"
 dotenvy = "0.15.7"
 derive_more = { version = "2.0.1", features = ["full"] }
-tonic = "0.13"
+tonic = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.8"
