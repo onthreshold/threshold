@@ -149,10 +149,7 @@ impl SpendIntentState {
         };
 
         node.network_handle
-            .send_broadcast(
-                gossipsub::IdentTopic::new("withdrawls"),
-                PendingSpend::encode(&spend_intent).map_err(NodeError::Error)?,
-            )
+            .send_broadcast(gossipsub::IdentTopic::new("withdrawls"), spend_intent)
             .map_err(|x| NodeError::Error(format!("Failed to send broadcast: {x:?}")))?;
 
         Ok(())

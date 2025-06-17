@@ -15,6 +15,7 @@ use types::{
     errors::{self, NetworkError},
     intents::DepositIntent,
     network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
+    proto::ProtoEncode,
 };
 
 // Import MockDb from our mocks module
@@ -85,11 +86,11 @@ impl Network for MockNetwork {
     fn send_broadcast(
         &self,
         topic: libp2p::gossipsub::IdentTopic,
-        message: Vec<u8>,
+        message: impl ProtoEncode,
     ) -> Result<(), errors::NetworkError> {
         let gossip_message = libp2p::gossipsub::Message {
             source: Some(self.peer),
-            data: message,
+            data: message.encode().map_err(NetworkError::SendError)?,
             sequence_number: None,
             topic: topic.hash(),
         };
@@ -385,11 +386,11 @@ impl MockNodeCluster {
     pub fn send_broadcast_to_all(
         &mut self,
         topic: libp2p::gossipsub::IdentTopic,
-        message: Vec<u8>,
+        message: impl ProtoEncode,
     ) {
         let gossip_message = libp2p::gossipsub::Message {
             source: None, // Simulate external broadcast
-            data: message,
+            data: message.encode().unwrap(),
             sequence_number: None,
             topic: topic.hash(),
         };
@@ -551,7 +552,7 @@ mod node_tests {
             // Test broadcast
             let topic = libp2p::gossipsub::IdentTopic::new("test-topic");
             first_network
-                .send_broadcast(topic, b"broadcast message".to_vec())
+                .send_broadcast(topic, "broadcast message")
                 .unwrap();
         }
 

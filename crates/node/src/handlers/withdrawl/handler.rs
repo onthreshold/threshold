@@ -5,6 +5,7 @@ use libp2p::gossipsub::Message;
 use types::errors::NodeError;
 use types::intents::PendingSpend;
 use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
+use types::proto::ProtoDecode;
 
 #[async_trait::async_trait]
 impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SpendIntentState {

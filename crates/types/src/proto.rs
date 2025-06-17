@@ -10,6 +10,7 @@ pub mod node_proto {
 }
 
 use p2p_proto::direct_message::Message;
+use prost::Message as ProstMessage;
 
 impl From<crate::network_event::DirectMessage> for p2p_proto::DirectMessage {
     fn from(msg: crate::network_event::DirectMessage) -> Self {
@@ -88,5 +89,31 @@ impl TryFrom<p2p_proto::DirectMessage> for crate::network_event::DirectMessage {
                 signature_share: share.signature_share,
             }),
         }
+    }
+}
+
+pub trait ProtoEncode {
+    fn encode(&self) -> Result<Vec<u8>, String>;
+}
+
+pub trait ProtoDecode {
+    fn decode(data: &[u8]) -> Result<Self, String>
+    where
+        Self: Sized;
+}
+
+impl ProtoEncode for p2p_proto::DkgMessage {
+    fn encode(&self) -> Result<Vec<u8>, String> {
+        let mut buf = Vec::new();
+        <p2p_proto::DkgMessage as ProstMessage>::encode(self, &mut buf)
+            .map_err(|e| e.to_string())?;
+        Ok(buf)
+    }
+}
+
+// Convenience implementation for string slices used in tests/mocks
+impl ProtoEncode for &str {
+    fn encode(&self) -> Result<Vec<u8>, String> {
+        Ok(self.as_bytes().to_vec())
     }
 }

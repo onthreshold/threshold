@@ -53,6 +53,7 @@ message GossipsubMessage {
     ConsensusMessage consensus = 1;
     DepositIntent deposit_intent = 2;
     PendingSpend pending_spend = 3;
+    DkgMessage dkg = 4;
   }
 }
 
@@ -95,4 +96,21 @@ message PendingSpend {
 
 message BitcoinTransaction {
   bytes raw_transaction = 1;
+}
+
+// ========== DKG Messages ==========
+
+message DkgMessage {
+  oneof message {
+    StartDkgMessage start_dkg = 1;
+    Round1Package round1_package = 2;
+  }
+}
+
+message StartDkgMessage {
+  string peer_id = 1;
+}
+
+message Round1Package {
+  bytes package_data = 1;
 }

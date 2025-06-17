@@ -33,10 +33,13 @@ use tokio::{
 };
 
 use crate::PeerData;
-use types::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
 use types::{
     errors::{NetworkError, NodeError},
     proto::p2p_proto,
+};
+use types::{
+    network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
+    proto::ProtoEncode,
 };
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -80,7 +83,7 @@ pub trait Network: Clone + Debug + Sync + Send {
     fn send_broadcast(
         &self,
         topic: gossipsub::IdentTopic,
-        message: Vec<u8>,
+        message: impl ProtoEncode,
     ) -> Result<(), NetworkError>;
     fn send_private_message(
         &self,
@@ -102,9 +105,12 @@ impl Network for NetworkHandle {
     fn send_broadcast(
         &self,
         topic: gossipsub::IdentTopic,
-        message: Vec<u8>,
+        message: impl ProtoEncode,
     ) -> Result<(), NetworkError> {
-        let network_message = NetworkMessage::SendBroadcast { topic, message };
+        let network_message = NetworkMessage::SendBroadcast {
+            topic,
+            message: message.encode().map_err(NetworkError::SendError)?,
+        };
         self.tx
             .send(network_message)
             .map_err(|e| NetworkError::SendError(e.to_string()))
@@ -116,9 +122,10 @@ impl Network for NetworkHandle {
         request: DirectMessage,
     ) -> Result<(), NetworkError> {
         let network_message = NetworkMessage::SendPrivateMessage(peer_id, request);
-        self.tx
-            .send(network_message)
-            .map_err(|e| NetworkError::SendError(e.to_string()))
+        self.tx.send(network_message).map_err(|e| {
+            tracing::error!("❌ Failed to send private message to {}: {}", peer_id, e);
+            NetworkError::SendError(e.to_string())
+        })
     }
 
     fn send_self_request(
@@ -444,13 +451,16 @@ impl libp2p::request_response::Codec for ProtobufCodec {
         let mut buf = vec![0u8; len];
         io.read_exact(&mut buf).await?;
 
-        // Decode protobuf
-        let proto_msg = <p2p_proto::DirectMessage as ProstMessage>::decode(&buf[..])
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        let proto_msg =
+            <p2p_proto::DirectMessage as ProstMessage>::decode(&buf[..]).map_err(|e| {
+                tracing::error!("❌ Failed to decode protobuf DirectMessage: {}", e);
+                std::io::Error::new(std::io::ErrorKind::InvalidData, e)
+            })?;
 
-        // Convert to DirectMessage
-        let direct_msg = types::network_event::DirectMessage::try_from(proto_msg)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        let direct_msg = types::network_event::DirectMessage::try_from(proto_msg).map_err(|e| {
+            tracing::error!("❌ Failed to convert protobuf to DirectMessage: {}", e);
+            std::io::Error::new(std::io::ErrorKind::InvalidData, e)
+        })?;
 
         Ok(direct_msg)
     }
@@ -481,11 +491,15 @@ impl libp2p::request_response::Codec for ProtobufCodec {
 
         // Encode protobuf
         let mut buf = Vec::new();
-        <p2p_proto::DirectMessage as ProstMessage>::encode(&proto_msg, &mut buf)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        <p2p_proto::DirectMessage as ProstMessage>::encode(&proto_msg, &mut buf).map_err(|e| {
+            tracing::error!("❌ Failed to encode DirectMessage to protobuf: {}", e);
+            std::io::Error::new(std::io::ErrorKind::InvalidData, e)
+        })?;
 
         let len = buf.len();
-        io.write_all(&len.to_be_bytes()).await?;
+
+        io.write_all(&u32::try_from(len).unwrap().to_be_bytes())
+            .await?;
 
         // Write the message
         io.write_all(&buf).await?;
