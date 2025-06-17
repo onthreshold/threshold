@@ -17,6 +17,12 @@ libp2p = { workspace = true }
 serde = { workspace = true }
 frost-secp256k1 = { workspace = true }
 bincode = { workspace = true }
+prost = { workspace = true }
+tonic = { workspace = true }
+serde_json = { workspace = true }
+
+[build-dependencies]
+tonic-build = "0.13"
 
 [lints]
 workspace = true

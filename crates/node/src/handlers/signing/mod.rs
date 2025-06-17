@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::PeerId;
+use types::intents::PendingSpend;
 
 // Active signing session tracking
 pub struct ActiveSigning {
@@ -20,5 +21,5 @@ pub struct ActiveSigning {
 
 pub struct SigningState {
     pub active_signing: Option<ActiveSigning>,
-    pub pending_spends: std::collections::BTreeMap<u64, crate::wallet::PendingSpend>,
+    pub pending_spends: std::collections::BTreeMap<u64, PendingSpend>,
 }

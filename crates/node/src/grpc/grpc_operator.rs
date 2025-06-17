@@ -1,14 +1,14 @@
-use crate::grpc::grpc_handler::node_proto::{
-    self, CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest,
-    ConfirmWithdrawalResponse, CreateDepositIntentRequest, CreateDepositIntentResponse,
-    GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
-    SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
-};
 use crate::swarm_manager::{Network, NetworkHandle};
 use tonic::Status;
 use tracing::{debug, info};
 use types::intents::WithdrawlIntent;
 use types::network_event::{SelfRequest, SelfResponse};
+use types::proto::node_proto::{
+    self, CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest,
+    ConfirmWithdrawalResponse, CreateDepositIntentRequest, CreateDepositIntentResponse,
+    GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
+    SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
+};
 
 pub async fn spend_funds(
     network: &NetworkHandle,

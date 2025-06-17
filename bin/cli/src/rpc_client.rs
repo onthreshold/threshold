@@ -1,8 +1,8 @@
-use node::grpc::grpc_handler::node_proto::{
+use tonic::Status;
+use types::proto::node_proto::{
     self, CheckBalanceResponse, CreateDepositIntentResponse, GetPendingDepositIntentsResponse,
     SpendFundsResponse, StartSigningResponse, node_control_client::NodeControlClient,
 };
-use tonic::Status;
 
 pub async fn rpc_spend(
     endpoint: Option<String>,
