@@ -7,9 +7,9 @@ use crate::{
     wallet::Wallet,
 };
 use libp2p::PeerId;
+use prost::Message as ProstMessage;
 use tracing::info;
 use types::network_event::NetworkEvent;
-use prost::Message as ProstMessage;
 
 #[derive(Debug, Clone)]
 pub enum ConsensusMessage {
@@ -25,25 +25,26 @@ pub struct LeaderAnnouncement {
 
 // Protobuf conversion functions for consensus messages
 fn encode_consensus_message(msg: &ConsensusMessage) -> Result<Vec<u8>, String> {
-    use crate::swarm_manager::p2p_proto::{ConsensusMessage as ProtoConsensusMessage, LeaderAnnouncement as ProtoLeaderAnnouncement, NewRound as ProtoNewRound};
     use crate::swarm_manager::p2p_proto::consensus_message::Message;
-    
+    use crate::swarm_manager::p2p_proto::{
+        ConsensusMessage as ProtoConsensusMessage, LeaderAnnouncement as ProtoLeaderAnnouncement,
+        NewRound as ProtoNewRound,
+    };
+
     let proto_msg = match msg {
         ConsensusMessage::LeaderAnnouncement(announcement) => {
             Message::LeaderAnnouncement(ProtoLeaderAnnouncement {
                 leader: announcement.leader.clone(),
                 round: announcement.round,
             })
-        },
-        ConsensusMessage::NewRound(round) => {
-            Message::NewRound(ProtoNewRound { round: *round })
-        },
+        }
+        ConsensusMessage::NewRound(round) => Message::NewRound(ProtoNewRound { round: *round }),
     };
-    
+
     let consensus_msg = ProtoConsensusMessage {
         message: Some(proto_msg),
     };
-    
+
     let mut buf = Vec::new();
     <ProtoConsensusMessage as ProstMessage>::encode(&consensus_msg, &mut buf)
         .map_err(|e| format!("Failed to encode consensus message: {}", e))?;
@@ -52,22 +53,21 @@ fn encode_consensus_message(msg: &ConsensusMessage) -> Result<Vec<u8>, String> {
 
 fn decode_consensus_message(data: &[u8]) -> Result<ConsensusMessage, String> {
     use crate::swarm_manager::p2p_proto::consensus_message::Message;
-    
-    let proto_msg = <crate::swarm_manager::p2p_proto::ConsensusMessage as ProstMessage>::decode(data)
-        .map_err(|e| format!("Failed to decode consensus message: {}", e))?;
-    
+
+    let proto_msg =
+        <crate::swarm_manager::p2p_proto::ConsensusMessage as ProstMessage>::decode(data)
+            .map_err(|e| format!("Failed to decode consensus message: {}", e))?;
+
     let message = proto_msg.message.ok_or("Missing message field")?;
-    
+
     match message {
         Message::LeaderAnnouncement(announcement) => {
             Ok(ConsensusMessage::LeaderAnnouncement(LeaderAnnouncement {
                 leader: announcement.leader,
                 round: announcement.round,
             }))
-        },
-        Message::NewRound(new_round) => {
-            Ok(ConsensusMessage::NewRound(new_round.round))
-        },
+        }
+        Message::NewRound(new_round) => Ok(ConsensusMessage::NewRound(new_round.round)),
     }
 }
 
@@ -83,13 +83,12 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
                 info!("Round timeout reached. I am current leader. Proposing new round.");
                 let next_round = self.current_round + 1;
                 let new_round_message = ConsensusMessage::NewRound(next_round);
-                let data = encode_consensus_message(&new_round_message)
-                    .map_err(|e| {
-                        types::errors::NodeError::Error(format!(
-                            "Failed to encode new round message: {}",
-                            e
-                        ))
-                    })?;
+                let data = encode_consensus_message(&new_round_message).map_err(|e| {
+                    types::errors::NodeError::Error(format!(
+                        "Failed to encode new round message: {}",
+                        e
+                    ))
+                })?;
 
                 node.network_handle
                     .send_broadcast(self.leader_topic.clone(), data)
@@ -116,13 +115,13 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
                 NetworkEvent::GossipsubMessage(message) => {
                     if let Some(peer) = message.source {
                         if message.topic == self.leader_topic.hash() {
-                            let consensus_message: ConsensusMessage = decode_consensus_message(&message.data)
-                            .map_err(|e| {
-                                types::errors::NodeError::Error(format!(
-                                    "Failed to decode consensus message: {}",
-                                    e
-                                ))
-                            })?;
+                            let consensus_message: ConsensusMessage =
+                                decode_consensus_message(&message.data).map_err(|e| {
+                                    types::errors::NodeError::Error(format!(
+                                        "Failed to decode consensus message: {}",
+                                        e
+                                    ))
+                                })?;
 
                             match consensus_message {
                                 ConsensusMessage::LeaderAnnouncement(announcement) => {
@@ -185,10 +184,9 @@ impl ConsensusState {
                 };
                 let message = ConsensusMessage::LeaderAnnouncement(announcement);
 
-                let leader_data = encode_consensus_message(&message)
-                    .map_err(|e| {
-                        types::errors::NodeError::Error(format!("Failed to encode leader: {}", e))
-                    })?;
+                let leader_data = encode_consensus_message(&message).map_err(|e| {
+                    types::errors::NodeError::Error(format!("Failed to encode leader: {}", e))
+                })?;
 
                 node.network_handle
                     .send_broadcast(self.leader_topic.clone(), leader_data)
