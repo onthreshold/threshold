@@ -16,3 +16,6 @@ types = { path = "../types" }
 dotenvy = { workspace = true }
 hex = { workspace = true }
 oracle = { path = "../oracle" }
+
+[lints]
+workspace = true
