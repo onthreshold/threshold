@@ -105,9 +105,7 @@ impl SigningState {
             };
             node.network_handle
                 .send_private_message(*peer, req)
-                .map_err(|e| {
-                    NodeError::Error(format!("Failed to send private request: {:?}", e))
-                })?;
+                .map_err(|e| NodeError::Error(format!("Failed to send private request: {e:?}")))?;
             debug!("🚀 Sent sign request to {}", peer);
         }
 
@@ -144,7 +142,7 @@ impl SigningState {
         // Save session (one at a time for simplicity)
         self.active_signing = Some(ActiveSigning {
             sign_id,
-            message: message.clone(),
+            message,
             selected_peers: Vec::new(),
             nonces,
             commitments: BTreeMap::new(), // not used for participant
@@ -243,7 +241,7 @@ impl SigningState {
                         .insert(peer_id_to_identifier(&node.peer_id), sig_share);
                 }
                 Err(e) => {
-                    return Err(NodeError::Error(format!("Failed to sign: {}", e)));
+                    return Err(NodeError::Error(format!("Failed to sign: {e}")));
                 }
             }
 
@@ -297,7 +295,7 @@ impl SigningState {
                 let _ = node.network_handle.send_private_message(peer, resp);
             }
             Err(e) => {
-                return Err(NodeError::Error(format!("Failed to sign: {}", e)));
+                return Err(NodeError::Error(format!("Failed to sign: {e}")));
             }
         }
 

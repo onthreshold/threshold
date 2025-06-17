@@ -176,13 +176,13 @@ pub async fn start_node(
     tokio::select! {
         result = grpc_handle => {
             match result {
-                Ok(_) => tracing::info!("gRPC server stopped"),
+                Ok(()) => tracing::info!("gRPC server stopped"),
                 Err(e) => tracing::error!("gRPC server error: {}", e),
             }
         }
         result = swarm_handle => {
             match result {
-                Ok(_) => tracing::info!("Swarm stopped"),
+                Ok(()) => tracing::info!("Swarm stopped"),
                 Err(e) => tracing::error!("Swarm error: {}", e),
             }
         }
@@ -191,7 +191,7 @@ pub async fn start_node(
         }
         result = deposit_monitor_handle => {
             match result {
-                Ok(_) => tracing::info!("Deposit monitor stopped"),
+                Ok(()) => tracing::info!("Deposit monitor stopped"),
                 Err(e) => tracing::error!("Deposit monitor error: {}", e),
             }
         }

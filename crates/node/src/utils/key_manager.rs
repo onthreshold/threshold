@@ -21,7 +21,7 @@ pub fn get_key_file_path() -> Result<PathBuf, NodeError> {
 
     let config_dir = proj_dirs.config_dir();
     fs::create_dir_all(config_dir)
-        .map_err(|e| NodeError::Error(format!("Failed to create config directory: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Failed to create config directory: {e}")))?;
 
     let path = config_dir.join("config.json");
     debug!("Using key file path: {}", path.display());
@@ -48,12 +48,12 @@ pub fn derive_key_from_password(password: &str, salt_str: &str) -> Result<Vec<u8
     let argon2 = Argon2::default();
     let password_bytes = password.as_bytes();
     let salt = SaltString::from_b64(salt_str)
-        .map_err(|e| NodeError::Error(format!("Salt decoding failed: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Salt decoding failed: {e}")))?;
 
     let mut key = vec![0u8; 32];
     argon2
         .hash_password_into(password_bytes, salt.as_str().as_bytes(), &mut key)
-        .map_err(|e| NodeError::Error(format!("Argon2 key derivation failed: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Argon2 key derivation failed: {e}")))?;
     Ok(key)
 }
 
@@ -73,7 +73,7 @@ pub fn encrypt_private_key(
     let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key_bytes));
     let ciphertext = cipher
         .encrypt(nonce, private_key_data)
-        .map_err(|e| NodeError::Error(format!("AES encryption failed: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("AES encryption failed: {e}")))?;
 
     let encrypted_b64 = BASE64.encode(ciphertext);
     let iv_b64 = BASE64.encode(iv);
@@ -90,18 +90,18 @@ pub fn decrypt_private_key(
 
     let iv_bytes = BASE64
         .decode(&params.iv_b64)
-        .map_err(|e| NodeError::Error(format!("IV decoding failed: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("IV decoding failed: {e}")))?;
     let nonce = Nonce::from_slice(&iv_bytes);
 
     let ciphertext = BASE64
         .decode(encrypted_private_key_b64)
-        .map_err(|e| NodeError::Error(format!("Ciphertext decoding failed: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Ciphertext decoding failed: {e}")))?;
 
     let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key_bytes));
 
     let decrypted_private_key = cipher
         .decrypt(nonce, ciphertext.as_ref())
-        .map_err(|e| NodeError::Error(format!("AES decryption failed: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("AES decryption failed: {e}")))?;
 
     Ok(decrypted_private_key)
 }
@@ -130,16 +130,16 @@ pub fn get_config(
     debug!("Using key file path: {}", key_file_path.display());
 
     let key_contents = fs::read_to_string(&key_file_path)
-        .map_err(|e| NodeError::Error(format!("Failed to read config file: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Failed to read config file: {e}")))?;
 
     let key_store = serde_json::from_str::<KeyStore>(&key_contents)
-        .map_err(|e| NodeError::Error(format!("Failed to deserialize key file: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Failed to deserialize key file: {e}")))?;
 
     let config_contents = fs::read_to_string(&config_file_path)
-        .map_err(|e| NodeError::Error(format!("Failed to read config file: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Failed to read config file: {e}")))?;
 
     let config_store = serde_yaml::from_str::<ConfigStore>(&config_contents)
-        .map_err(|e| NodeError::Error(format!("Failed to deserialize config file: {}", e)))?;
+        .map_err(|e| NodeError::Error(format!("Failed to deserialize config file: {e}")))?;
 
     let node_config = NodeConfig {
         key_data: key_store.key_data,
@@ -173,12 +173,8 @@ pub fn load_and_decrypt_keypair(config_data: &NodeConfig) -> Result<Keypair, Nod
         &config_data.key_data.encryption_params,
     )?;
 
-    Keypair::from_protobuf_encoding(&private_key_protobuf).map_err(|e| {
-        NodeError::Error(format!(
-            "Failed to reconstruct keypair from protobuf: {}",
-            e
-        ))
-    })
+    Keypair::from_protobuf_encoding(&private_key_protobuf)
+        .map_err(|e| NodeError::Error(format!("Failed to reconstruct keypair from protobuf: {e}")))
 }
 
 pub fn load_dkg_keys(
@@ -210,6 +206,7 @@ pub fn load_dkg_keys(
     }
 }
 
+#[must_use]
 pub fn generate_keys_from_mnemonic(mnemonic: &str) -> (Address, PrivateKey, CompressedPublicKey) {
     // Generate a new mnemonic (12 words)
     let mnemonic = Mnemonic::parse_in_normalized(Language::English, mnemonic).unwrap();

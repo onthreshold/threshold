@@ -16,6 +16,7 @@ use crate::{
 use types::intents::DepositIntent;
 
 impl DepositIntentState {
+    #[must_use]
     pub fn new(deposit_intent_tx: broadcast::Sender<DepositIntent>) -> Self {
         Self {
             pending_intents: vec![],
@@ -34,7 +35,7 @@ impl DepositIntentState {
 
         node.wallet.add_address(
             Address::from_str(&deposit_intent.deposit_address)
-                .map_err(|e| NodeError::Error(format!("Failed to parse deposit address: {}", e)))?
+                .map_err(|e| NodeError::Error(format!("Failed to parse deposit address: {e}")))?
                 .assume_checked(),
         );
 
@@ -42,7 +43,7 @@ impl DepositIntentState {
             .deposit_addresses
             .insert(deposit_intent.deposit_address.clone())
         {
-            if let Err(e) = self.deposit_intent_tx.send(deposit_intent.clone()) {
+            if let Err(e) = self.deposit_intent_tx.send(deposit_intent) {
                 error!("Failed to notify deposit monitor of new address: {}", e);
             }
         }
@@ -65,10 +66,10 @@ impl DepositIntentState {
         let frost_public_key = frost_pubkey
             .verifying_key()
             .serialize()
-            .map_err(|x| NodeError::Error(format!("Failed to serialize public key: {:?}", x)))?;
+            .map_err(|x| NodeError::Error(format!("Failed to serialize public key: {x:?}")))?;
 
         let public_key = bitcoin::PublicKey::from_slice(&frost_public_key)
-            .map_err(|e| NodeError::Error(format!("Failed to parse public key: {}", e)))?;
+            .map_err(|e| NodeError::Error(format!("Failed to parse public key: {e}")))?;
 
         let tweak_scalar = Scalar::from_be_bytes(
             bitcoin::hashes::sha256::Hash::hash(deposit_tracking_id.as_bytes()).to_byte_array(),
