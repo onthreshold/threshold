@@ -1,7 +1,6 @@
 use node::grpc::grpc_handler::node_proto::{
-    self, node_control_client::NodeControlClient, CheckBalanceResponse,
-    CreateDepositIntentResponse, GetPendingDepositIntentsResponse, SpendFundsResponse,
-    StartSigningResponse,
+    self, CheckBalanceResponse, CreateDepositIntentResponse, GetPendingDepositIntentsResponse,
+    SpendFundsResponse, StartSigningResponse, node_control_client::NodeControlClient,
 };
 use tonic::Status;
 

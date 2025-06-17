@@ -1,7 +1,12 @@
 [package]
 name = "node"
+description = "Node management and communication for the Threshold network"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/onthreshold/threshold/"
+license = "MIT"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
+categories = ["cryptography", "blockchain"]
 
 [lib]
 name = "node"

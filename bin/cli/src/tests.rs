@@ -38,7 +38,7 @@ fn generate_test_keypair(output_path: Option<PathBuf>, password: &str) -> Result
     let (encrypted_private_key, encryption_params) = encrypt_private_key(&keypair, password)?;
 
     let key_data = KeyData {
-        public_key_b58: public_key_b58.clone(),
+        public_key_b58,
         encrypted_private_key_b64: encrypted_private_key,
         encryption_params,
     };

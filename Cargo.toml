@@ -14,21 +14,23 @@ resolver = "2"
 [workspace.package]
 name = "threshold"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "building the best infrastructure for decentralized multisigs"
 license = "MIT"
-repository = "https://github.com/onthreshold/threshold/"
 keywords = ["bitcoin", "cryptocurrency", "wallet", "multisig"]
 categories = ["cryptography", "blockchain"]
+readme = "README.md"
 
 [workspace.dependencies]
 tokio = { version = "1.37.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
-futures = "0.3.30"
+futures = "0.3.31"
 serde_json = "1.0"
 frost-secp256k1 = "2.1.0"
 bitcoin = { version = "0.32.6", features = ["rand-std"] }
-libp2p = { version = "0.54", features = [
+bitcoin_hashes = "0.14.0"
+bitcoin-internals = "0.3.0"
+libp2p = { version = "0.55", features = [
     "noise",
     "ping",
     "tcp",
@@ -41,10 +43,13 @@ libp2p = { version = "0.54", features = [
     "mdns",
     "quic",
     "cbor",
+    "ed25519",
 ] }
 hex = "0.4"
 rand = "0.9.1"
-esplora-client = { version = "*", default-features = false, features = [
+rand_core = "0.9.3"
+rand_chacha = "0.9.0"
+esplora-client = { version = "0.12.0", default-features = false, features = [
     "async-https",
     "tokio",
 ] }
@@ -53,7 +58,7 @@ sha2 = "0.10.9"
 rocksdb = "0.23.0"
 async-trait = "0.1.88"
 dotenvy = "0.15"
-bip39 = "2.1.0"
+bip39 = { version = "2.1.0", features = ["rand", "rand_core"] }
 base64 = "0.22.1"
 tonic = "0.13"
 
@@ -74,3 +79,5 @@ doc_markdown = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 missing_safety_doc = "allow"
+cargo_common_metadata = "allow"
+multiple_crate_versions = "allow"

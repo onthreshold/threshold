@@ -1,7 +1,12 @@
 [package]
 name = "oracle"
+description = "Oracle communication service for the Threshold network"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+repository = "https://github.com/onthreshold/threshold/"
+license = "MIT"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
+categories = ["cryptography", "blockchain"]
 
 [dependencies]
 bitcoin = { workspace = true }

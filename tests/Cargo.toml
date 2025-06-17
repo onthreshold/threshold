@@ -1,7 +1,12 @@
 [package]
 name = "tests"
+description = "Integration tests for the Threshold network"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/onthreshold/threshold/"
+license = "MIT"
+keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
+categories = ["cryptography", "blockchain"]
 
 [[bin]]
 name = "integration-tests"
@@ -28,5 +33,5 @@ dotenvy = "0.15.7"
 serde_json = { workspace = true }
 uuid = "1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
-bip39 = { workspace = true, features = ["rand_core"] }
+bip39 = { workspace = true }
 clap = { version = "4.5.4", features = ["derive"] }

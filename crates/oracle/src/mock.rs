@@ -2,8 +2,8 @@ use std::{collections::HashMap, str::FromStr};
 
 use crate::oracle::Oracle;
 use bitcoin::{
-    absolute::LockTime, hashes::Hash, transaction::Version, Address, Amount, OutPoint, ScriptBuf,
-    Sequence, Transaction, TxIn, TxOut, Txid,
+    Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
+    absolute::LockTime, hashes::Hash, transaction::Version,
 };
 use tokio::sync::broadcast;
 use tracing::{error, info};
