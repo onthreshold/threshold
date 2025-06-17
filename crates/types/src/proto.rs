@@ -1,3 +1,5 @@
+#![allow(clippy::all, clippy::pedantic, clippy::nursery)]
+
 pub mod p2p_proto {
     tonic::include_proto!("p2p");
 }
@@ -88,3 +90,5 @@ impl TryFrom<p2p_proto::DirectMessage> for crate::network_event::DirectMessage {
         }
     }
 }
+
+
