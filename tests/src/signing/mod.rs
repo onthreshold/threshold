@@ -1,5 +1,12 @@
 #[cfg(test)]
 pub mod signing_tests {
+    use std::str::FromStr;
+
+    use crate::mocks::network::MockOracle;
+    use bitcoin::{Address, Amount, Network, OutPoint, Txid, hashes::Hash};
+    use node::wallet::{TaprootWallet, Wallet, taproot::TrackedUtxo};
+    use types::utxo::Utxo;
+
     use crate::mocks::network::MockNodeCluster;
     use rand::RngCore;
     use types::network_event::{DirectMessage, NetworkEvent, SelfRequest};
@@ -74,5 +81,138 @@ pub mod signing_tests {
                 node.peer_id
             );
         }
+    }
+
+    fn create_test_wallet() -> TaprootWallet {
+        let (events_emitter, _) = tokio::sync::broadcast::channel(100);
+        let (deposits_emitter, _) = tokio::sync::broadcast::channel(100);
+        let oracle = MockOracle::new(events_emitter, Some(deposits_emitter));
+        TaprootWallet::new(Box::new(oracle), vec![], Network::Regtest)
+    }
+
+    fn create_dummy_utxo(
+        value_sat: u64,
+        address_str: &str,
+        txid_byte: u8,
+        vout: u32,
+    ) -> TrackedUtxo {
+        let address = Address::from_str(address_str).unwrap().assume_checked();
+        let txid = Txid::from_byte_array([txid_byte; 32]);
+        TrackedUtxo {
+            utxo: Utxo {
+                outpoint: OutPoint::new(txid, vout),
+                value: Amount::from_sat(value_sat),
+                script_pubkey: address.script_pubkey(),
+            },
+            address,
+        }
+    }
+
+    #[test]
+    fn test_change_consolidation_with_lowest_address_in_wallet() {
+        let mut wallet = create_test_wallet();
+
+        let addr_input = "tb1pm5y7ps8v24r9l9pvgu8p4dcusnueuayavc9xcx5ze2z7t485gdcq6dzg7z";
+        let addr_low = "tb1pxpqezzaf7mk59tt5kgmpc4lvvjkx0zh3xhjre9cf9vspnlgrer3se036nk";
+
+        wallet.utxos = vec![
+            create_dummy_utxo(70_000, addr_input, 1, 0),
+            create_dummy_utxo(10_000, addr_low, 2, 0),
+        ];
+
+        let recipient_addr =
+            Address::from_str("tb1pwvn7aqsgrh7msgmpj9knrenglvdmsqljsads363696k2368x2kwsd5wztk")
+                .unwrap()
+                .assume_checked();
+
+        let (tx, _) = wallet
+            .create_spend(60_000, 1_000, &recipient_addr, false)
+            .unwrap();
+
+        assert_eq!(tx.input.len(), 1);
+        assert_eq!(tx.output.len(), 2);
+
+        let change_output = tx
+            .output
+            .iter()
+            .find(|o| o.value == Amount::from_sat(9_000))
+            .unwrap();
+
+        let expected_change_address = Address::from_str(addr_low).unwrap().assume_checked();
+        assert_eq!(
+            change_output.script_pubkey,
+            expected_change_address.script_pubkey()
+        );
+
+        let final_balance_at_lowest_addr: u64 = wallet
+            .get_utxos()
+            .iter()
+            .filter(|u| u.address == expected_change_address)
+            .map(|u| u.utxo.value.to_sat())
+            .sum();
+
+        assert_eq!(final_balance_at_lowest_addr, 19_000);
+    }
+
+    #[test]
+    fn test_spend_with_no_change() {
+        let mut wallet = create_test_wallet();
+
+        wallet.utxos = vec![create_dummy_utxo(
+            50_000,
+            "tb1pm5y7ps8v24r9l9pvgu8p4dcusnueuayavc9xcx5ze2z7t485gdcq6dzg7z",
+            1,
+            0,
+        )];
+
+        let recipient_addr =
+            Address::from_str("tb1pwvn7aqsgrh7msgmpj9knrenglvdmsqljsads363696k2368x2kwsd5wztk")
+                .unwrap()
+                .assume_checked();
+
+        let (tx, _) = wallet
+            .create_spend(49_000, 1_000, &recipient_addr, false)
+            .unwrap();
+
+        assert_eq!(tx.input.len(), 1);
+        assert_eq!(tx.output.len(), 1);
+        assert_eq!(tx.output[0].value, Amount::from_sat(49_000));
+    }
+
+    #[test]
+    fn test_spend_from_single_utxo_with_change() {
+        let mut wallet = create_test_wallet();
+        let utxo_addr_str = "tb1pm5y7ps8v24r9l9pvgu8p4dcusnueuayavc9xcx5ze2z7t485gdcq6dzg7z";
+        let utxo_addr = Address::from_str(utxo_addr_str).unwrap().assume_checked();
+
+        wallet.utxos = vec![create_dummy_utxo(50_000, utxo_addr_str, 1, 0)];
+
+        let recipient_addr =
+            Address::from_str("tb1pwvn7aqsgrh7msgmpj9knrenglvdmsqljsads363696k2368x2kwsd5wztk")
+                .unwrap()
+                .assume_checked();
+
+        let (tx, _) = wallet
+            .create_spend(30_000, 1_000, &recipient_addr, false)
+            .unwrap();
+
+        assert_eq!(tx.input.len(), 1);
+        assert_eq!(tx.output.len(), 2);
+
+        let change_output = tx
+            .output
+            .iter()
+            .find(|o| o.value == Amount::from_sat(19_000))
+            .unwrap();
+
+        assert_eq!(change_output.script_pubkey, utxo_addr.script_pubkey());
+
+        let final_balance: u64 = wallet
+            .get_utxos()
+            .iter()
+            .map(|u| u.utxo.value.to_sat())
+            .sum();
+
+        assert_eq!(final_balance, 19_000);
     }
 }

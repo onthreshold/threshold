@@ -39,10 +39,26 @@ impl TaprootWallet {
         }
     }
 
-    fn select_single_utxo(&self, target: u64) -> Option<&TrackedUtxo> {
-        self.utxos
-            .iter()
-            .find(|t: &&TrackedUtxo| t.utxo.value.to_sat() >= target)
+    fn select_utxos(&self, target: u64) -> Option<Vec<TrackedUtxo>> {
+        let mut selected = Vec::new();
+        let mut total_val: u64 = 0;
+        let mut sorted_utxos = self.utxos.clone();
+        sorted_utxos.sort_by(|a, b| b.utxo.value.cmp(&a.utxo.value));
+
+        for utxo in sorted_utxos {
+            if total_val < target {
+                selected.push(utxo.clone());
+                total_val += utxo.utxo.value.to_sat();
+            } else {
+                break;
+            }
+        }
+
+        if total_val >= target {
+            Some(selected)
+        } else {
+            None
+        }
     }
 
     fn is_p2wpkh(script: &ScriptBuf) -> bool {
@@ -96,26 +112,38 @@ impl Wallet for TaprootWallet {
         dry_run: bool,
     ) -> Result<(Transaction, [u8; 32]), NodeError> {
         let total_needed = amount_sat + estimated_fee_sat;
-        let utxo_entry = self
-            .select_single_utxo(total_needed)
-            .ok_or_else(|| NodeError::Error("No UTXO large enough".into()))?;
+        let selected_utxos = self
+            .select_utxos(total_needed)
+            .ok_or_else(|| NodeError::Error("Not enough funds to create transaction".into()))?;
 
-        let utxo = utxo_entry.utxo.clone();
-        let change_address = utxo_entry.address.clone();
+        let total_input_val = selected_utxos
+            .iter()
+            .fold(0, |acc, u| acc + u.utxo.value.to_sat());
+
+        let change_address = self
+            .utxos
+            .iter()
+            .min_by(|a, b| a.address.cmp(&b.address))
+            .ok_or_else(|| NodeError::Error("No UTXOs selected".into()))?
+            .address
+            .clone();
 
         if !dry_run {
-            self.utxos.retain(|t| t.utxo.outpoint != utxo.outpoint);
+            let outpoints: Vec<_> = selected_utxos.iter().map(|u| u.utxo.outpoint).collect();
+            self.utxos.retain(|t| !outpoints.contains(&t.utxo.outpoint));
         }
 
-        let change_sat = utxo.value.to_sat() - amount_sat - estimated_fee_sat;
+        let change_sat = total_input_val - amount_sat - estimated_fee_sat;
 
-        let input = TxIn {
-            previous_output: utxo.outpoint,
-            script_sig: ScriptBuf::new(),
-            sequence: Sequence::ZERO,
-            witness: Witness::new(),
-        };
-
+        let inputs: Vec<TxIn> = selected_utxos
+            .iter()
+            .map(|tracked_utxo| TxIn {
+                previous_output: tracked_utxo.utxo.outpoint,
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::ZERO,
+                witness: Witness::new(),
+            })
+            .collect();
         let mut outputs = vec![TxOut {
             value: Amount::from_sat(amount_sat),
             script_pubkey: recipient.script_pubkey(),
@@ -126,42 +154,61 @@ impl Wallet for TaprootWallet {
                 value: Amount::from_sat(change_sat),
                 script_pubkey: change_address.script_pubkey(),
             });
-            if !dry_run {
-                let change_outpoint = bitcoin::OutPoint {
-                    txid: utxo.outpoint.txid,
-                    vout: 1,
-                };
-
-                self.utxos.push(TrackedUtxo {
-                    utxo: Utxo {
-                        outpoint: change_outpoint,
-                        value: Amount::from_sat(change_sat),
-                        script_pubkey: change_address.script_pubkey(),
-                    },
-                    address: change_address,
-                });
-            }
         }
 
         let tx = Transaction {
             version: Version::TWO,
             lock_time: LockTime::ZERO,
-            input: vec![input],
+            input: inputs,
             output: outputs,
         };
 
+        if !dry_run && change_sat > 546 {
+            let change_vout: u32 = tx
+                .output
+                .iter()
+                .position(|o| o.script_pubkey == change_address.script_pubkey())
+                .unwrap()
+                .try_into()
+                .unwrap();
+
+            self.utxos.push(TrackedUtxo {
+                utxo: Utxo {
+                    outpoint: bitcoin::OutPoint {
+                        txid: tx.compute_txid(),
+                        vout: change_vout,
+                    },
+                    value: Amount::from_sat(change_sat),
+                    script_pubkey: change_address.script_pubkey(),
+                },
+                address: change_address,
+            });
+        }
+
         let mut sighash_cache = SighashCache::new(&tx);
-        let sighash = if Self::is_p2wpkh(&utxo.script_pubkey) {
+
+        let utxo_to_sign = selected_utxos
+            .first()
+            .ok_or_else(|| NodeError::Error("No UTXOs to sign".into()))?;
+
+        let sighash = if Self::is_p2wpkh(&utxo_to_sign.utxo.script_pubkey) {
             sighash_cache
-                .p2wpkh_signature_hash(0, &utxo.script_pubkey, utxo.value, EcdsaSighashType::All)
+                .p2wpkh_signature_hash(
+                    0,
+                    &utxo_to_sign.utxo.script_pubkey,
+                    utxo_to_sign.utxo.value,
+                    EcdsaSighashType::All,
+                )
                 .map_err(|e| NodeError::Error(format!("Failed to calculate sighash: {e}")))?
                 .to_byte_array()
-        } else if Self::is_p2tr(&utxo.script_pubkey) {
-            let prev = bitcoin::TxOut {
-                value: utxo.value,
-                script_pubkey: utxo.script_pubkey.clone(),
-            };
-            let prevouts = [prev];
+        } else if Self::is_p2tr(&utxo_to_sign.utxo.script_pubkey) {
+            let prevouts: Vec<TxOut> = selected_utxos
+                .iter()
+                .map(|u| bitcoin::TxOut {
+                    value: u.utxo.value,
+                    script_pubkey: u.utxo.script_pubkey.clone(),
+                })
+                .collect();
             sighash_cache
                 .taproot_key_spend_signature_hash(
                     0,

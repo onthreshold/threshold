@@ -6,7 +6,7 @@ use node::{
     swarm_manager::{Network, NetworkResponseFuture},
     wallet::TaprootWallet,
 };
-use oracle::mock::MockOracle;
+pub use oracle::mock::MockOracle;
 use tokio::sync::{
     broadcast,
     mpsc::{self, unbounded_channel},
