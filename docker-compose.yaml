@@ -5,78 +5,87 @@ services:
       dockerfile: Dockerfile
     image: vault-node
     environment:
-      - KEY_PASSWORD=
+      - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path one.json --config-file-path one.yaml --use-mock-oracle"
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_1.json --config-file-path /app/configs/node_1.yaml --use-mock-oracle"
     ports:
       - "50051:50051"
     volumes:
-      - ./keys/one.json:/app/one.json
-      - ./keys/one.yaml:/app/one.yaml
+      - ./keys/node_1/node_1.json:/app/configs/node_1.json
+      - ./keys/node_1/node_1.yaml:/app/configs/node_1.yaml
       - ./nodedb_1.db:/app/nodedb.db
     networks:
       - vaultnet
-
   node2:
-    image: vault-node
     build:
       context: .
       dockerfile: Dockerfile
+    image: vault-node
     environment:
-      - KEY_PASSWORD=
+      - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path two.json --config-file-path two.yaml --use-mock-oracle"
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_2.json --config-file-path /app/configs/node_2.yaml --use-mock-oracle"
+    ports:
+      - "50052:50051"
     volumes:
-      - ./keys/two.json:/app/two.json
-      - ./keys/two.yaml:/app/two.yaml
+      - ./keys/node_2/node_2.json:/app/configs/node_2.json
+      - ./keys/node_2/node_2.yaml:/app/configs/node_2.yaml
       - ./nodedb_2.db:/app/nodedb.db
     networks:
       - vaultnet
-
   node3:
     build:
       context: .
       dockerfile: Dockerfile
     image: vault-node
     environment:
-      - KEY_PASSWORD=
+      - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path three.json --config-file-path three.yaml --use-mock-oracle"
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_3.json --config-file-path /app/configs/node_3.yaml --use-mock-oracle"
+    ports:
+      - "50053:50051"
     volumes:
-      - ./keys/three.json:/app/three.json
-      - ./keys/three.yaml:/app/three.yaml
+      - ./keys/node_3/node_3.json:/app/configs/node_3.json
+      - ./keys/node_3/node_3.yaml:/app/configs/node_3.yaml
       - ./nodedb_3.db:/app/nodedb.db
     networks:
       - vaultnet
-
   node4:
     build:
       context: .
       dockerfile: Dockerfile
     image: vault-node
     environment:
-      - KEY_PASSWORD=
+      - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path four.json --config-file-path four.yaml --use-mock-oracle"
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_4.json --config-file-path /app/configs/node_4.yaml --use-mock-oracle"
+    ports:
+      - "50054:50051"
     volumes:
-      - ./keys/four.json:/app/four.json
-      - ./keys/four.yaml:/app/four.yaml
+      - ./keys/node_4/node_4.json:/app/configs/node_4.json
+      - ./keys/node_4/node_4.yaml:/app/configs/node_4.yaml
       - ./nodedb_4.db:/app/nodedb.db
     networks:
       - vaultnet
-
   node5:
     build:
       context: .
       dockerfile: Dockerfile
     image: vault-node
     environment:
-      - KEY_PASSWORD=
+      - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
-    entrypoint: "/app/cli run --key-file-path five.json --config-file-path five.yaml --use-mock-oracle"
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_5.json --config-file-path /app/configs/node_5.yaml --use-mock-oracle"
+    ports:
+      - "50055:50051"
     volumes:
-      - ./keys/five.json:/app/five.json
-      - ./keys/five.yaml:/app/five.yaml
+      - ./keys/node_5/node_5.json:/app/configs/node_5.json
+      - ./keys/node_5/node_5.yaml:/app/configs/node_5.yaml
       - ./nodedb_5.db:/app/nodedb.db
     networks:
       - vaultnet

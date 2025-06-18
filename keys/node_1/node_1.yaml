@@ -1,0 +1,17 @@
+allowed_peers:
+- name: node_2
+  public_key: 12D3KooWSj3SmzS1RUBx2tVg4kEQAqsGSAzwG3EEu9UuX8rLbDMb
+- name: node_3
+  public_key: 12D3KooWA1StPpgLW1DUV7WisrMJE6Sj6VHCbfD1HEnrD9Hhjaf7
+- name: node_4
+  public_key: 12D3KooWPhe3ki2bPr1y7dTyELfMnEL8vNpJrACX1NwSNRUikqyC
+- name: node_5
+  public_key: 12D3KooWS2y3NupYaMeAAZuyTD5sEpBwSEe1wR4geS5QXQbGFXFy
+log_file_path: /home/vidyootsenthil/.config/thevault/node.log
+key_file_path: keys/node_1/node_1.json
+database_directory: nodedb.db
+grpc_port: 50051
+libp2p_udp_port: 0
+libp2p_tcp_port: 0
+confirmation_depth: 6
+monitor_start_block: 0

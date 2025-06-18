@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Bootstrap and configure multiple threshold nodes for local development.
+#
+# This script will:
+#   1. Generate N node identities & config files into the `keys/` directory.
+#   2. Update each node's config to peer with the other N-1 nodes.
+#   3. Generate a docker-compose.yaml file to run the N nodes.
+#
+# The script is **non-interactive**. Provide the password for the private keys
+# via the KEY_PASSWORD environment variable.
+#
+# Usage example:
+#   KEY_PASSWORD=supersecret ./setup_nodes.sh          # generates 5 nodes
+#   KEY_PASSWORD=secret ./setup_nodes.sh 8             # generates 8 nodes
+# -----------------------------------------------------------------------------
+
+set -euo pipefail
+
+# --------------------------- Configuration -----------------------------------
+NUM_NODES=${1:-5}
+BASE_DIR="keys"
+CLI_CMD=(cargo run --quiet --bin cli)
+BASE_GRPC_PORT=50051
+DOCKER_COMPOSE_FILE="docker-compose.yaml"
+
+# Ensure KEY_PASSWORD is provided for non-interactive operation
+if [[ -z "${KEY_PASSWORD:-}" ]]; then
+  echo "ERROR: Please provide the password via KEY_PASSWORD environment variable." >&2
+  exit 1
+fi
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+# Determine project root
+if [[ -f "$SCRIPT_DIR/Cargo.toml" ]]; then
+  PROJECT_ROOT="$SCRIPT_DIR"
+elif [[ -f "$SCRIPT_DIR/../Cargo.toml" ]]; then
+  PROJECT_ROOT="$(realpath "$SCRIPT_DIR/..")"
+else
+  echo "ERROR: Could not locate Cargo.toml relative to $SCRIPT_DIR" >&2
+  exit 1
+fi
+
+cd "$PROJECT_ROOT"
+
+# Clean up previous configs if they exist
+if [ -d "$BASE_DIR" ]; then
+    echo "Removing existing '$BASE_DIR' directory..."
+    rm -rf "$BASE_DIR"
+fi
+mkdir -p "$BASE_DIR"
+
+# Arrays to capture peer ids and config paths
+declare -a PEER_IDS
+declare -a CONFIG_PATHS
+
+# --------------------------- Generation loop ---------------------------------
+echo "Generating $NUM_NODES node configurations in '$BASE_DIR'..."
+for i in $(seq 1 "$NUM_NODES"); do
+  node_name="node_${i}"
+  node_dir="$BASE_DIR/$node_name"
+  mkdir -p "$node_dir"
+
+  echo "  → $node_name"
+
+  OUTPUT=$(KEY_PASSWORD="$KEY_PASSWORD" \
+           "${CLI_CMD[@]}" setup \
+             --output-dir "$node_dir" \
+             --file-name "$node_name")
+
+  PEER_ID=$(echo "$OUTPUT" | sed -n -E 's/.*peer id ([A-Za-z0-9]+).*/\1/p')
+  CONFIG_PATH=$(echo "$OUTPUT" | sed -n -E 's/.*config file here: (.*)$/\1/p')
+
+  if [[ -z "$PEER_ID" || -z "$CONFIG_PATH" ]]; then
+    echo "Failed to parse peer-id or config path from CLI output, aborting." >&2
+    exit 1
+  fi
+
+  PEER_IDS[$i]="$PEER_ID"
+  CONFIG_PATHS[$i]="$CONFIG_PATH"
+done
+
+# --------------------------- Patching configs --------------------------------
+echo -e "\nPatching each node's allowed_peers list..."
+ALL_PEERS=$(IFS=','; echo "${PEER_IDS[*]}")
+
+for i in $(seq 1 "$NUM_NODES"); do
+  CONFIG_PATH="${CONFIG_PATHS[$i]}"
+
+  CONFIG_PATH="$CONFIG_PATH" \
+  SELF_INDEX="$i" \
+  ALL_PEERS="$ALL_PEERS" \
+  python3 - <<'PY'
+import os, pathlib, yaml, sys
+
+config_path = pathlib.Path(os.environ['CONFIG_PATH'])
+self_index   = int(os.environ['SELF_INDEX'])
+all_peers    = os.environ['ALL_PEERS'].split(',')
+
+try:
+    data = yaml.safe_load(config_path.read_text()) or {}
+except FileNotFoundError:
+    sys.stderr.write(f"Config file not found: {config_path}\n")
+    sys.exit(1)
+
+allowed = []
+for idx, peer_id in enumerate(all_peers, start=1):
+    if idx == self_index:
+        continue
+    allowed.append({'name': f'node_{idx}', 'public_key': peer_id})
+
+data['allowed_peers'] = allowed
+config_path.write_text(yaml.safe_dump(data, sort_keys=False))
+PY
+done
+echo "All configs patched."
+
+# ------------------- Generate docker-compose.yaml ----------------------------
+echo -e "\nGenerating '$DOCKER_COMPOSE_FILE' for $NUM_NODES nodes..."
+
+cat > "$DOCKER_COMPOSE_FILE" <<EOL
+services:
+EOL
+
+for i in $(seq 1 "$NUM_NODES"); do
+  node_name="node_${i}"
+  node_dir="$BASE_DIR/$node_name"
+  host_port=$((BASE_GRPC_PORT + i - 1))
+
+  cat >> "$DOCKER_COMPOSE_FILE" <<EOL
+  node${i}:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vault-node
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/${node_name}.json --config-file-path /app/configs/${node_name}.yaml --use-mock-oracle"
+    ports:
+      - "${host_port}:${BASE_GRPC_PORT}"
+    volumes:
+      - ./${node_dir}/${node_name}.json:/app/configs/${node_name}.json
+      - ./${node_dir}/${node_name}.yaml:/app/configs/${node_name}.yaml
+      - ./nodedb_${i}.db:/app/nodedb.db
+    networks:
+      - vaultnet
+EOL
+done
+
+cat >> "$DOCKER_COMPOSE_FILE" <<EOL
+
+networks:
+  vaultnet:
+    driver: bridge
+EOL
+
+echo "Successfully generated '$DOCKER_COMPOSE_FILE'."
+echo -e "\nSetup complete. You can now run 'docker-compose up'." 
