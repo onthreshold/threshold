@@ -271,7 +271,7 @@ impl DkgState {
         Ok(())
     }
 
-    pub fn handle_round2_payload<N: Network, W: Wallet>(
+    pub async fn handle_round2_payload<N: Network, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, W>,
         sender_peer_id: PeerId,
@@ -330,7 +330,8 @@ impl DkgState {
                             pubkey_package.verifying_key()
                         );
 
-                        self.save_dkg_keys(node, &private_key_package, &pubkey_package)?;
+                        self.save_dkg_keys(node, &private_key_package, &pubkey_package)
+                            .await?;
 
                         self.dkg_started = false;
                     }

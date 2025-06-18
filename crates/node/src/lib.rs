@@ -5,7 +5,7 @@ use crate::{
     },
     wallet::Wallet,
 };
-use abci::ChainInterface;
+use abci::{ChainMessage, ChainResponse};
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{
     Argon2,
@@ -283,20 +283,20 @@ pub struct NodeState<N: Network, W: Wallet> {
     pub network_events_stream: broadcast::Receiver<NetworkEvent>,
 
     pub oracle: Box<dyn Oracle>,
-    pub chain_interface: Box<dyn ChainInterface>,
+    pub chain_interface_tx: messenger::Sender<ChainMessage, ChainResponse>,
 }
 
 impl<N: Network, W: Wallet> NodeState<N, W> {
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn new_from_config(
+    pub async fn new_from_config(
         network_handle: &N,
         config: NodeConfig,
         network_events_sender: &broadcast::Sender<NetworkEvent>,
         deposit_intent_tx: broadcast::Sender<DepositIntent>,
         oracle: Box<dyn Oracle>,
         wallet: W,
-        chain_interface: Box<dyn ChainInterface>,
+        mut chain_interface_tx: messenger::Sender<ChainMessage, ChainResponse>,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {e}")))?;
@@ -316,7 +316,10 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
         let withdrawl_intent_state = SpendIntentState::new();
         let balance_state = BalanceState::new();
 
-        if let Ok(intents) = chain_interface.get_all_deposit_intents() {
+        if let Ok(ChainResponse::GetAllDepositIntents { intents }) = chain_interface_tx
+            .send_message_with_response(ChainMessage::GetAllDepositIntents)
+            .await
+        {
             info!("Found {} deposit intents", intents.len());
             for intent in intents {
                 if deposit_intent_state
@@ -349,7 +352,7 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
             pubkey_package: None,
             private_key_package: None,
             oracle,
-            chain_interface,
+            chain_interface_tx,
         };
 
         if let Some((private_key, pubkey)) = keys {

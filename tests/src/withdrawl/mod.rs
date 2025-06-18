@@ -41,7 +41,9 @@ mod withdrawl_tests {
                 address: hex::encode(public_key.serialize()),
                 balance: 100_000,
             },
-        );
+        )
+        .await
+        .unwrap();
 
         let utxo = Utxo {
             outpoint: OutPoint {
@@ -111,7 +113,9 @@ mod withdrawl_tests {
                 address: address.to_string(),
                 balance: 1,
             },
-        );
+        )
+        .await
+        .unwrap();
 
         // Prepare SpendIntent and state
         let mut spend_state = SpendIntentState {
@@ -158,7 +162,9 @@ mod withdrawl_tests {
                 address: hex::encode(public_key.serialize()),
                 balance: 100_000,
             },
-        );
+        )
+        .await
+        .unwrap();
 
         let utxo = Utxo {
             outpoint: OutPoint {
@@ -233,7 +239,9 @@ mod withdrawl_tests {
                     address: public_key_hex.clone(),
                     balance: initial_balance,
                 },
-            );
+            )
+            .await
+            .unwrap();
 
             let utxo = Utxo {
                 outpoint: OutPoint {
@@ -310,11 +318,19 @@ mod withdrawl_tests {
 
         // --- Assert: every peer has updated the user's balance ---
         let expected_debit = propose_resp.quote_satoshis;
-        for (_, node) in cluster.nodes.iter() {
-            let account = node
-                .chain_interface
-                .get_account(&public_key_hex)
-                .expect("Account should exist on all peers");
+        for (_, node) in cluster.nodes.iter_mut() {
+            let account = match node
+                .chain_interface_tx
+                .send_message_with_response(abci::ChainMessage::GetAccount {
+                    address: public_key_hex.clone(),
+                })
+                .await
+            {
+                Ok(abci::ChainResponse::GetAccount {
+                    account: Some(account),
+                }) => account,
+                _ => panic!("Account should exist on all peers"),
+            };
             assert_eq!(account.balance, initial_balance - expected_debit);
 
             // Assert the spent UTXO has been removed from the wallet

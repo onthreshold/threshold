@@ -1,5 +1,6 @@
 use std::{collections::HashSet, str::FromStr};
 
+use abci::{ChainMessage, ChainResponse};
 use bitcoin::{
     Address, Network as BitcoinNetwork, Transaction as BitcoinTransaction, hashes::Hash,
     secp256k1::Scalar,
@@ -27,13 +28,22 @@ impl DepositIntentState {
         }
     }
 
-    pub fn create_deposit_from_intent<N: Network, W: Wallet>(
+    pub async fn create_deposit_from_intent<N: Network, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, W>,
         deposit_intent: DepositIntent,
     ) -> Result<(), NodeError> {
-        node.chain_interface
-            .insert_deposit_intent(deposit_intent.clone())?;
+        let ChainResponse::InsertDepositIntent { error: None } = node
+            .chain_interface_tx
+            .send_message_with_response(ChainMessage::InsertDepositIntent {
+                intent: deposit_intent.clone(),
+            })
+            .await?
+        else {
+            return Err(NodeError::Error(
+                "Failed to insert deposit intent".to_string(),
+            ));
+        };
 
         node.wallet.add_address(
             Address::from_str(&deposit_intent.deposit_address)
@@ -53,7 +63,7 @@ impl DepositIntentState {
         Ok(())
     }
 
-    pub fn create_deposit<N: Network, W: Wallet>(
+    pub async fn create_deposit<N: Network, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, W>,
         user_pubkey: &str,
@@ -91,8 +101,17 @@ impl DepositIntentState {
                 .as_secs(),
         };
 
-        node.chain_interface
-            .insert_deposit_intent(deposit_intent.clone())?;
+        let ChainResponse::InsertDepositIntent { error: None } = node
+            .chain_interface_tx
+            .send_message_with_response(ChainMessage::InsertDepositIntent {
+                intent: deposit_intent.clone(),
+            })
+            .await?
+        else {
+            return Err(NodeError::Error(
+                "Failed to insert deposit intent".to_string(),
+            ));
+        };
 
         if self
             .deposit_addresses
@@ -113,16 +132,19 @@ impl DepositIntentState {
         Ok((deposit_tracking_id, deposit_address.to_string()))
     }
 
-    pub fn get_pending_deposit_intents<N: Network, W: Wallet>(
+    pub async fn get_pending_deposit_intents<N: Network, W: Wallet>(
         &self,
-        node: &NodeState<N, W>,
-    ) -> Vec<DepositIntent> {
-        match node.chain_interface.get_all_deposit_intents() {
-            Ok(intents) => intents,
-            Err(e) => {
-                error!("Failed to fetch deposit intents from db: {}", e);
-                Vec::new()
-            }
+        node: &mut NodeState<N, W>,
+    ) -> Result<Vec<DepositIntent>, NodeError> {
+        match node
+            .chain_interface_tx
+            .send_message_with_response(ChainMessage::GetAllDepositIntents)
+            .await?
+        {
+            ChainResponse::GetAllDepositIntents { intents } => Ok(intents),
+            _ => Err(NodeError::Error(
+                "Failed to fetch deposit intents from db".to_string(),
+            )),
         }
     }
 
@@ -144,9 +166,14 @@ impl DepositIntentState {
                     continue;
                 }
 
-                if let Some(intent) = node
-                    .chain_interface
-                    .get_deposit_intent_by_address(&addr_str)
+                if let ChainResponse::GetDepositIntentByAddress {
+                    intent: Some(intent),
+                } = node
+                    .chain_interface_tx
+                    .send_message_with_response(ChainMessage::GetDepositIntentByAddress {
+                        address: addr_str,
+                    })
+                    .await?
                 {
                     info!(
                         "Updating user balance for address: {} amount: {}",
@@ -160,9 +187,17 @@ impl DepositIntentState {
                         output.value.to_sat(),
                     )?;
 
-                    node.chain_interface
-                        .execute_transaction(transaction)
-                        .await?;
+                    let ChainResponse::ExecuteTransaction { error: None } = node
+                        .chain_interface_tx
+                        .send_message_with_response(ChainMessage::ExecuteTransaction {
+                            transaction,
+                        })
+                        .await?
+                    else {
+                        return Err(NodeError::Error(
+                            "Failed to execute transaction".to_string(),
+                        ));
+                    };
                 }
             }
         }

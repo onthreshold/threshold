@@ -31,7 +31,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
                 }
             }
             Some(NetworkEvent::MessageEvent((peer, DirectMessage::Round2Package(package)))) => {
-                self.handle_round2_payload(node, peer, package)?;
+                self.handle_round2_payload(node, peer, package).await?;
             }
             _ => {}
         }

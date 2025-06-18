@@ -1,0 +1,16 @@
+[package]
+name = "messenger"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+types = {path = "../crates/types"}
+
+[lints]
+workspace = true

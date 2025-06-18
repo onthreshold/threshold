@@ -175,8 +175,10 @@ impl ChainInterface for MockChainInterface {
         Ok(self.chain_state.get_all_deposit_intents())
     }
 
-    fn get_deposit_intent_by_address(&self, address: &str) -> Option<&DepositIntent> {
-        self.chain_state.get_deposit_intent_by_address(address)
+    fn get_deposit_intent_by_address(&self, address: &str) -> Option<DepositIntent> {
+        self.chain_state
+            .get_deposit_intent_by_address(address)
+            .cloned()
     }
 
     fn create_genesis_block(
@@ -206,8 +208,8 @@ impl ChainInterface for MockChainInterface {
         Ok(())
     }
 
-    fn get_account(&self, address: &str) -> Option<&Account> {
-        self.chain_state.get_account(address)
+    fn get_account(&self, address: &str) -> Option<Account> {
+        self.chain_state.get_account(address).cloned()
     }
 }
 
@@ -218,31 +220,45 @@ impl TestChainInterface for MockChainInterface {
 }
 
 // Helper function for tests to set up accounts
-pub fn setup_test_account(
+// Updated to work with the message-passing architecture
+pub async fn setup_test_account(
     node: &mut crate::mocks::network::MockNodeState,
     address: &str,
     account: Account,
-) {
-    // For testing, we know this is a MockChainInterface, so we can use unsafe downcast
-    // In a real implementation, we'd want a better design
-    let ptr = node.chain_interface.as_mut() as *mut dyn ChainInterface as *mut MockChainInterface;
-    unsafe {
-        if !ptr.is_null() {
-            (*ptr).upsert_account(address, account);
-        }
-    }
-}
+) -> Result<(), types::errors::NodeError> {
+    // Since there's no direct "create account" message in the current ChainMessage enum,
+    // we need to set up accounts through transactions.
+    // For testing purposes, we'll create a deposit transaction to establish the account balance.
 
-// Helper function for tests to access the database
-pub fn get_test_db(node: &crate::mocks::network::MockNodeState) -> &MockDb {
-    // For testing, we know this is a MockChainInterface, so we can use unsafe downcast
-    let ptr =
-        node.chain_interface.as_ref() as *const dyn ChainInterface as *const MockChainInterface;
-    unsafe {
-        if !ptr.is_null() {
-            (*ptr).get_db()
-        } else {
-            panic!("Failed to downcast to MockChainInterface")
-        }
+    use protocol::transaction::{Operation, Transaction, TransactionType};
+
+    let transaction = Transaction {
+        r#type: TransactionType::Deposit,
+        operations: vec![
+            Operation::OpPush {
+                value: account.balance.to_be_bytes().to_vec(),
+            },
+            Operation::OpPush {
+                value: address.as_bytes().to_vec(),
+            },
+            Operation::OpIncrementBalance,
+        ],
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+            .as_secs(),
+        version: 1,
+    };
+
+    match node
+        .chain_interface_tx
+        .send_message_with_response(abci::ChainMessage::ExecuteTransaction { transaction })
+        .await
+    {
+        Ok(abci::ChainResponse::ExecuteTransaction { error: None }) => Ok(()),
+        Ok(abci::ChainResponse::ExecuteTransaction { error: Some(e) }) => Err(e),
+        _ => Err(types::errors::NodeError::Error(
+            "Failed to set up test account".to_string(),
+        )),
     }
 }
