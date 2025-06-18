@@ -76,6 +76,7 @@ pub type NetworkResponseFuture =
 pub struct NetworkHandle {
     peer_id: PeerId,
     tx: mpsc::UnboundedSender<NetworkMessage>,
+    peers_to_names: BTreeMap<PeerId, String>,
 }
 
 pub trait Network: Clone + Debug + Sync + Send {
@@ -95,6 +96,7 @@ pub trait Network: Clone + Debug + Sync + Send {
         request: SelfRequest,
         sync: bool,
     ) -> Result<Option<NetworkResponseFuture>, NetworkError>;
+    fn peer_name(&self, peer_id: &PeerId) -> String;
 }
 
 impl Network for NetworkHandle {
@@ -161,6 +163,12 @@ impl Network for NetworkHandle {
             Ok(None)
         }
     }
+
+    fn peer_name(&self, peer_id: &PeerId) -> String {
+        self.peers_to_names
+            .get(peer_id)
+            .map_or_else(|| peer_id.to_string(), Clone::clone)
+    }
 }
 
 pub struct SwarmManager {
@@ -188,12 +196,7 @@ impl SwarmManager {
     ) -> Result<(Self, NetworkHandle), NodeError> {
         let (send_commands, receiving_commands) = unbounded_channel::<NetworkMessage>();
 
-        let (network_events_emitter, _) = broadcast::channel::<NetworkEvent>(100);
-
-        let network_handle = NetworkHandle {
-            peer_id: *swarm.local_peer_id(),
-            tx: send_commands,
-        };
+        let (network_events_emitter, _) = broadcast::channel::<NetworkEvent>(200);
 
         // Read full lines from stdin
         let round1_topic = gossipsub::IdentTopic::new("round1_topic");
@@ -212,6 +215,12 @@ impl SwarmManager {
             .iter()
             .map(|peer| (peer.public_key.parse().unwrap(), peer.name.clone()))
             .collect();
+
+        let network_handle = NetworkHandle {
+            peer_id: *swarm.local_peer_id(),
+            tx: send_commands,
+            peers_to_names: peers_to_names.clone(),
+        };
 
         let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
         swarm
@@ -362,18 +371,29 @@ pub fn build_swarm(
                 gossipsub::MessageId::from(s.finish().to_string())
             };
 
+            let mesh_high_env: usize = std::env::var("GOSSIPSUB_MESH_HIGH")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or_else(|| std::cmp::max(12, peer_data.len().saturating_sub(1)));
+
+            let mesh_n_high = mesh_high_env.clamp(4, 512);
+
+            let mesh_n = std::cmp::max(3, mesh_n_high * 2 / 3);
+            let mesh_n_low = std::cmp::max(1, mesh_n / 2);
+
             let gossipsub_config = gossipsub::ConfigBuilder::default()
-                .heartbeat_interval(Duration::from_secs(10)) // This is set to aid debugging by not cluttering the log space
-                .validation_mode(gossipsub::ValidationMode::Strict) // This sets the kind of message validation. The default is Strict (enforce message signing)
-                .message_id_fn(message_id_fn) // content-address messages. No two messages of the same content will be propagated.
-                .mesh_n_low(1) // Minimum number of peers in mesh network (default is 4)
-                .mesh_n_high(12) // Maximum number of peers in mesh network
-                .mesh_n(3) // Target number of peers in mesh network (default is 6)
-                .mesh_outbound_min(1) // Minimum outbound connections (default is 2)
-                .gossip_lazy(3) // Number of peers to gossip to (default is 6)
-                .flood_publish(true) // Always flood publish messages to all peers, regardless of mesh
+                .heartbeat_interval(Duration::from_secs(5))
+                .validation_mode(gossipsub::ValidationMode::Strict)
+                .message_id_fn(message_id_fn)
+                .mesh_n_low(mesh_n_low)
+                .mesh_n_high(mesh_n_high)
+                .mesh_n(mesh_n)
+                .mesh_outbound_min(mesh_n_low)
+                .gossip_lazy(std::cmp::max(3, mesh_n_low))
+                .max_transmit_size(64 * 1024)
+                .flood_publish(true)
                 .build()
-                .map_err(io::Error::other)?; // Temporary hack because `build` does not return a proper `std::error::Error`.
+                .map_err(io::Error::other)?;
 
             let gossipsub = gossipsub::Behaviour::new(
                 gossipsub::MessageAuthenticity::Signed(key.clone()),

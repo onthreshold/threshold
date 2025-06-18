@@ -13,6 +13,7 @@ pub mod utils;
 pub struct DkgState {
     pub dkg_started: bool,
     pub dkg_listeners: HashSet<PeerId>,
+    pub round1_listeners: HashSet<PeerId>,
 
     pub start_dkg_topic: libp2p::gossipsub::IdentTopic,
     pub round1_topic: libp2p::gossipsub::IdentTopic,

@@ -18,6 +18,7 @@ impl DkgState {
     pub fn new() -> Result<Self, NodeError> {
         Ok(Self {
             dkg_listeners: HashSet::new(),
+            round1_listeners: HashSet::new(),
             start_dkg_topic: gossipsub::IdentTopic::new("start-dkg"),
             round1_topic: gossipsub::IdentTopic::new("round1_topic"),
             round1_peer_packages: BTreeMap::new(),

@@ -160,6 +160,10 @@ impl Network for MockNetwork {
             Ok(None)
         }
     }
+
+    fn peer_name(&self, _peer_id: &libp2p::PeerId) -> String {
+        "test-peer".to_string()
+    }
 }
 
 pub struct MockNodeCluster {
