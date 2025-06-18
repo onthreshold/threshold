@@ -29,11 +29,11 @@ fn dkg_step_delay() -> Duration {
     std::env::var("DKG_STEP_DELAY_SECS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
-        .map_or_else(|| Duration::ZERO, Duration::from_secs)
+        .map_or_else(|| Duration::from_secs(1), Duration::from_secs)
 }
 
 impl DkgState {
-    pub async fn handle_dkg_start<N: Network, W: Wallet>(
+    pub fn handle_dkg_start<N: Network, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, W>,
     ) -> Result<(), NodeError> {
@@ -53,6 +53,12 @@ impl DkgState {
                 .max_signers
                 .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
                 as usize
+            && self.round1_listeners.len() + 1
+                == node
+                    .config
+                    .max_signers
+                    .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
+                    as usize
         {
             tracing::debug!(
                 "Not all listeners have subscribed to the DKG topic, not starting DKG process. Listeners: {:?}",
@@ -61,14 +67,25 @@ impl DkgState {
             return Ok(());
         }
 
-        tracing::info!("🚀 -------------------- STARTING DKG ---------------------------");
+        tracing::info!("🚀 -------------------- Finally starting DKG ---------------------------");
 
         self.dkg_started = true;
 
-        tokio::time::sleep(dkg_step_delay()).await;
+        tracing::info!(
+            "🚀 -------------------- Sleeping for DKG step delay ---------------------------"
+        );
 
+        // tokio::time::sleep(dkg_step_delay()).await;
+
+        tracing::info!(
+            "🚀 -------------------- Generating round1 package ---------------------------"
+        );
         // Run the DKG initialization code
         let participant_identifier = peer_id_to_identifier(&node.peer_id);
+
+        tracing::info!(
+            "🚀 -------------------- Generating round1 package YESSS ---------------------------"
+        );
 
         let (round1_secret_package, round1_package) = frost::keys::dkg::part1(
             participant_identifier,
@@ -85,6 +102,10 @@ impl DkgState {
         self.r1_secret_package = Some(round1_secret_package);
 
         // Broadcast START_DKG message to the network using protobuf
+
+        tracing::info!(
+            "🚀 -------------------- Broadcasting START_DKG message ---------------------------"
+        );
         let start_dkg_message = DkgMessage {
             message: Some(Message::StartDkg(StartDkgMessage {
                 peer_id: node.peer_id.to_string(),
@@ -107,6 +128,9 @@ impl DkgState {
             }
         }
 
+        tracing::info!(
+            "🚀 -------------------- Broadcasting round1 package ---------------------------"
+        );
         // Broadcast round1 package using protobuf
         let serialized_pkg = round1_package
             .serialize()
@@ -130,7 +154,7 @@ impl DkgState {
             .network_handle
             .send_broadcast(self.round1_topic.clone(), round1_gossipsub_message)
         {
-            Ok(()) => tracing::debug!("Broadcast round1"),
+            Ok(()) => tracing::info!("Broadcast round1"),
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to send broadcast: {e:?}")));
             }
@@ -180,9 +204,9 @@ impl DkgState {
         // Add package to peer packages
         self.round1_peer_packages.insert(identifier, package);
 
-        tracing::debug!(
+        tracing::info!(
             "Received round1 package from {} ({}/{})",
-            sender_peer_id,
+            node.network_handle.peer_name(&sender_peer_id),
             self.round1_peer_packages.len(),
             node.config
                 .max_signers
@@ -213,9 +237,7 @@ impl DkgState {
                     frost::keys::dkg::part2(r1_secret_package.clone(), &self.round1_peer_packages);
                 match part2_result {
                     Ok((round2_secret_package, round2_packages)) => {
-                        tracing::info!(
-                            "-------------------- ENTERING ROUND 2 ---------------------"
-                        );
+                        tracing::info!("✅ All round1 packages collected; entering FROST round 2");
                         self.r1_secret_package = None;
                         self.r2_secret_package = Some(round2_secret_package);
 
@@ -294,9 +316,9 @@ impl DkgState {
         // Add package to peer packages
         self.round2_peer_packages.insert(identifier, package);
 
-        tracing::debug!(
+        tracing::info!(
             "Received round2 package from {} ({}/{})",
-            sender_peer_id,
+            node.network_handle.peer_name(&sender_peer_id),
             self.round2_peer_packages.len(),
             node.config
                 .max_signers
