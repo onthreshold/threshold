@@ -76,11 +76,12 @@ impl ChainInterfaceImpl {
         executor: Box<dyn TransactionExecutor>,
     ) -> (Self, messenger::Sender<ChainMessage, ChainResponse>) {
         let (tx, rx) = messenger::channel(100, Some(100));
+        let chain_state = db.get_chain_state().unwrap_or_default().unwrap_or_default();
         (
             Self {
                 db,
                 executor,
-                chain_state: chain_state::ChainState::new(),
+                chain_state,
                 message_stream: rx,
             },
             tx,
