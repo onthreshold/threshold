@@ -138,6 +138,7 @@ impl SpendIntentState {
 
         node.chain_state
             .upsert_account(&user_pubkey, updated_account);
+        node.db.flush_state(&node.chain_state)?;
 
         let recipient_script = tx.output[0].script_pubkey.clone();
 
@@ -181,6 +182,7 @@ impl SpendIntentState {
 
         acct = acct.decrement_balance(debit);
         node.chain_state.upsert_account(&pending.user_pubkey, acct);
+        node.db.flush_state(&node.chain_state)?;
 
         Ok(())
     }

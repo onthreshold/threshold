@@ -69,6 +69,11 @@ impl Db for MockDb {
         Ok(())
     }
 
+    fn flush_state(&mut self, chain_state: &ChainState) -> Result<(), NodeError> {
+        self.chain_state = chain_state.clone();
+        Ok(())
+    }
+
     fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError> {
         Ok(self.deposit_intents.get(tracking_id).cloned())
     }
