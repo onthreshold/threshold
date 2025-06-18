@@ -1,4 +1,4 @@
-use crate::{Network, NodeState, db::Db, handlers::Handler, wallet::Wallet};
+use crate::{Network, NodeState, handlers::Handler, wallet::Wallet};
 use types::errors::NodeError;
 use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 
@@ -13,10 +13,10 @@ impl BalanceState {
 }
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for BalanceState {
+impl<N: Network, W: Wallet> Handler<N, W> for BalanceState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), NodeError> {
         if let Some(NetworkEvent::SelfRequest {
@@ -25,7 +25,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for BalanceState {
         }) = message
         {
             let balance = node
-                .chain_state
+                .chain_interface
                 .get_account(&address)
                 .map_or(0, |acct| acct.balance);
 

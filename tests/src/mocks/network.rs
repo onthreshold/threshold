@@ -18,12 +18,12 @@ use types::{
     proto::ProtoEncode,
 };
 
-// Import MockDb from our mocks module
-use crate::mocks::db::MockDb;
+// Import MockChainInterface from our mocks module
+use crate::mocks::abci::MockChainInterface;
 
 use crate::util::local_dkg::perform_distributed_key_generation;
 
-type MockNodeState = NodeState<MockNetwork, MockDb, TaprootWallet>;
+pub type MockNodeState = NodeState<MockNetwork, TaprootWallet>;
 
 #[derive(Debug)]
 pub struct SenderToNode {
@@ -498,7 +498,7 @@ pub fn create_node_network(
 
     let network = MockNetwork::new(events_emitter_tx.clone(), peer_id, pending_events_tx);
 
-    let mock_db = MockDb::new();
+    let mock_abci = Box::new(MockChainInterface::new());
     let oracle = MockOracle::new(events_emitter_tx.clone(), Some(deposit_intent_tx.clone()));
 
     let wallet = TaprootWallet::new(
@@ -510,11 +510,11 @@ pub fn create_node_network(
     let nodes_state = NodeState::new_from_config(
         &network,
         node_config,
-        mock_db,
         &events_emitter_tx,
         deposit_intent_tx,
         Box::new(oracle),
         wallet,
+        mock_abci,
     )?;
 
     Ok((nodes_state, network))

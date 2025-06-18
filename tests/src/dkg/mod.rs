@@ -1,10 +1,11 @@
 #[cfg(test)]
 mod dkg_test {
 
+    use crate::mocks::abci::get_test_db;
     use crate::mocks::network::MockNodeCluster;
+    use abci::db::Db;
     use bincode;
     use log::info;
-    use node::db::Db;
     use protocol::block::{ChainConfig, ValidatorInfo};
     use sha2::{Digest, Sha256};
     use tracing_subscriber::EnvFilter;
@@ -387,7 +388,8 @@ mod dkg_test {
         cluster.run_n_iterations(10).await;
 
         for (peer_id, node) in cluster.nodes.iter() {
-            let genesis_block_from_db = node.db.get_block_by_height(0).unwrap().unwrap();
+            let db = get_test_db(node);
+            let genesis_block_from_db = db.get_block_by_height(0).unwrap().unwrap();
 
             let dkg_pub_key = node.pubkey_package.clone().unwrap();
             let mut validators: Vec<ValidatorInfo> = node

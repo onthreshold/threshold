@@ -4,9 +4,7 @@ use frost_secp256k1::{self as frost};
 use tracing::{error, info};
 use types::{errors::NodeError, intents::PendingSpend};
 
-use crate::{
-    NodeState, db::Db, handlers::signing::SigningState, swarm_manager::Network, wallet::Wallet,
-};
+use crate::{NodeState, handlers::signing::SigningState, swarm_manager::Network, wallet::Wallet};
 
 impl SigningState {
     pub const fn new() -> Result<Self, NodeError> {
@@ -33,9 +31,9 @@ impl SigningState {
             .map_err(|e| format!("Parse schnorr sig: {e}"))
     }
 
-    pub fn start_spend_request<N: Network, D: Db, W: Wallet>(
+    pub fn start_spend_request<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         amount_sat: u64,
         estimated_fee_sat: u64,
         address: &str,

@@ -2,12 +2,12 @@
 mod deposit_tests {
     use std::str::FromStr;
 
+    use crate::mocks::abci::setup_test_account;
     use crate::mocks::network::MockNodeCluster;
+    use abci::chain_state::Account;
     use bitcoin::Address;
     use bitcoin::hashes::Hash;
-    use node::{
-        db::Db, grpc::grpc_operator, handlers::deposit::DepositIntentState, wallet::Wallet,
-    };
+    use node::{grpc::grpc_operator, handlers::deposit::DepositIntentState, wallet::Wallet};
     use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;
     use types::intents::DepositIntent;
@@ -44,12 +44,11 @@ mod deposit_tests {
 
         let response = rx.recv().await.unwrap();
         let node = cluster.nodes.get(&node_peer).unwrap();
-        let db = &node.db;
 
         // retrieve the first deposit intent stored
-        let intent_opt = db
-            .get_deposit_intent(&response.deposit_tracking_id)
-            .unwrap();
+        let intent_opt = node
+            .chain_interface
+            .get_deposit_intent_by_address(&response.deposit_address);
 
         println!("intent_opt: {:?}", intent_opt);
 
@@ -64,7 +63,7 @@ mod deposit_tests {
         // parse address and validate
         let addr = Address::from_str(&intent.deposit_address).unwrap();
 
-        // The wallet is configured for testnet, so validate against testnet
+        // The MockNodeCluster uses Testnet, so validate against Testnet
         assert!(addr.is_valid_for_network(bitcoin::Network::Testnet));
     }
 
@@ -99,9 +98,8 @@ mod deposit_tests {
 
         for (_, node) in cluster.nodes.iter() {
             let intent_opt = node
-                .db
-                .get_deposit_intent(&response.deposit_tracking_id)
-                .unwrap();
+                .chain_interface
+                .get_deposit_intent_by_address(&response.deposit_address);
             assert!(intent_opt.is_some(), "deposit intent not stored");
             let intent = intent_opt.unwrap();
             assert_eq!(intent.deposit_address, response.deposit_address);
@@ -127,7 +125,7 @@ mod deposit_tests {
         let amount_sat = 42_000;
 
         // Act: invoke create_deposit
-        let (tracking_id, deposit_address) = state
+        let (_, deposit_address) = state
             .create_deposit(
                 node,
                 "020202020202020202020202020202020202020202020202020202020202020202",
@@ -135,11 +133,10 @@ mod deposit_tests {
             )
             .expect("create_deposit should succeed");
 
-        // Assert: DB contains the new intent
+        // Assert: ABCI contains the new intent
         let stored = node
-            .db
-            .get_deposit_intent(&tracking_id)
-            .expect("db query failed")
+            .chain_interface
+            .get_deposit_intent_by_address(&deposit_address)
             .expect("intent not stored");
         assert_eq!(stored.deposit_address, deposit_address);
         assert_eq!(stored.amount_sat, amount_sat);
@@ -182,12 +179,11 @@ mod deposit_tests {
             .create_deposit_from_intent(node, deposit_intent.clone())
             .expect("create_deposit_from_intent failed");
 
-        // Assert DB persistence
+        // Assert ABCI persistence
         let stored = node
-            .db
-            .get_deposit_intent(&deposit_tracking_id)
-            .unwrap()
-            .expect("intent not stored in db");
+            .chain_interface
+            .get_deposit_intent_by_address(&deposit_address)
+            .expect("intent not stored in abci");
         assert_eq!(stored.deposit_address, deposit_address);
 
         // Assert notification via channel
@@ -215,9 +211,10 @@ mod deposit_tests {
         let user_address = Address::p2pkh(user_btc_pubkey, bitcoin::Network::Testnet);
 
         // Insert user account with zero balance
-        node.chain_state.upsert_account(
+        setup_test_account(
+            node,
             &user_address.to_string(),
-            protocol::chain_state::Account::new(user_address.to_string(), 0),
+            Account::new(user_address.to_string(), 0),
         );
 
         // ----- Prepare deposit address affiliated with node pubkey -----
@@ -238,7 +235,7 @@ mod deposit_tests {
 
         let deposit_amount_sat = 15_000;
 
-        node.db
+        node.chain_interface
             .insert_deposit_intent(DepositIntent {
                 amount_sat: deposit_amount_sat,
                 user_pubkey: user_address.to_string(), // must match account key
@@ -275,13 +272,14 @@ mod deposit_tests {
 
         // ----- Call update_user_balance -----
         let balance_before = node
-            .chain_state
+            .chain_interface
             .get_account(&user_address.to_string())
             .unwrap()
             .balance;
 
         state
             .update_user_balance(node, &tx)
+            .await
             .expect("balance update failed");
 
         // --- Assert wallet updated with the new UTXO ---
@@ -294,7 +292,7 @@ mod deposit_tests {
         assert!(utxo_found, "wallet did not ingest expected UTXO");
 
         let balance_after = node
-            .chain_state
+            .chain_interface
             .get_account(&user_address.to_string())
             .unwrap()
             .balance;
@@ -322,9 +320,10 @@ mod deposit_tests {
         let user_address = Address::p2pkh(user_btc_pubkey, bitcoin::Network::Testnet);
 
         // Insert user account with zero balance
-        node.chain_state.upsert_account(
+        setup_test_account(
+            node,
             &user_address.to_string(),
-            protocol::chain_state::Account::new(user_address.to_string(), 0),
+            Account::new(user_address.to_string(), 0),
         );
 
         // ----- Craft transaction -----
@@ -356,11 +355,12 @@ mod deposit_tests {
         // ----- Call update_user_balance -----
         state
             .update_user_balance(node, &tx)
+            .await
             .expect("balance update failed");
 
         // Assert: balance should not have changed
         let balance = node
-            .chain_state
+            .chain_interface
             .get_account(&user_address.to_string())
             .unwrap()
             .balance;

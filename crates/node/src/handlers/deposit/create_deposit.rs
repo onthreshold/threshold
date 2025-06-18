@@ -1,8 +1,11 @@
 use std::{collections::HashSet, str::FromStr};
 
-use bitcoin::{Address, Network as BitcoinNetwork, Transaction, hashes::Hash, secp256k1::Scalar};
+use bitcoin::{
+    Address, Network as BitcoinNetwork, Transaction as BitcoinTransaction, hashes::Hash,
+    secp256k1::Scalar,
+};
 use libp2p::gossipsub::IdentTopic;
-use protocol::chain_state::Account;
+use protocol::transaction::Transaction;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
@@ -10,8 +13,7 @@ use types::errors::NodeError;
 use uuid::Uuid;
 
 use crate::{
-    NodeState, db::Db, handlers::deposit::DepositIntentState, swarm_manager::Network,
-    wallet::Wallet,
+    NodeState, handlers::deposit::DepositIntentState, swarm_manager::Network, wallet::Wallet,
 };
 use types::intents::DepositIntent;
 
@@ -19,19 +21,19 @@ impl DepositIntentState {
     #[must_use]
     pub fn new(deposit_intent_tx: broadcast::Sender<DepositIntent>) -> Self {
         Self {
-            pending_intents: vec![],
             deposit_addresses: HashSet::new(),
             deposit_intent_tx,
             processed_txids: HashSet::new(),
         }
     }
 
-    pub fn create_deposit_from_intent<N: Network, D: Db, W: Wallet>(
+    pub fn create_deposit_from_intent<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         deposit_intent: DepositIntent,
     ) -> Result<(), NodeError> {
-        node.db.insert_deposit_intent(deposit_intent.clone())?;
+        node.chain_interface
+            .insert_deposit_intent(deposit_intent.clone())?;
 
         node.wallet.add_address(
             Address::from_str(&deposit_intent.deposit_address)
@@ -51,9 +53,9 @@ impl DepositIntentState {
         Ok(())
     }
 
-    pub fn create_deposit<N: Network, D: Db, W: Wallet>(
+    pub fn create_deposit<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         user_pubkey: &str,
         amount_sat: u64,
     ) -> Result<(String, String), NodeError> {
@@ -89,14 +91,8 @@ impl DepositIntentState {
                 .as_secs(),
         };
 
-        if node.chain_state.get_account(user_pubkey).is_none() {
-            node.chain_state.upsert_account(
-                user_pubkey,
-                protocol::chain_state::Account::new(user_pubkey.to_string(), 0),
-            );
-        }
-
-        node.db.insert_deposit_intent(deposit_intent.clone())?;
+        node.chain_interface
+            .insert_deposit_intent(deposit_intent.clone())?;
 
         if self
             .deposit_addresses
@@ -117,11 +113,11 @@ impl DepositIntentState {
         Ok((deposit_tracking_id, deposit_address.to_string()))
     }
 
-    pub fn get_pending_deposit_intents<N: Network, D: Db, W: Wallet>(
+    pub fn get_pending_deposit_intents<N: Network, W: Wallet>(
         &self,
-        node: &NodeState<N, D, W>,
+        node: &NodeState<N, W>,
     ) -> Vec<DepositIntent> {
-        match node.db.get_all_deposit_intents() {
+        match node.chain_interface.get_all_deposit_intents() {
             Ok(intents) => intents,
             Err(e) => {
                 error!("Failed to fetch deposit intents from db: {}", e);
@@ -130,10 +126,10 @@ impl DepositIntentState {
         }
     }
 
-    pub fn update_user_balance<N: Network, D: Db, W: Wallet>(
+    pub async fn update_user_balance<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
-        tx: &Transaction,
+        node: &mut NodeState<N, W>,
+        tx: &BitcoinTransaction,
     ) -> Result<(), NodeError> {
         if !self.processed_txids.insert(tx.compute_txid()) {
             return Ok(());
@@ -148,21 +144,25 @@ impl DepositIntentState {
                     continue;
                 }
 
-                if let Some(intent) = node.db.get_deposit_intent_by_address(&addr_str)? {
+                if let Some(intent) = node
+                    .chain_interface
+                    .get_deposit_intent_by_address(&addr_str)
+                {
                     info!(
                         "Updating user balance for address: {} amount: {}",
                         intent.user_pubkey,
                         output.value.to_sat()
                     );
-                    let user_account = node
-                        .chain_state
-                        .get_account(&intent.user_pubkey)
-                        .cloned()
-                        .unwrap_or_else(|| Account::new(intent.user_pubkey.to_string(), 0));
 
-                    let updated = user_account.increment_balance(output.value.to_sat());
-                    node.chain_state
-                        .upsert_account(&intent.user_pubkey, updated);
+                    let transaction = Transaction::create_deposit_transaction(
+                        tx,
+                        &intent.user_pubkey,
+                        output.value.to_sat(),
+                    )?;
+
+                    node.chain_interface
+                        .execute_transaction(transaction)
+                        .await?;
                 }
             }
         }

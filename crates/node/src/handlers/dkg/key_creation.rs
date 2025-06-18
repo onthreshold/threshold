@@ -6,7 +6,7 @@ use types::errors::NodeError;
 use types::network_event::DirectMessage;
 
 use crate::swarm_manager::Network;
-use crate::{NodeState, db::Db, handlers::dkg::DkgState, peer_id_to_identifier, wallet::Wallet};
+use crate::{NodeState, handlers::dkg::DkgState, peer_id_to_identifier, wallet::Wallet};
 use types::proto::p2p_proto::dkg_message::Message;
 use types::proto::p2p_proto::{DkgMessage, StartDkgMessage};
 
@@ -33,9 +33,9 @@ fn dkg_step_delay() -> Duration {
 }
 
 impl DkgState {
-    pub async fn handle_dkg_start<N: Network, D: Db, W: Wallet>(
+    pub async fn handle_dkg_start<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
     ) -> Result<(), NodeError> {
         if self.dkg_started {
             tracing::debug!("DKG already started, skipping DKG process");
@@ -148,9 +148,9 @@ impl DkgState {
         }
     }
 
-    pub fn handle_round1_payload<N: Network, D: Db, W: Wallet>(
+    pub fn handle_round1_payload<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         sender_peer_id: PeerId,
         protobuf_data: &[u8],
     ) -> Result<(), NodeError> {
@@ -195,9 +195,9 @@ impl DkgState {
         Ok(())
     }
 
-    pub fn try_enter_round2<N: Network, D: Db, W: Wallet>(
+    pub fn try_enter_round2<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
     ) -> Result<(), NodeError> {
         if let Some(r1_secret_package) = self.r1_secret_package.as_ref() {
             if self.round1_peer_packages.len() + 1
@@ -271,9 +271,9 @@ impl DkgState {
         Ok(())
     }
 
-    pub fn handle_round2_payload<N: Network, D: Db, W: Wallet>(
+    pub fn handle_round2_payload<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         sender_peer_id: PeerId,
         package: round2::Package,
     ) -> Result<(), NodeError> {

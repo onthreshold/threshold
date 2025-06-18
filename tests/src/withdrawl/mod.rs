@@ -6,9 +6,10 @@ mod withdrawl_tests {
         ConfirmWithdrawalRequest, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
     };
 
+    use crate::mocks::abci::setup_test_account;
     use crate::mocks::network::MockNodeCluster;
+    use abci::chain_state::Account;
     use node::handlers::withdrawl::SpendIntentState;
-    use protocol::chain_state::Account;
     use std::collections::HashMap;
     use tokio::sync::mpsc::unbounded_channel;
     use types::intents::WithdrawlIntent;
@@ -33,7 +34,8 @@ mod withdrawl_tests {
         let address = Address::p2wpkh(&btc_pubkey, bitcoin::Network::Signet);
 
         // Provide the node with sufficient on-chain balance for this address
-        node.chain_state.upsert_account(
+        setup_test_account(
+            node,
             &hex::encode(public_key.serialize()),
             Account {
                 address: hex::encode(public_key.serialize()),
@@ -102,7 +104,8 @@ mod withdrawl_tests {
         let address = Address::p2pkh(btc_pubkey, bitcoin::Network::Signet);
 
         // Insert account with low balance (e.g., 1 satoshi)
-        node.chain_state.upsert_account(
+        setup_test_account(
+            node,
             &address.to_string(),
             Account {
                 address: address.to_string(),
@@ -148,7 +151,8 @@ mod withdrawl_tests {
         let address = Address::p2wpkh(&btc_pubkey, bitcoin::Network::Signet);
 
         // Fund account and wallet UTXO so propose succeeds
-        node.chain_state.upsert_account(
+        setup_test_account(
+            node,
             &hex::encode(public_key.serialize()),
             Account {
                 address: hex::encode(public_key.serialize()),
@@ -222,7 +226,8 @@ mod withdrawl_tests {
 
         // Populate chain state on **all** peers before we take any mutable references to a single node
         for (_peer, node) in cluster.nodes.iter_mut() {
-            node.chain_state.upsert_account(
+            setup_test_account(
+                node,
                 &public_key_hex,
                 Account {
                     address: public_key_hex.clone(),
@@ -307,7 +312,7 @@ mod withdrawl_tests {
         let expected_debit = propose_resp.quote_satoshis;
         for (_, node) in cluster.nodes.iter() {
             let account = node
-                .chain_state
+                .chain_interface
                 .get_account(&public_key_hex)
                 .expect("Account should exist on all peers");
             assert_eq!(account.balance, initial_balance - expected_debit);

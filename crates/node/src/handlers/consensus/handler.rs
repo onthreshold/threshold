@@ -1,6 +1,5 @@
 use crate::{
     NodeState,
-    db::Db,
     handlers::Handler,
     handlers::consensus::{ConsensusPhase, ConsensusState},
     swarm_manager::Network,
@@ -11,10 +10,10 @@ use tracing::info;
 use types::{network_event::NetworkEvent, proto::ProtoDecode};
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
+impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         if let Some(start_time) = self.round_start_time {
@@ -77,9 +76,9 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for ConsensusState {
 }
 
 impl ConsensusState {
-    fn handle_new_round<N: Network, D: Db, W: Wallet>(
+    fn handle_new_round<N: Network, W: Wallet>(
         &mut self,
-        node: &NodeState<N, D, W>,
+        node: &NodeState<N, W>,
         sender: PeerId,
         round: u32,
     ) -> Result<(), types::errors::NodeError> {
@@ -102,9 +101,9 @@ impl ConsensusState {
         self.start_new_round(node)
     }
 
-    fn start_new_round<N: Network, D: Db, W: Wallet>(
+    fn start_new_round<N: Network, W: Wallet>(
         &mut self,
-        node: &NodeState<N, D, W>,
+        node: &NodeState<N, W>,
     ) -> Result<(), types::errors::NodeError> {
         self.current_round += 1;
 
@@ -138,9 +137,9 @@ impl ConsensusState {
         Ok(())
     }
 
-    fn handle_leader_announcement<N: Network, D: Db, W: Wallet>(
+    fn handle_leader_announcement<N: Network, W: Wallet>(
         &mut self,
-        node: &NodeState<N, D, W>,
+        node: &NodeState<N, W>,
         announcement: &types::consensus::LeaderAnnouncement,
     ) -> Result<(), types::errors::NodeError> {
         let leader = PeerId::from_bytes(&announcement.leader).map_err(|e| {
