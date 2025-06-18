@@ -7,32 +7,24 @@
 #   2. Update each node's config to peer with the other N-1 nodes.
 #   3. Generate a docker-compose.yaml file to run the N nodes.
 #
-# The script is **non-interactive**. Provide the password for the private keys
-# via the KEY_PASSWORD environment variable.
-#
 # Usage example:
-#   KEY_PASSWORD=supersecret ./setup_nodes.sh          # generates 5 nodes
-#   KEY_PASSWORD=secret ./setup_nodes.sh 8             # generates 8 nodes
+#   ./setup_nodes.sh          # generates 5 nodes
+#   ./setup_nodes.sh 8             # generates 8 nodes
 # -----------------------------------------------------------------------------
 
 set -euo pipefail
 
 # --------------------------- Configuration -----------------------------------
 NUM_NODES=${1:-5}
-BASE_DIR="keys"
-CLI_CMD=(cargo run --quiet --bin cli)
-BASE_GRPC_PORT=50051
-DOCKER_COMPOSE_FILE="docker-compose.yaml"
+BASE_DIR="test_artifacts/"
 
-# Ensure KEY_PASSWORD is provided for non-interactive operation
-if [[ -z "${KEY_PASSWORD:-}" ]]; then
-  echo "ERROR: Please provide the password via KEY_PASSWORD environment variable." >&2
-  exit 1
-fi
+CLI_CMD=(cargo run --quiet --bin cli)
+BASE_GRPC_PORT=50056
+DOCKER_COMPOSE_FILE="docker-compose.yaml"
+KEY_PASSWORD="supersecret"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-# Determine project root
 if [[ -f "$SCRIPT_DIR/Cargo.toml" ]]; then
   PROJECT_ROOT="$SCRIPT_DIR"
 elif [[ -f "$SCRIPT_DIR/../Cargo.toml" ]]; then
@@ -44,14 +36,18 @@ fi
 
 cd "$PROJECT_ROOT"
 
-# Clean up previous configs if they exist
 if [ -d "$BASE_DIR" ]; then
     echo "Removing existing '$BASE_DIR' directory..."
     rm -rf "$BASE_DIR"
 fi
+
+find . -name "*test_artifacts*test_artifacts*" -type f -delete 2>/dev/null || true
+find . -name "*node_*node_*" -type f -delete 2>/dev/null || true
+
 mkdir -p "$BASE_DIR"
 
-# Arrays to capture peer ids and config paths
+CONFIGS_DIR="$BASE_DIR/test_${NUM_NODES}_nodes"
+
 declare -a PEER_IDS
 declare -a CONFIG_PATHS
 
@@ -59,14 +55,14 @@ declare -a CONFIG_PATHS
 echo "Generating $NUM_NODES node configurations in '$BASE_DIR'..."
 for i in $(seq 1 "$NUM_NODES"); do
   node_name="node_${i}"
-  node_dir="$BASE_DIR/$node_name"
+  node_dir="$CONFIGS_DIR/$node_name"
   mkdir -p "$node_dir"
 
   echo "  → $node_name"
 
   OUTPUT=$(KEY_PASSWORD="$KEY_PASSWORD" \
            "${CLI_CMD[@]}" setup \
-             --output-dir "$node_dir" \
+             --output-dir "$(realpath "$node_dir")" \
              --file-name "$node_name")
 
   PEER_ID=$(echo "$OUTPUT" | sed -n -E 's/.*peer id ([A-Za-z0-9]+).*/\1/p')
@@ -119,43 +115,51 @@ echo "All configs patched."
 # ------------------- Generate docker-compose.yaml ----------------------------
 echo -e "\nGenerating '$DOCKER_COMPOSE_FILE' for $NUM_NODES nodes..."
 
-cat > "$DOCKER_COMPOSE_FILE" <<EOL
+cat > "$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_FILE" <<EOL
 services:
 EOL
 
 for i in $(seq 1 "$NUM_NODES"); do
   node_name="node_${i}"
-  node_dir="$BASE_DIR/$node_name"
+  node_dir="$CONFIGS_DIR/$node_name"
   host_port=$((BASE_GRPC_PORT + i - 1))
 
-  cat >> "$DOCKER_COMPOSE_FILE" <<EOL
+  cat >> "$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_FILE" <<EOL
   node${i}:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: vault-node
     environment:
-      - KEY_PASSWORD=supersecret
+      - KEY_PASSWORD=${KEY_PASSWORD}
       - IS_TESTNET=true
       - RUST_LOG=info
     entrypoint: "/app/cli run --key-file-path /app/configs/${node_name}.json --config-file-path /app/configs/${node_name}.yaml --use-mock-oracle"
     ports:
       - "${host_port}:${BASE_GRPC_PORT}"
     volumes:
-      - ./${node_dir}/${node_name}.json:/app/configs/${node_name}.json
-      - ./${node_dir}/${node_name}.yaml:/app/configs/${node_name}.yaml
+      - ./${node_name}/${node_name}.json:/app/configs/${node_name}.json
+      - ./${node_name}/${node_name}.yaml:/app/configs/${node_name}.yaml
       - ./nodedb_${i}.db:/app/nodedb.db
     networks:
       - vaultnet
 EOL
 done
 
-cat >> "$DOCKER_COMPOSE_FILE" <<EOL
-
+cat >> "$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_FILE" <<EOL
 networks:
   vaultnet:
     driver: bridge
 EOL
 
-echo "Successfully generated '$DOCKER_COMPOSE_FILE'."
-echo -e "\nSetup complete. You can now run 'docker-compose up'." 
+DOCKER_COMPOSE_FILE_PATH="$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_FILE"
+
+echo "Successfully generated '$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_FILE'."
+
+# ------------------- Build Docker Image Once ----------------------------
+echo -e "\nBuilding Docker image..."
+
+cd "$BASE_DIR/test_${NUM_NODES}_nodes"
+docker build -t vault-node -f ../../Dockerfile ../..
+
+# ------------------- Start Docker Compose ----------------------------
+echo -e "\nStarting Docker Compose for $NUM_NODES nodes..."
+
+docker compose -f "$DOCKER_COMPOSE_FILE" up -d
