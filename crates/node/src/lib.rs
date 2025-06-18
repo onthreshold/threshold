@@ -320,6 +320,10 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
             }
         }
 
+        let chain_state = storage_db
+            .get_chain_state()?
+            .unwrap_or_else(ChainState::new);
+
         let mut node_state = Self {
             network_handle: network_handle.clone(),
             network_events_stream: network_events_sender.subscribe(),
@@ -341,7 +345,7 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
             ],
             pubkey_package: None,
             private_key_package: None,
-            chain_state: ChainState::default(),
+            chain_state,
             oracle,
         };
 

@@ -22,6 +22,7 @@ pub trait Db: Send {
         &self,
         address: &str,
     ) -> Result<Option<DepositIntent>, NodeError>;
+    fn flush_state(&mut self, chain_state: &ChainState) -> Result<(), NodeError>;
 }
 
 pub struct RocksDb {
@@ -87,6 +88,15 @@ impl Db for RocksDb {
             .db
             .get_cf(self.db.cf_handle("chain_state").unwrap(), "c:state")?;
         Ok(chain_state.and_then(|b| ChainState::deserialize(&b).ok()))
+    }
+
+    fn flush_state(&mut self, chain_state: &ChainState) -> Result<(), NodeError> {
+        self.db.put_cf(
+            self.db.cf_handle("chain_state").unwrap(),
+            "c:state",
+            chain_state.serialize()?,
+        )?;
+        Ok(())
     }
 
     fn insert_block(&mut self, block: Block) -> Result<(), NodeError> {
