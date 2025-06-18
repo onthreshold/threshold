@@ -334,8 +334,6 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
             network_handle: network_handle.clone(),
             network_events_stream: network_events_sender.subscribe(),
             peer_id: network_handle.peer_id(),
-            min_signers,
-            max_signers,
             peers: HashSet::new(),
             rng: frost::rand_core::OsRng,
             wallet,
