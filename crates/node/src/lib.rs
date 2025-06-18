@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::Network;
 use tokio::sync::broadcast;
-use tracing::error;
+use tracing::{error, info};
 use types::{errors::NodeError, intents::DepositIntent, network_event::NetworkEvent};
 
 pub mod grpc;
@@ -296,7 +296,7 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
         deposit_intent_tx: broadcast::Sender<DepositIntent>,
         oracle: Box<dyn Oracle>,
         wallet: W,
-        abci: Box<dyn ChainInterface>,
+        chain_interface: Box<dyn ChainInterface>,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {e}")))?;
@@ -312,24 +312,23 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
 
         consensus_state.validators.insert(network_handle.peer_id());
 
-        let deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
+        let mut deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
         let withdrawl_intent_state = SpendIntentState::new();
         let balance_state = BalanceState::new();
 
-        //TODO: Fix this w/ abci
-        // if let Ok(intents) = transaction_executor.get_all_deposit_intents() {
-        //     info!("Found {} deposit intents", intents.len());
-        //     for intent in intents {
-        //         if deposit_intent_state
-        //             .deposit_addresses
-        //             .insert(intent.deposit_address.clone())
-        //         {
-        //             if let Err(e) = deposit_intent_state.deposit_intent_tx.send(intent.clone()) {
-        //                 error!("Failed to notify deposit monitor of new address: {}", e);
-        //             }
-        //         }
-        //     }
-        // }
+        if let Ok(intents) = chain_interface.get_all_deposit_intents() {
+            info!("Found {} deposit intents", intents.len());
+            for intent in intents {
+                if deposit_intent_state
+                    .deposit_addresses
+                    .insert(intent.deposit_address.clone())
+                {
+                    if let Err(e) = deposit_intent_state.deposit_intent_tx.send(intent.clone()) {
+                        error!("Failed to notify deposit monitor of new address: {}", e);
+                    }
+                }
+            }
+        }
 
         let mut node_state = Self {
             network_handle: network_handle.clone(),
@@ -352,7 +351,7 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
             pubkey_package: None,
             private_key_package: None,
             oracle,
-            chain_interface: abci,
+            chain_interface,
         };
 
         if let Some((private_key, pubkey)) = keys {

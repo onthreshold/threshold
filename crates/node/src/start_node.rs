@@ -119,7 +119,7 @@ pub async fn start_node(
 
     let db = RocksDb::new(config_database_path.to_str().unwrap());
 
-    let abci = ChainInterfaceImpl::new(
+    let chain_interface = ChainInterfaceImpl::new(
         Box::new(db),
         Box::new(TransactionExecutorImpl::new(oracle.clone())),
     );
@@ -142,7 +142,7 @@ pub async fn start_node(
                 bitcoin::Network::Bitcoin
             }
         }),
-        Box::new(abci),
+        Box::new(chain_interface),
     )
     .expect("Failed to create node");
 
