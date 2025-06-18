@@ -4,23 +4,11 @@
 
 A decentralized multisig infrastructure for Bitcoin built in Rust.
 
-This project uses Rust version 1.87:
-
-```bash
-rustup default 1.87
-```
-
-## Table of Contents
-
-- [Node CLI](#node-cli)
-- [Compilation](#compilation)
-- [Testing](#testing)
-
-## Node CLI
+## Getting Started
 
 The Threshold project includes a command-line interface for managing nodes, keys, and performing operations.
 
-### CLI Help
+### CLI
 
 ```bash
 cargo run --bin cli -- --help
@@ -40,12 +28,6 @@ cargo run --bin cli setup --help
 
 - `-o, --output-dir <OUTPUT_DIR>` - Directory to save the keypair
 - `-f, --file-name <FILE_NAME>` - Name for the keypair file
-
-**Example:**
-
-```bash
-cargo run --bin cli setup --output-dir ./keys --file-name my_node
-```
 
 #### Run - Start a Node
 
@@ -70,16 +52,6 @@ cargo run --bin cli run --help
 - `-s, --monitor-start-block <MONITOR_START_BLOCK>` - Starting block for monitoring
 - `--use-mock-oracle` - Use mock oracle for testing
 
-**Example:**
-
-```bash
-cargo run --bin cli run \
-  --key-file-path ./keys/my_node.json \
-  --config-file-path ./keys/my_node.yaml \
-  --grpc-port 50051 \
-  --use-mock-oracle
-```
-
 #### Other Commands
 
 - `spend <amount> <address_to>` - Spend funds to an address
@@ -88,13 +60,9 @@ cargo run --bin cli run \
 - `get-pending-deposit-intents` - Get pending deposit intents
 - `check-balance <address>` - Check balance of an address
 
-## Compilation
+## Installation
 
-### Prerequisites
-
-#### System Dependencies (Bare Metal)
-
-Install the required system dependencies:
+#### 1. Install pre-requisites
 
 ```bash
 # Ubuntu/Debian
@@ -125,7 +93,7 @@ sudo yum install -y \
   rocksdb-devel
 ```
 
-#### Rust Toolchain
+#### 2. Install Rust Toolchain
 
 Ensure you have the correct Rust version:
 
@@ -134,46 +102,26 @@ rustup default 1.87
 rustup update
 ```
 
-### Compilation Methods
-
-#### 1. Bare Metal Compilation
+#### 3. Bare Metal Compilation
 
 Compile the project directly on your system:
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/onthreshold/threshold.git
 cd threshold
-
-# Build the CLI
-cargo build --bin cli
-
-# Build in release mode (optimized)
-cargo build --release --bin cli
 
 # Build all workspace members
 cargo build --workspace
 ```
 
-#### 2. Docker Compilation
-
-Build using Docker:
-
-```bash
-# Build the Docker image
-docker build -t vault-node .
-
-# Run the container
-docker run -it vault-node --help
-```
-
-#### 3. Docker Compose
+#### 4. Run with Docker Compose
 
 Use the provided docker-compose configuration for multi-node setup:
 
 ```bash
 # Start all nodes
-docker-compose up -d
+docker-compose up -d --build
 
 # View logs
 docker-compose logs -f
@@ -182,53 +130,19 @@ docker-compose logs -f
 docker-compose down
 ```
 
-The docker-compose.yaml file includes 5 pre-configured nodes with:
-
-- Individual gRPC ports (50051-50055)
-- Separate database files
-- Mock oracle for testing
-- Network isolation
-
 ## Testing
 
-### Running Tests
-
-#### Unit Tests
-
-Run all unit tests:
-
-```bash
-# Run all tests in the workspace
-cargo test --workspace
-
-# Run tests for a specific crate
-cargo test -p node
-cargo test -p protocol
-cargo test -p types
-
-# Run tests with verbose output
-cargo test --workspace -- --nocapture
-
-# Run tests in release mode
-cargo test --release --workspace
-```
-
-#### Integration Tests
-
-Run integration tests:
+### Run Tests
 
 ```bash
 # Run integration tests
-cargo test -p tests
+cargo test -p integration-tests
 
-# Run specific integration test modules
-cargo test -p tests deposit
-cargo test -p tests withdrawl
-cargo test -p tests dkg
-cargo test -p tests signing
+# Run all tests
+cargo test --workspace
 ```
 
-#### Test Coverage
+### Test Coverage
 
 Generate test coverage report:
 
@@ -240,56 +154,25 @@ cargo install cargo-tarpaulin
 cargo tarpaulin --workspace --out Html
 ```
 
-### Node Setup Script
+### Run with `n` nodes
 
 The `setup_nodes.sh` script automates the creation of multiple test nodes for development and testing.
-
-#### Usage
 
 ```bash
 # Generate 5 nodes (default)
 ./setup_nodes.sh
 
-# Generate custom number of nodes
+# Generate custom number of nodes (8 in this example)
 ./setup_nodes.sh 8
 ```
 
-#### What the Script Does
-
-1. **Generates Node Identities**: Creates N node keypairs and configuration files
-2. **Configures Peering**: Sets up each node to peer with all other nodes
-3. **Creates Docker Compose**: Generates a docker-compose.yaml for the nodes
-4. **Builds Docker Image**: Builds the vault-node Docker image
-5. **Starts the Cluster**: Launches all nodes using Docker Compose
-
 #### Output
-
-The script creates:
 
 - `test_artifacts/test_N_nodes/` directory containing:
   - Individual node configurations (`node_1/`, `node_2/`, etc.)
   - Key files (`node_X.json`, `node_X.yaml`)
   - Docker Compose file
   - Database files (`nodedb_X.db`)
-
-#### Configuration Details
-
-- **gRPC Ports**: 50056-50060 (for 5 nodes)
-- **Key Password**: "supersecret" (for testing)
-- **Mock Oracle**: Enabled for testing
-- **Network**: Isolated bridge network
-- **Signer Configuration**:
-  - Min signers: 2/3 of total nodes
-  - Max signers: Total number of nodes
-
-### Test Artifacts
-
-The testing system creates several artifacts:
-
-- **Database Files**: `nodedb_X.db` - RocksDB databases for each node
-- **Key Files**: JSON and YAML configuration files
-- **Log Files**: Node operation logs
-- **Docker Images**: Built vault-node images
 
 ### Cleanup
 
@@ -309,36 +192,6 @@ rm -f nodedb_*.db
 docker rmi vault-node
 ```
 
-## Development
-
-### Project Structure
-
-```
-├── bin/cli/           # Command-line interface
-├── bin/utxo-spend/    # UTXO spending utilities
-├── crates/            # Core Rust crates
-│   ├── node/          # Node implementation
-│   ├── protocol/      # Protocol definitions
-│   ├── types/         # Shared types
-│   ├── oracle/        # Oracle implementations
-│   └── abci/          # ABCI interface
-├── tests/             # Integration tests
-├── setup_nodes.sh     # Node setup script
-├── docker-compose.yaml # Multi-node Docker setup
-└── Dockerfile         # Docker build configuration
-```
-
-### Key Dependencies
-
-- **libp2p**: Peer-to-peer networking
-- **rocksdb**: Database storage
-- **bitcoin**: Bitcoin protocol implementation
-- **frost-secp256k1**: Threshold signature scheme
-- **tonic**: gRPC framework
-- **tokio**: Async runtime
-
 ### Environment Variables
 
-- `KEY_PASSWORD`: Password for key encryption
-- `IS_TESTNET`: Enable testnet mode
-- `RUST_LOG`: Logging level (debug, info, warn, error)
+Refer to the [.env.dist](https://github.com/onthreshold/threshold/blob/main/.env.dist) file for the default environment variables.
