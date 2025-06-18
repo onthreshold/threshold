@@ -154,6 +154,8 @@ pub fn get_config(
         libp2p_tcp_port: config_store.libp2p_tcp_port,
         confirmation_depth: config_store.confirmation_depth,
         monitor_start_block: config_store.monitor_start_block,
+        min_signers: config_store.min_signers,
+        max_signers: config_store.max_signers,
     };
 
     debug!("Read config file");

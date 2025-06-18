@@ -9,7 +9,7 @@ mod consensus_tests {
 
     #[tokio::test]
     async fn leader_remains_consistent_across_nodes() {
-        let mut cluster = MockNodeCluster::new_with_keys(4, 2, 4).await;
+        let mut cluster = MockNodeCluster::new_with_keys(4).await;
         cluster.setup().await;
 
         let leader_topic = libp2p::gossipsub::IdentTopic::new("leader");

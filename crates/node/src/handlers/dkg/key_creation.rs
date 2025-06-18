@@ -47,7 +47,13 @@ impl DkgState {
             return Ok(());
         }
 
-        if self.dkg_listeners.len() + 1 != node.max_signers as usize {
+        if self.dkg_listeners.len() + 1
+            != node
+                .config
+                .max_signers
+                .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
+                as usize
+        {
             tracing::debug!(
                 "Not all listeners have subscribed to the DKG topic, not starting DKG process. Listeners: {:?}",
                 self.dkg_listeners.len()
@@ -66,8 +72,12 @@ impl DkgState {
 
         let (round1_secret_package, round1_package) = frost::keys::dkg::part1(
             participant_identifier,
-            node.max_signers,
-            node.min_signers,
+            node.config
+                .max_signers
+                .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?,
+            node.config
+                .min_signers
+                .ok_or_else(|| NodeError::Error("Min signers not set".to_string()))?,
             node.rng,
         )
         .expect("Failed to generate round1 package");
@@ -174,7 +184,10 @@ impl DkgState {
             "Received round1 package from {} ({}/{})",
             sender_peer_id,
             self.round1_peer_packages.len(),
-            node.max_signers - 1
+            node.config
+                .max_signers
+                .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
+                - 1
         );
 
         self.try_enter_round2(node)?;
@@ -187,7 +200,13 @@ impl DkgState {
         node: &mut NodeState<N, D, W>,
     ) -> Result<(), NodeError> {
         if let Some(r1_secret_package) = self.r1_secret_package.as_ref() {
-            if self.round1_peer_packages.len() + 1 == node.max_signers as usize {
+            if self.round1_peer_packages.len() + 1
+                == node
+                    .config
+                    .max_signers
+                    .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
+                    as usize
+            {
                 tracing::info!("Received all round1 packages, entering part2");
                 // all packages received
                 let part2_result =
@@ -279,10 +298,19 @@ impl DkgState {
             "Received round2 package from {} ({}/{})",
             sender_peer_id,
             self.round2_peer_packages.len(),
-            node.max_signers - 1
+            node.config
+                .max_signers
+                .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
+                - 1
         );
         if let Some(r2_secret_package) = self.r2_secret_package.as_ref() {
-            if self.round2_peer_packages.len() + 1 == node.max_signers as usize {
+            if self.round2_peer_packages.len() + 1
+                == node
+                    .config
+                    .max_signers
+                    .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
+                    as usize
+            {
                 tracing::info!("Received all round2 packages, entering part3");
                 std::thread::sleep(dkg_step_delay());
 

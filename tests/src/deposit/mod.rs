@@ -16,7 +16,7 @@ mod deposit_tests {
 
     #[tokio::test]
     async fn deposit_intent_creates_valid_address_and_persists_on_node() {
-        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
 
         let node_peer = *cluster.nodes.keys().next().unwrap();
@@ -64,20 +64,13 @@ mod deposit_tests {
         // parse address and validate
         let addr = Address::from_str(&intent.deposit_address).unwrap();
 
-        let is_testnet: bool = std::env::var("IS_TESTNET")
-            .unwrap_or("false".to_string())
-            .parse()
-            .unwrap();
-        assert!(addr.is_valid_for_network(if is_testnet {
-            bitcoin::Network::Testnet
-        } else {
-            bitcoin::Network::Bitcoin
-        }));
+        // The wallet is configured for testnet, so validate against testnet
+        assert!(addr.is_valid_for_network(bitcoin::Network::Testnet));
     }
 
     #[tokio::test]
     async fn deposit_intent_creates_valid_address_and_persists_on_node_and_is_broadcasted() {
-        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
 
         let node_peer = *cluster.nodes.keys().next().unwrap();
@@ -118,7 +111,7 @@ mod deposit_tests {
     #[tokio::test]
     async fn create_deposit_state_generates_and_persists_intent() {
         // Arrange cluster with two peers to satisfy DKG assumptions (keys already seeded)
-        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
 
         // Work with first node in cluster
@@ -163,7 +156,7 @@ mod deposit_tests {
     #[tokio::test]
     async fn create_deposit_from_intent_persists_and_broadcasts() {
         // Setup cluster and node
-        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
         let node_peer = *cluster.nodes.keys().next().unwrap();
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
@@ -205,7 +198,7 @@ mod deposit_tests {
     #[tokio::test]
     async fn update_user_balance_increases_balance_after_confirmation() {
         // Setup cluster
-        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
 
         let node_peer = *cluster.nodes.keys().next().unwrap();
@@ -312,7 +305,7 @@ mod deposit_tests {
     #[tokio::test]
     async fn update_user_balance_does_not_increase_balance_for_non_deposit_transactions() {
         // Setup cluster
-        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
 
         let node_peer = *cluster.nodes.keys().next().unwrap();

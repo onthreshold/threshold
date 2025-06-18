@@ -1,12 +1,12 @@
 allowed_peers:
-- name: node_1
-  public_key: 12D3KooWJGkA7JCgXvCivQZaGESnThF4ugzm7Jf2H9tBqj4HwcDJ
-- name: node_2
-  public_key: 12D3KooWSj3SmzS1RUBx2tVg4kEQAqsGSAzwG3EEu9UuX8rLbDMb
-- name: node_3
-  public_key: 12D3KooWA1StPpgLW1DUV7WisrMJE6Sj6VHCbfD1HEnrD9Hhjaf7
-- name: node_4
-  public_key: 12D3KooWPhe3ki2bPr1y7dTyELfMnEL8vNpJrACX1NwSNRUikqyC
+  - name: node_1
+    public_key: 12D3KooWJGkA7JCgXvCivQZaGESnThF4ugzm7Jf2H9tBqj4HwcDJ
+  - name: node_2
+    public_key: 12D3KooWSj3SmzS1RUBx2tVg4kEQAqsGSAzwG3EEu9UuX8rLbDMb
+  - name: node_3
+    public_key: 12D3KooWA1StPpgLW1DUV7WisrMJE6Sj6VHCbfD1HEnrD9Hhjaf7
+  - name: node_4
+    public_key: 12D3KooWPhe3ki2bPr1y7dTyELfMnEL8vNpJrACX1NwSNRUikqyC
 log_file_path: /home/vidyootsenthil/.config/thevault/node.log
 key_file_path: keys/node_5/node_5.json
 database_directory: nodedb.db
@@ -15,3 +15,5 @@ libp2p_udp_port: 0
 libp2p_tcp_port: 0
 confirmation_depth: 6
 monitor_start_block: 0
+min_signers: 3
+max_signers: 5

@@ -13,8 +13,6 @@ use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 pub async fn start_node(
-    max_signers: Option<u16>,
-    min_signers: Option<u16>,
     config: NodeConfig,
     grpc_port: Option<u16>,
     log_file: Option<PathBuf>,
@@ -82,9 +80,6 @@ pub async fn start_node(
         }
     };
 
-    let max_signers = max_signers.unwrap_or(5);
-    let min_signers = min_signers.unwrap_or(3);
-
     let allowed_peers = config.allowed_peers.clone();
 
     let (network_handle, mut swarm) = build_swarm(
@@ -123,8 +118,6 @@ pub async fn start_node(
 
     let mut node_state = NodeState::new_from_config(
         &network_handle,
-        min_signers,
-        max_signers,
         config,
         RocksDb::new(config_database_path.to_str().unwrap()),
         &swarm.network_events,

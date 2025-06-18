@@ -147,11 +147,11 @@ enum Commands {
         #[arg(short = 'd', long)]
         database_directory: Option<String>,
         #[arg(short = 'o', long)]
-        log_file: Option<String>,
-        #[arg(short = 'n', long)]
-        max_signers: Option<u16>,
-        #[arg(short = 'm', long)]
         min_signers: Option<u16>,
+        #[arg(short = 'm', long)]
+        max_signers: Option<u16>,
+        #[arg(short = 'l', long)]
+        log_file: Option<String>,
         #[arg(short = 'f', long)]
         confirmation_depth: Option<u32>,
         #[arg(short = 's', long)]
@@ -210,8 +210,8 @@ async fn main() -> Result<(), CliError> {
             libp2p_tcp_port,
             database_directory,
             log_file,
-            max_signers,
             min_signers,
+            max_signers,
             confirmation_depth,
             monitor_start_block,
             use_mock_oracle,
@@ -224,8 +224,8 @@ async fn main() -> Result<(), CliError> {
                 libp2p_tcp_port,
                 database_directory,
                 log_file,
-                max_signers,
                 min_signers,
+                max_signers,
                 confirmation_depth,
                 monitor_start_block,
                 use_mock_oracle,
@@ -349,8 +349,8 @@ struct StartNodeConfigParams {
     libp2p_tcp_port: Option<u16>,
     database_directory: Option<String>,
     log_file: Option<String>,
-    max_signers: Option<u16>,
     min_signers: Option<u16>,
+    max_signers: Option<u16>,
     confirmation_depth: Option<u32>,
     monitor_start_block: Option<u32>,
     use_mock_oracle: Option<bool>,
@@ -383,6 +383,14 @@ async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> 
         config.set_database_directory(PathBuf::from(dir));
     }
 
+    if let Some(min) = params.min_signers {
+        config.set_min_signers(min);
+    }
+
+    if let Some(max) = params.max_signers {
+        config.set_max_signers(max);
+    }
+
     if let Some(depth) = params.confirmation_depth {
         config.set_confirmation_depth(depth);
     }
@@ -392,8 +400,6 @@ async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> 
     }
 
     start_node(
-        params.max_signers,
-        params.min_signers,
         config,
         params.grpc_port,
         params.log_file.map(PathBuf::from),

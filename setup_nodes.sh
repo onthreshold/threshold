@@ -78,8 +78,13 @@ for i in $(seq 1 "$NUM_NODES"); do
 done
 
 # --------------------------- Patching configs --------------------------------
-echo -e "\nPatching each node's allowed_peers list..."
+echo -e "\nPatching each node's allowed_peers list and signer configuration..."
 ALL_PEERS=$(IFS=','; echo "${PEER_IDS[*]}")
+
+MAX_SIGNERS=$NUM_NODES
+MIN_SIGNERS=$(( (NUM_NODES * 2) / 3 ))
+
+echo "Setting min_signers: $MIN_SIGNERS, max_signers: $MAX_SIGNERS"
 
 for i in $(seq 1 "$NUM_NODES"); do
   CONFIG_PATH="${CONFIG_PATHS[$i]}"
@@ -87,12 +92,16 @@ for i in $(seq 1 "$NUM_NODES"); do
   CONFIG_PATH="$CONFIG_PATH" \
   SELF_INDEX="$i" \
   ALL_PEERS="$ALL_PEERS" \
+  MIN_SIGNERS="$MIN_SIGNERS" \
+  MAX_SIGNERS="$MAX_SIGNERS" \
   python3 - <<'PY'
 import os, pathlib, yaml, sys
 
 config_path = pathlib.Path(os.environ['CONFIG_PATH'])
 self_index   = int(os.environ['SELF_INDEX'])
 all_peers    = os.environ['ALL_PEERS'].split(',')
+min_signers  = int(os.environ['MIN_SIGNERS'])
+max_signers  = int(os.environ['MAX_SIGNERS'])
 
 try:
     data = yaml.safe_load(config_path.read_text()) or {}
@@ -107,6 +116,8 @@ for idx, peer_id in enumerate(all_peers, start=1):
     allowed.append({'name': f'node_{idx}', 'public_key': peer_id})
 
 data['allowed_peers'] = allowed
+data['min_signers'] = min_signers
+data['max_signers'] = max_signers
 config_path.write_text(yaml.safe_dump(data, sort_keys=False))
 PY
 done

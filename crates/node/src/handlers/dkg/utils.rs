@@ -122,8 +122,14 @@ impl DkgState {
 
         let chain_config = ChainConfig {
             block_time_seconds: 10,
-            min_signers: node.min_signers,
-            max_signers: node.max_signers,
+            min_signers: node
+                .config
+                .min_signers
+                .ok_or_else(|| NodeError::Error("Min signers not set".to_string()))?,
+            max_signers: node
+                .config
+                .max_signers
+                .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?,
             min_stake: 100,
             max_block_size: 1000,
         };
