@@ -170,15 +170,20 @@ pub struct MockNodeCluster {
 }
 
 impl MockNodeCluster {
-    pub async fn new(peers: u32, min_signers: u16, max_signers: u16) -> Self {
+    pub async fn new(peers: u32) -> Self {
         let mut path = PathBuf::new();
         path.push("config.json");
 
         let mut config_path = PathBuf::new();
         config_path.push("config.toml");
 
-        let node_config = node::NodeConfig::new(path.clone(), config_path, None, "test-password")
-            .expect("Failed to create node config");
+        let mut node_config =
+            node::NodeConfig::new(path.clone(), config_path, None, "test-password")
+                .expect("Failed to create node config");
+
+        // Set the min_signers and max_signers for testing
+        node_config.min_signers = Some(peers as u16);
+        node_config.max_signers = Some(peers as u16);
 
         let mut nodes = BTreeMap::new();
         let mut senders = BTreeMap::new();
@@ -189,13 +194,9 @@ impl MockNodeCluster {
 
         for _i in 0..peers {
             let peer_id = libp2p::PeerId::random();
-            let Ok((node, network)) = create_node_network(
-                peer_id,
-                node_config.clone(),
-                min_signers,
-                max_signers,
-                pending_events_tx.clone(),
-            ) else {
+            let Ok((node, network)) =
+                create_node_network(peer_id, node_config.clone(), pending_events_tx.clone())
+            else {
                 panic!("Failed to create node network");
             };
 
@@ -452,8 +453,15 @@ impl MockNodeCluster {
         self.nodes.keys().cloned().collect()
     }
 
-    pub async fn new_with_keys(peers: u32, min_signers: u16, max_signers: u16) -> Self {
-        let mut cluster = Self::new(peers, min_signers, max_signers).await;
+    pub async fn new_with_keys(peers: u32) -> Self {
+        let mut cluster = Self::new(peers).await;
+
+        // Set the min_signers and max_signers in the config for all nodes
+        for node in cluster.nodes.values_mut() {
+            node.config.min_signers = Some(peers as u16);
+            node.config.max_signers = Some(peers as u16);
+        }
+
         let identifiers: Vec<Identifier> = cluster
             .nodes
             .keys()
@@ -461,8 +469,9 @@ impl MockNodeCluster {
             .collect();
 
         // Run offline DKG once and distribute keys
+        // Use the actual number of peers for both min_signers and max_signers
         let dkg_out =
-            perform_distributed_key_generation(identifiers, max_signers, min_signers).unwrap();
+            perform_distributed_key_generation(identifiers, peers as u16, peers as u16).unwrap();
 
         for (peer_id, node) in cluster.nodes.iter_mut() {
             let id = node::peer_id_to_identifier(peer_id);
@@ -482,8 +491,6 @@ impl MockNodeCluster {
 pub fn create_node_network(
     peer_id: libp2p::PeerId,
     node_config: node::NodeConfig,
-    min_signers: u16,
-    max_signers: u16,
     pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
 ) -> Result<(MockNodeState, MockNetwork), errors::NodeError> {
     let (events_emitter_tx, _) = broadcast::channel::<NetworkEvent>(256);
@@ -502,8 +509,6 @@ pub fn create_node_network(
 
     let nodes_state = NodeState::new_from_config(
         &network,
-        min_signers,
-        max_signers,
         node_config,
         mock_db,
         &events_emitter_tx,
@@ -521,7 +526,7 @@ mod node_tests {
 
     #[tokio::test]
     async fn peers_can_connect() {
-        let mut cluster = MockNodeCluster::new(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new(2).await;
         cluster.setup().await;
         println!("Ran setup");
         cluster.run_n_iterations(1).await;
@@ -537,7 +542,7 @@ mod node_tests {
 
     #[tokio::test]
     async fn network_events_are_processed_correctly() {
-        let mut cluster = MockNodeCluster::new(3, 2, 3).await;
+        let mut cluster = MockNodeCluster::new(3).await;
         cluster.setup().await;
 
         // Get peer IDs for testing

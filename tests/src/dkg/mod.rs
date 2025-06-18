@@ -29,7 +29,7 @@ mod dkg_test {
     #[tokio::test]
     async fn peers_send_start_dkg_at_startup() {
         setup();
-        let mut cluster = MockNodeCluster::new(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new(2).await;
         cluster.setup().await;
         info!("Ran setup");
 
@@ -55,7 +55,7 @@ mod dkg_test {
     #[tokio::test]
     async fn test_dkg_round1_broadcasts() {
         setup();
-        let mut cluster = MockNodeCluster::new(3, 2, 3).await;
+        let mut cluster = MockNodeCluster::new(3).await;
 
         cluster.setup().await;
         info!("Started DKG Round1 test with {} nodes", cluster.nodes.len());
@@ -121,7 +121,7 @@ mod dkg_test {
     #[tokio::test]
     async fn test_dkg_round2_private_requests() {
         setup();
-        let mut cluster = MockNodeCluster::new(3, 2, 3).await;
+        let mut cluster = MockNodeCluster::new(3).await;
 
         cluster.setup().await;
         info!("Started DKG Round2 test with {} nodes", cluster.nodes.len());
@@ -201,7 +201,7 @@ mod dkg_test {
     #[tokio::test]
     async fn test_dkg_completion() {
         setup();
-        let mut cluster = MockNodeCluster::new(3, 2, 3).await;
+        let mut cluster = MockNodeCluster::new(3).await;
         cluster.setup().await;
         info!("Started DKG test with {} nodes", cluster.nodes.len());
 
@@ -264,7 +264,7 @@ mod dkg_test {
     #[tokio::test]
     async fn test_dkg_completes_within_5_iterations() {
         setup();
-        let mut cluster = MockNodeCluster::new(3, 2, 3).await;
+        let mut cluster = MockNodeCluster::new(3).await;
         cluster.setup().await;
         info!(
             "Started DKG completion test (within 5 iterations) with {} nodes",
@@ -303,7 +303,7 @@ mod dkg_test {
     async fn test_dkg_completion_256_nodes() {
         // setup();
         let start_time = std::time::Instant::now();
-        let mut cluster = MockNodeCluster::new(256, 171, 256).await;
+        let mut cluster = MockNodeCluster::new(256).await;
         cluster.setup().await;
         info!("Started DKG test with {} nodes", cluster.nodes.len());
 
@@ -377,7 +377,7 @@ mod dkg_test {
     #[tokio::test]
     async fn test_genesis_block_contains_dkg_metadata() {
         setup();
-        let mut cluster = MockNodeCluster::new(3, 2, 3).await;
+        let mut cluster = MockNodeCluster::new(3).await;
         cluster.setup().await;
         info!(
             "Started genesis block DKG metadata test with {} nodes",
@@ -402,8 +402,8 @@ mod dkg_test {
             validators.sort_by(|a, b| a.pub_key.cmp(&b.pub_key));
 
             let chain_config = ChainConfig {
-                min_signers: node.min_signers,
-                max_signers: node.max_signers,
+                min_signers: node.config.min_signers.unwrap_or(3),
+                max_signers: node.config.max_signers.unwrap_or(5),
                 min_stake: 100,
                 block_time_seconds: 10,
                 max_block_size: 1000,

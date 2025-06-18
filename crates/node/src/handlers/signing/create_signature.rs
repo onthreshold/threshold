@@ -55,7 +55,11 @@ impl SigningState {
         let self_identifier = peer_id_to_identifier(&node.peer_id);
 
         // Select participants: self + first (min_signers -1) peers
-        let required = (node.min_signers - 1) as usize;
+        let required = (node
+            .config
+            .min_signers
+            .ok_or_else(|| NodeError::Error("Min signers not set".to_string()))?
+            - 1) as usize;
         if node.peers.len() < required {
             error!(
                 "❌ Not enough peers – need at least {} others, have {}",
@@ -206,10 +210,18 @@ impl SigningState {
             "📩 Received commitments from {} (total {}/{})",
             peer,
             active.commitments.len(),
-            node.min_signers
+            node.config
+                .min_signers
+                .ok_or_else(|| NodeError::Error("Min signers not set".to_string()))?
         );
 
-        if active.commitments.len() == node.min_signers as usize {
+        if active.commitments.len()
+            == node
+                .config
+                .min_signers
+                .ok_or_else(|| NodeError::Error("Min signers not set".to_string()))?
+                as usize
+        {
             // Build signing package
             let signing_package =
                 frost::SigningPackage::new(active.commitments.clone(), &active.message);
@@ -342,10 +354,18 @@ impl SigningState {
             "✅ Received signature share from {} (total {}/{})",
             peer,
             active.signature_shares.len(),
-            node.min_signers
+            node.config
+                .min_signers
+                .ok_or_else(|| NodeError::Error("Min signers not set".to_string()))?
         );
 
-        if active.signature_shares.len() == node.min_signers as usize {
+        if active.signature_shares.len()
+            == node
+                .config
+                .min_signers
+                .ok_or_else(|| NodeError::Error("Min signers not set".to_string()))?
+                as usize
+        {
             let signing_package = active
                 .signing_package
                 .clone()

@@ -17,7 +17,7 @@ mod withdrawl_tests {
     #[tokio::test]
     async fn propose_withdrawal_returns_quote_and_challenge() {
         // Arrange: create a mock cluster
-        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
 
         // Select a single node & associated network handle
@@ -89,7 +89,7 @@ mod withdrawl_tests {
     #[tokio::test]
     async fn propose_withdrawal_insufficient_balance() {
         // Setup minimal cluster and node
-        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
 
         let node_peer = *cluster.nodes.keys().next().unwrap();
@@ -134,7 +134,7 @@ mod withdrawl_tests {
     #[tokio::test]
     async fn confirm_withdrawal_fails_invalid_signature() {
         // Setup cluster
-        let mut cluster = MockNodeCluster::new_with_keys(2, 2, 2).await;
+        let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
 
         // Extract node
@@ -200,7 +200,7 @@ mod withdrawl_tests {
 
     #[tokio::test]
     async fn confirm_withdrawal_generates_tx_and_updates_peers() {
-        let mut cluster = MockNodeCluster::new_with_keys(3, 2, 3).await;
+        let mut cluster = MockNodeCluster::new_with_keys(3).await;
         cluster.setup().await;
 
         // Select an initiating node and its network handle

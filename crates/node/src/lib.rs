@@ -80,6 +80,8 @@ pub struct NodeConfig {
     pub libp2p_tcp_port: u16,
     pub confirmation_depth: u32,
     pub monitor_start_block: u32,
+    pub min_signers: Option<u16>,
+    pub max_signers: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -99,6 +101,8 @@ pub struct ConfigStore {
     libp2p_tcp_port: u16,
     confirmation_depth: u32,
     monitor_start_block: u32,
+    min_signers: Option<u16>,
+    max_signers: Option<u16>,
 }
 
 impl NodeConfig {
@@ -169,6 +173,8 @@ impl NodeConfig {
             libp2p_tcp_port: 0,
             confirmation_depth: 6,
             monitor_start_block: 0,
+            min_signers: None,
+            max_signers: None,
         })
     }
 
@@ -209,6 +215,8 @@ impl NodeConfig {
             libp2p_tcp_port: self.libp2p_tcp_port,
             confirmation_depth: self.confirmation_depth,
             monitor_start_block: self.monitor_start_block,
+            min_signers: self.min_signers,
+            max_signers: self.max_signers,
         };
 
         let config_str: String = serde_yaml::to_string(&config_store).unwrap();
@@ -250,6 +258,14 @@ impl NodeConfig {
     pub const fn set_monitor_start_block(&mut self, block: u32) {
         self.monitor_start_block = block;
     }
+
+    pub const fn set_min_signers(&mut self, min: u16) {
+        self.min_signers = Some(min);
+    }
+
+    pub const fn set_max_signers(&mut self, max: u16) {
+        self.max_signers = Some(max);
+    }
 }
 
 pub struct NodeState<N: Network, D: Db, W: Wallet> {
@@ -260,8 +276,6 @@ pub struct NodeState<N: Network, D: Db, W: Wallet> {
     pub peer_id: PeerId,
     pub peers: HashSet<PeerId>,
 
-    pub min_signers: u16,
-    pub max_signers: u16,
     pub rng: frost::rand_core::OsRng,
     pub pubkey_package: Option<frost::keys::PublicKeyPackage>,
     pub private_key_package: Option<frost::keys::KeyPackage>,
@@ -279,8 +293,6 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
     #[allow(clippy::too_many_arguments)]
     pub fn new_from_config(
         network_handle: &N,
-        min_signers: u16,
-        max_signers: u16,
         config: NodeConfig,
         storage_db: D,
         network_events_sender: &broadcast::Sender<NetworkEvent>,
@@ -328,8 +340,6 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
             network_handle: network_handle.clone(),
             network_events_stream: network_events_sender.subscribe(),
             peer_id: network_handle.peer_id(),
-            min_signers,
-            max_signers,
             db: storage_db,
             peers: HashSet::new(),
             rng: frost::rand_core::OsRng,

@@ -14,11 +14,9 @@ pub mod signing_tests {
     #[tokio::test]
     async fn signing_flow_completes_and_produces_shares() {
         let peers = 3;
-        let min_signers = 2;
-        let max_signers = 3;
 
         // Build cluster with pre-generated FROST keys – no DKG needed
-        let mut cluster = MockNodeCluster::new_with_keys(peers, min_signers, max_signers).await;
+        let mut cluster = MockNodeCluster::new_with_keys(peers).await;
         cluster.setup().await;
 
         // ── start signing ──
@@ -64,10 +62,10 @@ pub mod signing_tests {
         }
 
         // ── explicit assertions ──
-        assert!(req >= min_signers as usize - 1, "missing SignRequest(s)");
-        assert!(comm >= min_signers as usize - 1, "missing Commitments");
-        assert!(pack >= min_signers as usize - 1, "missing SignPackage");
-        assert!(share >= min_signers as usize - 1, "missing SignatureShare");
+        assert!(req >= peers as usize - 1, "missing SignRequest(s)");
+        assert!(comm >= peers as usize - 1, "missing Commitments");
+        assert!(pack >= peers as usize - 1, "missing SignPackage");
+        assert!(share >= peers as usize - 1, "missing SignatureShare");
 
         // protocol should be finished – no pending spends
         for node in cluster.nodes.values() {
