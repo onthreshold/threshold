@@ -72,7 +72,7 @@ fn create_test_chain_interface() -> (ChainInterfaceImpl, TempDir) {
     let oracle = AlwaysValidOracle {};
     let executor = Box::new(TransactionExecutorImpl::new(Box::new(oracle)));
 
-    let chain_interface = ChainInterfaceImpl::new(db, executor);
+    let (chain_interface, _) = ChainInterfaceImpl::new(db, executor);
     (chain_interface, temp_dir)
 }
 

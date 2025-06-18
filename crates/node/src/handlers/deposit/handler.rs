@@ -25,7 +25,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                 response_channel,
             }) => {
                 let (deposit_tracking_id, deposit_address) =
-                    self.create_deposit(node, &user_pubkey, amount_sat)?;
+                    self.create_deposit(node, &user_pubkey, amount_sat).await?;
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::CreateDepositResponse {
@@ -39,7 +39,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                 request: SelfRequest::GetPendingDepositIntents,
                 response_channel,
             }) => {
-                let response = self.get_pending_deposit_intents(node);
+                let response = self.get_pending_deposit_intents(node).await?;
                 if let Some(response_channel) = response_channel {
                     response_channel
                         .send(SelfResponse::GetPendingDepositIntentsResponse { intents: response })
@@ -60,7 +60,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                         NodeError::Error(format!("Failed to parse deposit intent: {e}"))
                     })?;
 
-                    if let Err(e) = self.create_deposit_from_intent(node, deposit_intent) {
+                    if let Err(e) = self.create_deposit_from_intent(node, deposit_intent).await {
                         info!("Failed to store deposit intent: {}", e);
                     }
                 }

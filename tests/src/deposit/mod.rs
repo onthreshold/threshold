@@ -43,12 +43,19 @@ mod deposit_tests {
         println!("cluster.run_n_iterations(10).await;");
 
         let response = rx.recv().await.unwrap();
-        let node = cluster.nodes.get(&node_peer).unwrap();
+        let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
         // retrieve the first deposit intent stored
-        let intent_opt = node
-            .chain_interface
-            .get_deposit_intent_by_address(&response.deposit_address);
+        let intent_opt = match node
+            .chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::GetDepositIntentByAddress {
+                address: response.deposit_address.clone(),
+            })
+            .await
+        {
+            Ok(abci::ChainResponse::GetDepositIntentByAddress { intent }) => intent,
+            _ => None,
+        };
 
         println!("intent_opt: {:?}", intent_opt);
 
@@ -96,10 +103,17 @@ mod deposit_tests {
 
         let response = rx.recv().await.unwrap();
 
-        for (_, node) in cluster.nodes.iter() {
-            let intent_opt = node
-                .chain_interface
-                .get_deposit_intent_by_address(&response.deposit_address);
+        for (_, node) in cluster.nodes.iter_mut() {
+            let intent_opt = match node
+                .chain_interface_tx
+                .send_message_with_response(abci::ChainMessage::GetDepositIntentByAddress {
+                    address: response.deposit_address.clone(),
+                })
+                .await
+            {
+                Ok(abci::ChainResponse::GetDepositIntentByAddress { intent }) => intent,
+                _ => None,
+            };
             assert!(intent_opt.is_some(), "deposit intent not stored");
             let intent = intent_opt.unwrap();
             assert_eq!(intent.deposit_address, response.deposit_address);
@@ -131,13 +145,22 @@ mod deposit_tests {
                 "020202020202020202020202020202020202020202020202020202020202020202",
                 amount_sat,
             )
+            .await
             .expect("create_deposit should succeed");
 
         // Assert: ABCI contains the new intent
-        let stored = node
-            .chain_interface
-            .get_deposit_intent_by_address(&deposit_address)
-            .expect("intent not stored");
+        let stored = match node
+            .chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::GetDepositIntentByAddress {
+                address: deposit_address.clone(),
+            })
+            .await
+        {
+            Ok(abci::ChainResponse::GetDepositIntentByAddress {
+                intent: Some(intent),
+            }) => intent,
+            _ => panic!("intent not stored"),
+        };
         assert_eq!(stored.deposit_address, deposit_address);
         assert_eq!(stored.amount_sat, amount_sat);
         assert_eq!(
@@ -177,13 +200,22 @@ mod deposit_tests {
         // Act
         state
             .create_deposit_from_intent(node, deposit_intent.clone())
+            .await
             .expect("create_deposit_from_intent failed");
 
         // Assert ABCI persistence
-        let stored = node
-            .chain_interface
-            .get_deposit_intent_by_address(&deposit_address)
-            .expect("intent not stored in abci");
+        let stored = match node
+            .chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::GetDepositIntentByAddress {
+                address: deposit_address.clone(),
+            })
+            .await
+        {
+            Ok(abci::ChainResponse::GetDepositIntentByAddress {
+                intent: Some(intent),
+            }) => intent,
+            _ => panic!("intent not stored in abci"),
+        };
         assert_eq!(stored.deposit_address, deposit_address);
 
         // Assert notification via channel
@@ -215,7 +247,9 @@ mod deposit_tests {
             node,
             &user_address.to_string(),
             Account::new(user_address.to_string(), 0),
-        );
+        )
+        .await
+        .unwrap();
 
         // ----- Prepare deposit address affiliated with node pubkey -----
         let frost_pubkey_bytes = node
@@ -235,15 +269,22 @@ mod deposit_tests {
 
         let deposit_amount_sat = 15_000;
 
-        node.chain_interface
-            .insert_deposit_intent(DepositIntent {
-                amount_sat: deposit_amount_sat,
-                user_pubkey: user_address.to_string(), // must match account key
-                deposit_tracking_id: Uuid::new_v4().to_string(),
-                deposit_address: deposit_address.to_string(),
-                timestamp: 0,
+        match node
+            .chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::InsertDepositIntent {
+                intent: DepositIntent {
+                    amount_sat: deposit_amount_sat,
+                    user_pubkey: user_address.to_string(), // must match account key
+                    deposit_tracking_id: Uuid::new_v4().to_string(),
+                    deposit_address: deposit_address.to_string(),
+                    timestamp: 0,
+                },
             })
-            .unwrap();
+            .await
+        {
+            Ok(abci::ChainResponse::InsertDepositIntent { error: None }) => {}
+            _ => panic!("Failed to insert deposit intent"),
+        }
 
         // ----- Craft transaction -----
         let tx_in = {
@@ -271,11 +312,18 @@ mod deposit_tests {
         };
 
         // ----- Call update_user_balance -----
-        let balance_before = node
-            .chain_interface
-            .get_account(&user_address.to_string())
-            .unwrap()
-            .balance;
+        let balance_before = match node
+            .chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::GetAccount {
+                address: user_address.to_string(),
+            })
+            .await
+        {
+            Ok(abci::ChainResponse::GetAccount {
+                account: Some(account),
+            }) => account.balance,
+            _ => panic!("Failed to get account balance"),
+        };
 
         state
             .update_user_balance(node, &tx)
@@ -291,11 +339,18 @@ mod deposit_tests {
         });
         assert!(utxo_found, "wallet did not ingest expected UTXO");
 
-        let balance_after = node
-            .chain_interface
-            .get_account(&user_address.to_string())
-            .unwrap()
-            .balance;
+        let balance_after = match node
+            .chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::GetAccount {
+                address: user_address.to_string(),
+            })
+            .await
+        {
+            Ok(abci::ChainResponse::GetAccount {
+                account: Some(account),
+            }) => account.balance,
+            _ => panic!("Failed to get account balance"),
+        };
 
         assert_eq!(balance_after, balance_before + deposit_amount_sat);
     }
@@ -324,7 +379,9 @@ mod deposit_tests {
             node,
             &user_address.to_string(),
             Account::new(user_address.to_string(), 0),
-        );
+        )
+        .await
+        .unwrap();
 
         // ----- Craft transaction -----
         let deposit_amount_sat = 15_000;
@@ -359,11 +416,18 @@ mod deposit_tests {
             .expect("balance update failed");
 
         // Assert: balance should not have changed
-        let balance = node
-            .chain_interface
-            .get_account(&user_address.to_string())
-            .unwrap()
-            .balance;
+        let balance = match node
+            .chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::GetAccount {
+                address: user_address.to_string(),
+            })
+            .await
+        {
+            Ok(abci::ChainResponse::GetAccount {
+                account: Some(account),
+            }) => account.balance,
+            _ => 0, // If no account found, balance is 0
+        };
         assert_eq!(balance, 0);
 
         // Wallet UTXOs should remain unchanged (none ingested)

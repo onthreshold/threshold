@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
+use abci::{ChainMessage, ChainResponse};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use frost_secp256k1::{self as frost};
 use libp2p::gossipsub;
@@ -57,7 +58,7 @@ impl DkgState {
         }
     }
 
-    pub fn save_dkg_keys<N: Network, W: Wallet>(
+    pub async fn save_dkg_keys<N: Network, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, W>,
         private_key: &frost::keys::KeyPackage,
@@ -133,8 +134,19 @@ impl DkgState {
             max_block_size: 1000,
         };
 
-        node.chain_interface
-            .create_genesis_block(validators, chain_config, pubkey)?;
+        let ChainResponse::CreateGenesisBlock { error: None } = node
+            .chain_interface_tx
+            .send_message_with_response(ChainMessage::CreateGenesisBlock {
+                validators,
+                chain_config,
+                pubkey: pubkey.clone(),
+            })
+            .await?
+        else {
+            return Err(NodeError::Error(
+                "Failed to create genesis block".to_string(),
+            ));
+        };
 
         node.config.save_to_keys_file()?;
         Ok(())

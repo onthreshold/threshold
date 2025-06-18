@@ -29,7 +29,7 @@ libp2p = { workspace = true, features = [
 ] }
 futures = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-tracing = "0.1"
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
 tracing-appender = "0.2"
 serde = { workspace = true, features = ["derive"] }
@@ -59,6 +59,7 @@ dotenvy = { workspace = true }
 bip39 = { workspace = true }
 num-traits = "0.2.19"
 abci = { path = "../abci" }
+messenger = { path = "../../messenger" }
 
 [dev-dependencies]
 tempfile = "3.8"

@@ -19,9 +19,11 @@ serde = { workspace = true }
 rocksdb = { workspace = true }
 hex = { workspace = true }
 frost-secp256k1 = { workspace = true }
+tokio = { workspace = true, features = ["test-util", "macros"] }
+tracing = { workspace = true }
+messenger = { path = "../../messenger" }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["test-util", "macros"] }
 tempfile = { workspace = true }
 uuid = { workspace = true }
 rand = { workspace = true }

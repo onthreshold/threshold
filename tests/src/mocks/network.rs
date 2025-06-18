@@ -18,8 +18,7 @@ use types::{
     proto::ProtoEncode,
 };
 
-// Import MockChainInterface from our mocks module
-use crate::mocks::abci::MockChainInterface;
+// MockChainInterface import removed - no longer needed with message-passing architecture
 
 use crate::util::local_dkg::perform_distributed_key_generation;
 
@@ -195,7 +194,7 @@ impl MockNodeCluster {
         for _i in 0..peers {
             let peer_id = libp2p::PeerId::random();
             let Ok((node, network)) =
-                create_node_network(peer_id, node_config.clone(), pending_events_tx.clone())
+                create_node_network(peer_id, node_config.clone(), pending_events_tx.clone()).await
             else {
                 panic!("Failed to create node network");
             };
@@ -488,7 +487,7 @@ impl MockNodeCluster {
     }
 }
 
-pub fn create_node_network(
+pub async fn create_node_network(
     peer_id: libp2p::PeerId,
     node_config: node::NodeConfig,
     pending_events_tx: mpsc::UnboundedSender<PendingNetworkEvent>,
@@ -498,7 +497,16 @@ pub fn create_node_network(
 
     let network = MockNetwork::new(events_emitter_tx.clone(), peer_id, pending_events_tx);
 
-    let mock_abci = Box::new(MockChainInterface::new());
+    let executor = Box::new(crate::mocks::abci::MockTransactionExecutor);
+    let db = Box::new(crate::mocks::db::MockDb::new());
+
+    let (mut chain_interface_impl, chain_interface_tx) =
+        abci::ChainInterfaceImpl::new(db, executor);
+
+    tokio::spawn(async move {
+        chain_interface_impl.start().await;
+    });
+
     let oracle = MockOracle::new(events_emitter_tx.clone(), Some(deposit_intent_tx.clone()));
 
     let wallet = TaprootWallet::new(
@@ -514,8 +522,9 @@ pub fn create_node_network(
         deposit_intent_tx,
         Box::new(oracle),
         wallet,
-        mock_abci,
-    )?;
+        chain_interface_tx,
+    )
+    .await?;
 
     Ok((nodes_state, network))
 }

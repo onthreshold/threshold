@@ -6,7 +6,7 @@ members = [
     "crates/node",
     "crates/protocol",
     "crates/types",
-    "crates/oracle", "crates/abci",
+    "crates/oracle", "crates/abci", "messenger",
 ]
 resolver = "2"
 
@@ -64,6 +64,7 @@ prost = "0.13"
 prost-types = "0.13.5"
 tempfile = "3.20.0"
 uuid = { version = "1.7.0", features = ["v4", "serde"] }
+tracing = "0.1"
 
 [workspace.lints.rust]
 unsafe_code = "warn"

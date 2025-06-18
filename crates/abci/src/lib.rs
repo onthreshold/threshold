@@ -3,6 +3,7 @@ use protocol::{
     block::{ChainConfig, GenesisBlock, ValidatorInfo},
     transaction::Transaction,
 };
+use tokio::sync::broadcast;
 use types::{errors::NodeError, intents::DepositIntent};
 
 use crate::{chain_state::Account, db::Db, executor::TransactionExecutor};
@@ -10,12 +11,13 @@ use crate::{chain_state::Account, db::Db, executor::TransactionExecutor};
 pub mod chain_state;
 pub mod db;
 pub mod executor;
+pub mod main_loop;
 
 #[async_trait::async_trait]
 pub trait ChainInterface: Send + Sync {
     fn insert_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError>;
     fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError>;
-    fn get_deposit_intent_by_address(&self, address: &str) -> Option<&DepositIntent>;
+    fn get_deposit_intent_by_address(&self, address: &str) -> Option<DepositIntent>;
 
     fn create_genesis_block(
         &mut self,
@@ -25,23 +27,64 @@ pub trait ChainInterface: Send + Sync {
     ) -> Result<(), NodeError>;
 
     async fn execute_transaction(&mut self, transaction: Transaction) -> Result<(), NodeError>;
-    fn get_account(&self, address: &str) -> Option<&Account>;
+    fn get_account(&self, address: &str) -> Option<Account>;
+}
+
+#[derive(Clone)]
+pub enum ChainMessage {
+    InsertDepositIntent {
+        intent: DepositIntent,
+    },
+    GetAccount {
+        address: String,
+    },
+    GetAllDepositIntents,
+    GetDepositIntentByAddress {
+        address: String,
+    },
+    CreateGenesisBlock {
+        validators: Vec<ValidatorInfo>,
+        chain_config: ChainConfig,
+        pubkey: PublicKeyPackage,
+    },
+    ExecuteTransaction {
+        transaction: Transaction,
+    },
+}
+
+#[derive(Clone)]
+pub enum ChainResponse {
+    InsertDepositIntent { error: Option<NodeError> },
+    GetAccount { account: Option<Account> },
+    GetAllDepositIntents { intents: Vec<DepositIntent> },
+    GetDepositIntentByAddress { intent: Option<DepositIntent> },
+    CreateGenesisBlock { error: Option<NodeError> },
+    ExecuteTransaction { error: Option<NodeError> },
 }
 
 pub struct ChainInterfaceImpl {
     db: Box<dyn Db>,
     executor: Box<dyn TransactionExecutor>,
     chain_state: chain_state::ChainState,
+    message_stream: broadcast::Receiver<(ChainMessage, broadcast::Sender<ChainResponse>)>,
 }
 
 impl ChainInterfaceImpl {
     #[must_use]
-    pub fn new(db: Box<dyn Db>, executor: Box<dyn TransactionExecutor>) -> Self {
-        Self {
-            db,
-            executor,
-            chain_state: chain_state::ChainState::new(),
-        }
+    pub fn new(
+        db: Box<dyn Db>,
+        executor: Box<dyn TransactionExecutor>,
+    ) -> (Self, messenger::Sender<ChainMessage, ChainResponse>) {
+        let (tx, rx) = messenger::channel(100, Some(100));
+        (
+            Self {
+                db,
+                executor,
+                chain_state: chain_state::ChainState::new(),
+                message_stream: rx,
+            },
+            tx,
+        )
     }
 }
 
@@ -52,16 +95,18 @@ impl ChainInterface for ChainInterfaceImpl {
         self.db.insert_deposit_intent(intent)
     }
 
-    fn get_account(&self, address: &str) -> Option<&Account> {
-        self.chain_state.get_account(address)
+    fn get_account(&self, address: &str) -> Option<Account> {
+        self.chain_state.get_account(address).cloned()
     }
 
     fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError> {
         Ok(self.chain_state.get_all_deposit_intents())
     }
 
-    fn get_deposit_intent_by_address(&self, address: &str) -> Option<&DepositIntent> {
-        self.chain_state.get_deposit_intent_by_address(address)
+    fn get_deposit_intent_by_address(&self, address: &str) -> Option<DepositIntent> {
+        self.chain_state
+            .get_deposit_intent_by_address(address)
+            .cloned()
     }
 
     fn create_genesis_block(

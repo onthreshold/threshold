@@ -1,4 +1,5 @@
 use crate::{Network, NodeState, handlers::Handler, wallet::Wallet};
+use abci::{ChainMessage, ChainResponse};
 use types::errors::NodeError;
 use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 
@@ -24,10 +25,17 @@ impl<N: Network, W: Wallet> Handler<N, W> for BalanceState {
             response_channel,
         }) = message
         {
-            let balance = node
-                .chain_interface
-                .get_account(&address)
-                .map_or(0, |acct| acct.balance);
+            let ChainResponse::GetAccount {
+                account: Some(account),
+            } = node
+                .chain_interface_tx
+                .send_message_with_response(ChainMessage::GetAccount { address })
+                .await?
+            else {
+                return Err(NodeError::Error("Failed to get account".to_string()));
+            };
+
+            let balance = account.balance;
 
             if let Some(response_channel) = response_channel {
                 response_channel

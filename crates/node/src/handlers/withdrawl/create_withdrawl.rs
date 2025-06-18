@@ -1,5 +1,6 @@
 use crate::swarm_manager::Network;
 use crate::{NodeState, handlers::withdrawl::SpendIntentState, wallet::Wallet};
+use abci::{ChainMessage, ChainResponse};
 use bitcoin::{
     Transaction as BitcoinTransaction,
     key::Secp256k1,
@@ -10,7 +11,6 @@ use num_traits::cast::ToPrimitive;
 use protocol::transaction::Transaction;
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
-use tracing::info;
 use types::errors::NodeError;
 use types::intents::{PendingSpend, WithdrawlIntent};
 use types::network_event::SelfRequest;
@@ -21,9 +21,15 @@ impl SpendIntentState {
         node: &mut NodeState<N, W>,
         withdrawal_intent: &WithdrawlIntent,
     ) -> Result<(u64, String), NodeError> {
-        let account = node
-            .chain_interface
-            .get_account(&withdrawal_intent.public_key);
+        let ChainResponse::GetAccount { account } = node
+            .chain_interface_tx
+            .send_message_with_response(ChainMessage::GetAccount {
+                address: withdrawal_intent.public_key.clone(),
+            })
+            .await?
+        else {
+            return Err(NodeError::Error("Failed to get account".to_string()));
+        };
 
         let Some(account) = account else {
             return Err(NodeError::Error("Account not found".to_string()));
@@ -134,17 +140,15 @@ impl SpendIntentState {
             tx.output[0].value.to_sat() + fee,
         )?;
 
-        node.chain_interface
-            .execute_transaction(transaction)
-            .await?;
-
-        let updated_account = node.chain_interface.get_account(&user_pubkey);
-
-        info!(
-            "🚀 Updated account balance: account: {}, balance: {}",
-            user_pubkey,
-            updated_account.map_or(0, |acct| acct.balance)
-        );
+        let ChainResponse::ExecuteTransaction { error: None } = node
+            .chain_interface_tx
+            .send_message_with_response(ChainMessage::ExecuteTransaction { transaction })
+            .await?
+        else {
+            return Err(NodeError::Error(
+                "Failed to execute transaction".to_string(),
+            ));
+        };
 
         let recipient_script = tx.output[0].script_pubkey.clone();
 
@@ -182,9 +186,15 @@ impl SpendIntentState {
 
         let transaction = Transaction::create_withdrawal_transaction(&pending.user_pubkey, debit)?;
 
-        node.chain_interface
-            .execute_transaction(transaction)
-            .await?;
+        let ChainResponse::ExecuteTransaction { error: None } = node
+            .chain_interface_tx
+            .send_message_with_response(ChainMessage::ExecuteTransaction { transaction })
+            .await?
+        else {
+            return Err(NodeError::Error(
+                "Failed to execute transaction".to_string(),
+            ));
+        };
 
         Ok(())
     }

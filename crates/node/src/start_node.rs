@@ -119,7 +119,7 @@ pub async fn start_node(
 
     let db = RocksDb::new(config_database_path.to_str().unwrap());
 
-    let chain_interface = ChainInterfaceImpl::new(
+    let (mut chain_interface, chain_message_tx) = ChainInterfaceImpl::new(
         Box::new(db),
         Box::new(TransactionExecutorImpl::new(oracle.clone())),
     );
@@ -142,14 +142,19 @@ pub async fn start_node(
                 bitcoin::Network::Bitcoin
             }
         }),
-        Box::new(chain_interface),
+        chain_message_tx,
     )
+    .await
     .expect("Failed to create node");
 
     let network_handle = node_state.network_handle.clone();
 
     let swarm_handle = tokio::spawn(async move {
         swarm.start().await;
+    });
+
+    let chain_interface_handle = tokio::spawn(async move {
+        chain_interface.start().await;
     });
 
     let grpc_handle = tokio::spawn(async move {
@@ -195,6 +200,12 @@ pub async fn start_node(
             match result {
                 Ok(()) => tracing::info!("Deposit monitor stopped"),
                 Err(e) => tracing::error!("Deposit monitor error: {}", e),
+            }
+        }
+        result = chain_interface_handle => {
+            match result {
+                Ok(()) => tracing::info!("Chain interface stopped"),
+                Err(e) => tracing::error!("Chain interface error: {}", e),
             }
         }
     }
