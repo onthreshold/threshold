@@ -1,0 +1,30 @@
+[package]
+name = "abci"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+protocol = { path = "../protocol" }
+types = { path = "../types" }
+oracle = { path = "../oracle" }
+bitcoin = { workspace = true }
+async-trait = { workspace = true }
+bincode = { workspace = true }
+serde = { workspace = true }
+rocksdb = { workspace = true }
+hex = { workspace = true }
+frost-secp256k1 = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+tempfile = { workspace = true }
+uuid = { workspace = true }
+rand = { workspace = true }
+
+[lints]
+workspace = true

@@ -11,16 +11,16 @@ use crate::handlers::signing::SigningState;
 use crate::peer_id_to_identifier;
 use crate::swarm_manager::Network;
 use crate::{
-    NodeState, db::Db, handlers::signing::ActiveSigning, handlers::withdrawl::SpendIntentState,
+    NodeState, handlers::signing::ActiveSigning, handlers::withdrawl::SpendIntentState,
     wallet::Wallet,
 };
 use types::errors::NodeError;
 use types::network_event::DirectMessage;
 
 impl SigningState {
-    pub fn start_signing_session<N: Network, D: Db, W: Wallet>(
+    pub fn start_signing_session<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         message_hex: &str,
     ) -> Result<Option<u64>, NodeError> {
         if node.private_key_package.is_none() || node.pubkey_package.is_none() {
@@ -124,9 +124,9 @@ impl SigningState {
     }
 
     /// Handle incoming SignRequest (participant side)
-    pub fn handle_sign_request<N: Network, D: Db, W: Wallet>(
+    pub fn handle_sign_request<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         peer: PeerId,
         sign_id: u64,
         message: Vec<u8>,
@@ -183,9 +183,9 @@ impl SigningState {
     }
 
     /// Coordinator receives commitments responses
-    pub fn handle_commitments_response<N: Network, D: Db, W: Wallet>(
+    pub fn handle_commitments_response<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         peer: PeerId,
         sign_id: u64,
         commitments_bytes: &[u8],
@@ -271,9 +271,9 @@ impl SigningState {
     }
 
     /// Participant handles SignPackage request
-    pub fn handle_sign_package<N: Network, D: Db, W: Wallet>(
+    pub fn handle_sign_package<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         peer: PeerId,
         sign_id: u64,
         package_bytes: &[u8],
@@ -328,9 +328,9 @@ impl SigningState {
     }
 
     /// Coordinator handles incoming signature share
-    pub async fn handle_signature_share<N: Network, D: Db, W: Wallet>(
+    pub async fn handle_signature_share<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         peer: PeerId,
         sign_id: u64,
         sig_bytes: &[u8],

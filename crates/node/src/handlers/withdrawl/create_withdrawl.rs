@@ -1,12 +1,13 @@
 use crate::swarm_manager::Network;
-use crate::{NodeState, db::Db, handlers::withdrawl::SpendIntentState, wallet::Wallet};
+use crate::{NodeState, handlers::withdrawl::SpendIntentState, wallet::Wallet};
 use bitcoin::{
-    Transaction,
+    Transaction as BitcoinTransaction,
     key::Secp256k1,
     secp256k1::{Message, PublicKey, ecdsa::Signature},
 };
 use libp2p::gossipsub;
 use num_traits::cast::ToPrimitive;
+use protocol::transaction::Transaction;
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use tracing::info;
@@ -15,12 +16,15 @@ use types::intents::{PendingSpend, WithdrawlIntent};
 use types::network_event::SelfRequest;
 
 impl SpendIntentState {
-    pub async fn propose_withdrawal<N: Network, D: Db, W: Wallet>(
+    pub async fn propose_withdrawal<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         withdrawal_intent: &WithdrawlIntent,
     ) -> Result<(u64, String), NodeError> {
-        let account = node.chain_state.get_account(&withdrawal_intent.public_key);
+        let account = node
+            .chain_interface
+            .get_account(&withdrawal_intent.public_key);
+
         let Some(account) = account else {
             return Err(NodeError::Error("Account not found".to_string()));
         };
@@ -88,9 +92,9 @@ impl SpendIntentState {
         Ok(secp.verify_ecdsa(&message, &signature, &public_key).is_ok())
     }
 
-    pub fn confirm_withdrawal<N: Network, D: Db, W: Wallet>(
+    pub fn confirm_withdrawal<N: Network, W: Wallet>(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         challenge: &str,
         signature: &str,
     ) -> Result<(), NodeError> {
@@ -117,28 +121,30 @@ impl SpendIntentState {
         Ok(())
     }
 
-    pub async fn handle_signed_withdrawal<N: Network, D: Db, W: Wallet>(
-        node: &mut NodeState<N, D, W>,
-        tx: &Transaction,
+    pub async fn handle_signed_withdrawal<N: Network, W: Wallet>(
+        node: &mut NodeState<N, W>,
+        tx: &BitcoinTransaction,
         fee: u64,
         user_pubkey: String,
     ) -> Result<(), NodeError> {
         node.oracle.broadcast_transaction(tx).await?;
-        let user_account = node
-            .chain_state
-            .get_account(&user_pubkey)
-            .ok_or_else(|| NodeError::Error("User not found".to_string()))?;
 
-        let updated_account = user_account.decrement_balance(tx.output[0].value.to_sat() + fee);
+        let transaction = Transaction::create_withdrawal_transaction(
+            &user_pubkey,
+            tx.output[0].value.to_sat() + fee,
+        )?;
+
+        node.chain_interface
+            .execute_transaction(transaction)
+            .await?;
+
+        let updated_account = node.chain_interface.get_account(&user_pubkey);
 
         info!(
             "🚀 Updated account balance: account: {}, balance: {}",
-            user_pubkey, updated_account.balance
+            user_pubkey,
+            updated_account.map_or(0, |acct| acct.balance)
         );
-
-        node.chain_state
-            .upsert_account(&user_pubkey, updated_account);
-        node.db.flush_state(&node.chain_state)?;
 
         let recipient_script = tx.output[0].script_pubkey.clone();
 
@@ -156,9 +162,9 @@ impl SpendIntentState {
         Ok(())
     }
 
-    pub async fn handle_withdrawl_message<N: Network, D: Db, W: Wallet>(
+    pub async fn handle_withdrawl_message<N: Network, W: Wallet>(
         &self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         pending: PendingSpend,
     ) -> Result<(), NodeError> {
         node.oracle.broadcast_transaction(&pending.tx).await?;
@@ -174,15 +180,11 @@ impl SpendIntentState {
 
         let debit = pay_out.value.to_sat() + pending.fee;
 
-        let mut acct = node
-            .chain_state
-            .get_account(&pending.user_pubkey)
-            .ok_or_else(|| NodeError::Error("user missing".into()))?
-            .clone();
+        let transaction = Transaction::create_withdrawal_transaction(&pending.user_pubkey, debit)?;
 
-        acct = acct.decrement_balance(debit);
-        node.chain_state.upsert_account(&pending.user_pubkey, acct);
-        node.db.flush_state(&node.chain_state)?;
+        node.chain_interface
+            .execute_transaction(transaction)
+            .await?;
 
         Ok(())
     }

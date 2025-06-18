@@ -13,6 +13,7 @@ name = "integration-tests"
 path = "src/bin/integration-tests/main.rs"
 
 [dependencies]
+abci = { path = "../crates/abci" }
 bitcoin = { workspace = true }
 protocol = { path = "../crates/protocol" }
 node = { path = "../crates/node" }

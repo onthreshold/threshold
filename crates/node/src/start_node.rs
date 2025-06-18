@@ -1,8 +1,9 @@
+use abci::{ChainInterfaceImpl, db::rocksdb::RocksDb, executor::TransactionExecutorImpl};
 use oracle::{esplora::EsploraOracle, mock::MockOracle, oracle::Oracle};
 use types::{errors::NodeError, intents::DepositIntent};
 
 use crate::{
-    NodeConfig, NodeState, db::RocksDb, grpc::grpc_handler::NodeControlService,
+    NodeConfig, NodeState, grpc::grpc_handler::NodeControlService,
     key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm, wallet::TaprootWallet,
 };
 use bitcoin::Network;
@@ -116,10 +117,16 @@ pub async fn start_node(
         ))
     };
 
+    let db = RocksDb::new(config_database_path.to_str().unwrap());
+
+    let abci = ChainInterfaceImpl::new(
+        Box::new(db),
+        Box::new(TransactionExecutorImpl::new(oracle.clone())),
+    );
+
     let mut node_state = NodeState::new_from_config(
         &network_handle,
         config,
-        RocksDb::new(config_database_path.to_str().unwrap()),
         &swarm.network_events,
         deposit_intent_tx,
         oracle.clone(),
@@ -135,6 +142,7 @@ pub async fn start_node(
                 bitcoin::Network::Bitcoin
             }
         }),
+        Box::new(abci),
     )
     .expect("Failed to create node");
 

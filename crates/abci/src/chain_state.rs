@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
-use types::errors::NodeError;
+use types::{errors::NodeError, intents::DepositIntent};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct Account {
@@ -40,6 +40,7 @@ impl Account {
 pub struct ChainState {
     // address -> account
     accounts: HashMap<String, Account>,
+    deposit_intents: Vec<DepositIntent>,
     block_height: u64,
 }
 
@@ -55,6 +56,7 @@ impl ChainState {
     pub fn new() -> Self {
         Self {
             accounts: HashMap::new(),
+            deposit_intents: Vec::new(),
             block_height: 0,
         }
     }
@@ -63,6 +65,7 @@ impl ChainState {
     pub const fn new_with_accounts(accounts: HashMap<String, Account>, block_height: u64) -> Self {
         Self {
             accounts,
+            deposit_intents: Vec::new(),
             block_height,
         }
     }
@@ -74,6 +77,22 @@ impl ChainState {
 
     pub fn upsert_account(&mut self, address: &str, account: Account) {
         self.accounts.insert(address.to_string(), account);
+    }
+
+    pub fn insert_deposit_intent(&mut self, intent: DepositIntent) {
+        self.deposit_intents.push(intent);
+    }
+
+    #[must_use]
+    pub fn get_all_deposit_intents(&self) -> Vec<DepositIntent> {
+        self.deposit_intents.clone()
+    }
+
+    #[must_use]
+    pub fn get_deposit_intent_by_address(&self, address: &str) -> Option<&DepositIntent> {
+        self.deposit_intents
+            .iter()
+            .find(|intent| intent.deposit_address == address)
     }
 
     #[must_use]

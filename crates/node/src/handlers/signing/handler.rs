@@ -1,5 +1,4 @@
 use crate::NodeState;
-use crate::db::Db;
 use crate::handlers::Handler;
 use crate::handlers::signing::SigningState;
 use crate::swarm_manager::Network;
@@ -8,10 +7,10 @@ use types::errors::NodeError;
 use types::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SigningState {
+impl<N: Network, W: Wallet> Handler<N, W> for SigningState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), NodeError> {
         match message {

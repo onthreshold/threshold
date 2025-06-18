@@ -6,15 +6,13 @@ use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 use types::proto::ProtoDecode;
 
 use crate::swarm_manager::Network;
-use crate::{
-    NodeState, db::Db, handlers::Handler, handlers::deposit::DepositIntentState, wallet::Wallet,
-};
+use crate::{NodeState, handlers::Handler, handlers::deposit::DepositIntentState, wallet::Wallet};
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DepositIntentState {
+impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         match message {
@@ -52,7 +50,7 @@ impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DepositIntentState {
                 request: SelfRequest::ConfirmDeposit { confirmed_tx },
                 ..
             }) => {
-                if let Err(e) = self.update_user_balance(node, &confirmed_tx) {
+                if let Err(e) = self.update_user_balance(node, &confirmed_tx).await {
                     info!("Failed to update user balance: {}", e);
                 }
             }

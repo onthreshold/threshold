@@ -1,11 +1,11 @@
 use crate::{
-    db::Db,
     handlers::{
         Handler, balance::BalanceState, consensus::ConsensusState, deposit::DepositIntentState,
         dkg::DkgState, signing::SigningState, withdrawl::SpendIntentState,
     },
     wallet::Wallet,
 };
+use abci::ChainInterface;
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{
     Argon2,
@@ -18,12 +18,11 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::{PeerId, identity::Keypair};
 use oracle::oracle::Oracle;
-use protocol::chain_state::ChainState;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
 use swarm_manager::Network;
 use tokio::sync::broadcast;
-use tracing::{error, info};
+use tracing::error;
 use types::{errors::NodeError, intents::DepositIntent, network_event::NetworkEvent};
 
 pub mod grpc;
@@ -32,7 +31,6 @@ pub mod main_loop;
 pub mod start_node;
 
 pub mod utils;
-pub use utils::db;
 pub use utils::key_manager;
 pub use utils::swarm_manager;
 pub mod wallet;
@@ -268,10 +266,8 @@ impl NodeConfig {
     }
 }
 
-pub struct NodeState<N: Network, D: Db, W: Wallet> {
-    pub handlers: Vec<Box<dyn Handler<N, D, W>>>,
-    pub db: D,
-    pub chain_state: ChainState,
+pub struct NodeState<N: Network, W: Wallet> {
+    pub handlers: Vec<Box<dyn Handler<N, W>>>,
 
     pub peer_id: PeerId,
     pub peers: HashSet<PeerId>,
@@ -287,18 +283,20 @@ pub struct NodeState<N: Network, D: Db, W: Wallet> {
     pub network_events_stream: broadcast::Receiver<NetworkEvent>,
 
     pub oracle: Box<dyn Oracle>,
+    pub chain_interface: Box<dyn ChainInterface>,
 }
 
-impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
+impl<N: Network, W: Wallet> NodeState<N, W> {
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new_from_config(
         network_handle: &N,
         config: NodeConfig,
-        storage_db: D,
         network_events_sender: &broadcast::Sender<NetworkEvent>,
         deposit_intent_tx: broadcast::Sender<DepositIntent>,
         oracle: Box<dyn Oracle>,
         wallet: W,
+        abci: Box<dyn ChainInterface>,
     ) -> Result<Self, NodeError> {
         let keys = key_manager::load_dkg_keys(config.clone())
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {e}")))?;
@@ -314,33 +312,31 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
 
         consensus_state.validators.insert(network_handle.peer_id());
 
-        let mut deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
+        let deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
         let withdrawl_intent_state = SpendIntentState::new();
         let balance_state = BalanceState::new();
 
-        if let Ok(intents) = storage_db.get_all_deposit_intents() {
-            info!("Found {} deposit intents", intents.len());
-            for intent in intents {
-                if deposit_intent_state
-                    .deposit_addresses
-                    .insert(intent.deposit_address.clone())
-                {
-                    if let Err(e) = deposit_intent_state.deposit_intent_tx.send(intent.clone()) {
-                        error!("Failed to notify deposit monitor of new address: {}", e);
-                    }
-                }
-            }
-        }
-
-        let chain_state = storage_db
-            .get_chain_state()?
-            .unwrap_or_else(ChainState::new);
+        //TODO: Fix this w/ abci
+        // if let Ok(intents) = transaction_executor.get_all_deposit_intents() {
+        //     info!("Found {} deposit intents", intents.len());
+        //     for intent in intents {
+        //         if deposit_intent_state
+        //             .deposit_addresses
+        //             .insert(intent.deposit_address.clone())
+        //         {
+        //             if let Err(e) = deposit_intent_state.deposit_intent_tx.send(intent.clone()) {
+        //                 error!("Failed to notify deposit monitor of new address: {}", e);
+        //             }
+        //         }
+        //     }
+        // }
 
         let mut node_state = Self {
             network_handle: network_handle.clone(),
             network_events_stream: network_events_sender.subscribe(),
             peer_id: network_handle.peer_id(),
-            db: storage_db,
+            min_signers,
+            max_signers,
             peers: HashSet::new(),
             rng: frost::rand_core::OsRng,
             wallet,
@@ -355,8 +351,8 @@ impl<N: Network, D: Db, W: Wallet> NodeState<N, D, W> {
             ],
             pubkey_package: None,
             private_key_package: None,
-            chain_state,
             oracle,
+            chain_interface: abci,
         };
 
         if let Some((private_key, pubkey)) = keys {

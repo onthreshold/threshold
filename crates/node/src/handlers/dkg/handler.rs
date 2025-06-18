@@ -1,12 +1,12 @@
 use crate::swarm_manager::Network;
-use crate::{NodeState, db::Db, handlers::Handler, handlers::dkg::DkgState, wallet::Wallet};
+use crate::{NodeState, handlers::Handler, handlers::dkg::DkgState, wallet::Wallet};
 use types::network_event::{DirectMessage, NetworkEvent};
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for DkgState {
+impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         match message {

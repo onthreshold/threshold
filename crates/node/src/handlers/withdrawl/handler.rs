@@ -1,6 +1,6 @@
 use crate::swarm_manager::Network;
 use crate::wallet::Wallet;
-use crate::{NodeState, db::Db, handlers::Handler, handlers::withdrawl::SpendIntentState};
+use crate::{NodeState, handlers::Handler, handlers::withdrawl::SpendIntentState};
 use libp2p::gossipsub::Message;
 use types::errors::NodeError;
 use types::intents::PendingSpend;
@@ -8,10 +8,10 @@ use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 use types::proto::ProtoDecode;
 
 #[async_trait::async_trait]
-impl<N: Network, D: Db, W: Wallet> Handler<N, D, W> for SpendIntentState {
+impl<N: Network, W: Wallet> Handler<N, W> for SpendIntentState {
     async fn handle(
         &mut self,
-        node: &mut NodeState<N, D, W>,
+        node: &mut NodeState<N, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), NodeError> {
         match message {

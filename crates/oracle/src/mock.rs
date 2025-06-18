@@ -49,6 +49,10 @@ impl Oracle for MockOracle {
         amount: u64,
         tx_hash: Txid,
     ) -> Result<bool, NodeError> {
+        if self.transactions.is_empty() {
+            return Ok(true);
+        }
+
         let tx_hash_str = tx_hash.to_string();
 
         match self.transactions.get(&tx_hash_str) {
