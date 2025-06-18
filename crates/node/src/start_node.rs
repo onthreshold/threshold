@@ -124,6 +124,10 @@ pub async fn start_node(
         Box::new(TransactionExecutorImpl::new(oracle.clone())),
     );
 
+    let chain_interface_handle = tokio::spawn(async move {
+        chain_interface.start().await;
+    });
+
     let mut node_state = NodeState::new_from_config(
         &network_handle,
         config,
@@ -151,10 +155,6 @@ pub async fn start_node(
 
     let swarm_handle = tokio::spawn(async move {
         swarm.start().await;
-    });
-
-    let chain_interface_handle = tokio::spawn(async move {
-        chain_interface.start().await;
     });
 
     let grpc_handle = tokio::spawn(async move {
