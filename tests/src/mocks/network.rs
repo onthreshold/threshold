@@ -177,13 +177,14 @@ impl MockNodeCluster {
         let mut config_path = PathBuf::new();
         config_path.push("config.toml");
 
-        let mut node_config =
-            node::NodeConfig::new(path.clone(), config_path, None, "test-password")
-                .expect("Failed to create node config");
-
-        // Set the min_signers and max_signers for testing
-        node_config.min_signers = Some(peers as u16);
-        node_config.max_signers = Some(peers as u16);
+        let node_config = node::NodeConfigBuilder::new()
+            .key_file_path(path.clone())
+            .config_file_path(config_path)
+            .password("test-password")
+            .min_signers(peers as u16)
+            .max_signers(peers as u16)
+            .build()
+            .expect("Failed to create node config");
 
         let mut nodes = BTreeMap::new();
         let mut senders = BTreeMap::new();

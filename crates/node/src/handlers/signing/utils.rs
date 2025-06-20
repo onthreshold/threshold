@@ -3,14 +3,21 @@ use std::{collections::BTreeMap, str::FromStr};
 use crate::{NodeState, handlers::signing::SigningState, wallet::Wallet};
 use frost_secp256k1::{self as frost};
 use tracing::{error, info};
-use types::{errors::NodeError, intents::PendingSpend, network::network_protocol::Network};
+use types::{intents::PendingSpend, network::network_protocol::Network};
+
+impl Default for SigningState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl SigningState {
-    pub const fn new() -> Result<Self, NodeError> {
-        Ok(Self {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
             active_signing: None,
             pending_spends: BTreeMap::new(),
-        })
+        }
     }
 
     pub fn frost_signature_to_bitcoin(

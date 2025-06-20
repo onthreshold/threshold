@@ -1,6 +1,4 @@
-use std::{fs, path::PathBuf};
-
-use crate::{ConfigStore, EncryptionParams, KeyStore, NodeConfig};
+use crate::{NodeConfig, config::EncryptionParams};
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{Argon2, password_hash::SaltString};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -8,12 +6,10 @@ use bip39::{Language, Mnemonic};
 use bitcoin::bip32::{DerivationPath, Xpriv};
 use bitcoin::key::Secp256k1;
 use bitcoin::{Address, CompressedPublicKey, Network, PrivateKey};
-use directories::ProjectDirs;
 use frost::rand_core::RngCore;
 use frost_secp256k1 as frost;
 use libp2p::identity::Keypair;
 use std::str::FromStr;
-use tracing::debug;
 use types::errors::NodeError;
 
 pub fn derive_key_from_password(password: &str, salt_str: &str) -> Result<Vec<u8>, NodeError> {
@@ -96,35 +92,6 @@ pub fn load_and_decrypt_keypair(config_data: &NodeConfig) -> Result<Keypair, Nod
 
     Keypair::from_protobuf_encoding(&private_key_protobuf)
         .map_err(|e| NodeError::Error(format!("Failed to reconstruct keypair from protobuf: {e}")))
-}
-
-pub fn load_dkg_keys(
-    config: NodeConfig,
-) -> Result<
-    Option<(frost::keys::KeyPackage, frost::keys::PublicKeyPackage)>,
-    Box<dyn std::error::Error>,
-> {
-    if let Some(dkg_keys) = config.dkg_keys {
-        let password = match std::env::var("KEY_PASSWORD") {
-            Ok(pw) => pw,
-            Err(_) => get_password_from_prompt()?,
-        };
-
-        let private_key_bytes = decrypt_private_key(
-            &dkg_keys.encrypted_private_key_package_b64,
-            &password,
-            &dkg_keys.dkg_encryption_params,
-        )?;
-
-        let private_key = frost::keys::KeyPackage::deserialize(&private_key_bytes)?;
-
-        let pubkey_bytes = BASE64.decode(&dkg_keys.pubkey_package_b64)?;
-        let pubkey = frost::keys::PublicKeyPackage::deserialize(&pubkey_bytes)?;
-
-        Ok(Some((private_key, pubkey)))
-    } else {
-        Ok(None)
-    }
 }
 
 #[must_use]

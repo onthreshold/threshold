@@ -23,7 +23,11 @@ use crate::{
     errors::{CliError, KeygenError},
     rpc_client::rpc_get_pending_deposit_intents,
 };
-use node::{EncryptionParams, KeyData, NodeConfig, start_node::start_node};
+use node::{
+    NodeConfig, NodeConfigBuilder,
+    config::{EncryptionParams, KeyData},
+    start_node::start_node,
+};
 
 use types::errors::NodeError;
 
@@ -312,19 +316,14 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
         get_key_file_path()?
     };
 
-    let mut config = NodeConfig::new(
-        paths.key_file_path.clone(),
-        paths.config_file_path.clone(),
-        get_log_file_path().ok(),
-        &user_password,
-    )
-    .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
-
-    config.key_data = key_data;
-    config.grpc_port = 50051;
-    config.libp2p_udp_port = 0;
-    config.libp2p_tcp_port = 0;
-    config.database_directory = PathBuf::from("nodedb.db");
+    let config = NodeConfigBuilder::new()
+        .key_file_path(paths.key_file_path.clone())
+        .config_file_path(paths.config_file_path.clone())
+        .log_file_path(get_log_file_path().ok())
+        .password(&user_password)
+        .key_data(key_data)
+        .build()
+        .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
     config
         .save_to_keys_file()
