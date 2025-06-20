@@ -86,6 +86,7 @@ message Vote {
 
 enum VoteType {
   PREVOTE = 0;
+  PRECOMMIT = 1;
 }
 
 // ========== Intent Messages ==========

@@ -28,6 +28,7 @@ pub struct ConsensusState {
     pub is_leader: bool,
 
     pub prevotes: HashSet<PeerId>,
+    pub precommits: HashSet<PeerId>,
     pub current_block_hash: Option<Vec<u8>>,
 }
 
@@ -53,6 +54,7 @@ impl ConsensusState {
             round_start_time: None,
             is_leader: false,
             prevotes: HashSet::new(),
+            precommits: HashSet::new(),
             current_block_hash: None,
         }
     }
