@@ -23,9 +23,8 @@ use crate::{
     errors::{CliError, KeygenError},
     rpc_client::rpc_get_pending_deposit_intents,
 };
-use node::{
-    EncryptionParams, KeyData, NodeConfig, key_manager::get_config, start_node::start_node,
-};
+use node::{EncryptionParams, KeyData, NodeConfig, start_node::start_node};
+
 use types::errors::NodeError;
 
 struct VaultConfigPath {
@@ -321,14 +320,14 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
     )
     .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
-    config.set_key_data(key_data);
-    config.set_grpc_port(50051);
-    config.set_libp2p_udp_port(0);
-    config.set_libp2p_tcp_port(0);
-    config.set_database_directory(PathBuf::from("nodedb.db"));
+    config.key_data = key_data;
+    config.grpc_port = 50051;
+    config.libp2p_udp_port = 0;
+    config.libp2p_tcp_port = 0;
+    config.database_directory = PathBuf::from("nodedb.db");
 
     config
-        .save_to_file()
+        .save_to_keys_file()
         .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
     println!(
@@ -357,7 +356,7 @@ struct StartNodeConfigParams {
 }
 
 async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> {
-    let mut config = match get_config(
+    let mut config = match NodeConfig::get_config(
         params.key_file_path.clone(),
         params.config_file_path.clone(),
     ) {
@@ -368,35 +367,35 @@ async fn start_node_cli(params: StartNodeConfigParams) -> Result<(), NodeError> 
     };
 
     if let Some(port) = params.grpc_port {
-        config.set_grpc_port(port);
+        config.grpc_port = port;
     }
 
     if let Some(port) = params.libp2p_udp_port {
-        config.set_libp2p_udp_port(port);
+        config.libp2p_udp_port = port;
     }
 
     if let Some(port) = params.libp2p_tcp_port {
-        config.set_libp2p_tcp_port(port);
+        config.libp2p_tcp_port = port;
     }
 
     if let Some(dir) = params.database_directory {
-        config.set_database_directory(PathBuf::from(dir));
+        config.database_directory = PathBuf::from(dir);
     }
 
     if let Some(min) = params.min_signers {
-        config.set_min_signers(min);
+        config.min_signers = Some(min);
     }
 
     if let Some(max) = params.max_signers {
-        config.set_max_signers(max);
+        config.max_signers = Some(max);
     }
 
     if let Some(depth) = params.confirmation_depth {
-        config.set_confirmation_depth(depth);
+        config.confirmation_depth = depth;
     }
 
     if let Some(block) = params.monitor_start_block {
-        config.set_monitor_start_block(block);
+        config.monitor_start_block = block;
     }
 
     start_node(
