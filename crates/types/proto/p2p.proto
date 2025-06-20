@@ -63,6 +63,7 @@ message ConsensusMessage {
   oneof message {
     LeaderAnnouncement leader_announcement = 1;
     NewRound new_round = 2;
+    Vote vote = 3;
   }
 }
 
@@ -73,6 +74,18 @@ message LeaderAnnouncement {
 
 message NewRound {
   uint32 round = 1;
+}
+
+message Vote {
+  uint32 round = 1;
+  uint64 height = 2;
+  bytes block_hash = 3;
+  bytes voter = 4;
+  VoteType vote_type = 5;
+}
+
+enum VoteType {
+  PREVOTE = 0;
 }
 
 // ========== Intent Messages ==========
