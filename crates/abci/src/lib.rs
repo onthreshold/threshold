@@ -141,7 +141,15 @@ impl ChainInterface for ChainInterfaceImpl {
         &mut self,
         transaction: Transaction,
     ) -> Result<(), NodeError> {
-        self.chain_state.add_transaction_to_block(transaction);
+        self.chain_state
+            .add_transaction_to_block(transaction.clone());
+        // TODO: this is a hack to get the chain state to update.
+        let new_chain_state = self
+            .executor
+            .execute_transaction(transaction, self.chain_state.clone())
+            .await?;
+        self.db.flush_state(&new_chain_state)?;
+        self.chain_state = new_chain_state;
         Ok(())
     }
 
