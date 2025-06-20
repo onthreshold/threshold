@@ -8,7 +8,7 @@ use abci::{
 };
 use frost_secp256k1::keys::PublicKeyPackage;
 use protocol::{
-    block::{ChainConfig, GenesisBlock, ValidatorInfo},
+    block::{Block, ChainConfig, GenesisBlock, ValidatorInfo},
     transaction::Transaction,
 };
 use types::{errors::NodeError, intents::DepositIntent};
@@ -181,6 +181,16 @@ impl ChainInterface for MockChainInterface {
             .cloned()
     }
 
+    fn get_proposed_block(
+        &self,
+        previous_block: Option<Block>,
+        proposer: Vec<u8>,
+    ) -> Result<Block, NodeError> {
+        Ok(self
+            .chain_state
+            .get_proposed_block(previous_block, proposer))
+    }
+
     fn create_genesis_block(
         &mut self,
         validators: Vec<ValidatorInfo>,
@@ -197,7 +207,10 @@ impl ChainInterface for MockChainInterface {
         self.db.insert_block(genesis_block.to_block())
     }
 
-    async fn execute_transaction(&mut self, transaction: Transaction) -> Result<(), NodeError> {
+    async fn add_transaction_to_block(
+        &mut self,
+        transaction: Transaction,
+    ) -> Result<(), NodeError> {
         let new_chain_state = self
             .executor
             .execute_transaction(transaction, self.chain_state.clone())
@@ -252,11 +265,11 @@ pub async fn setup_test_account(
 
     match node
         .chain_interface_tx
-        .send_message_with_response(abci::ChainMessage::ExecuteTransaction { transaction })
+        .send_message_with_response(abci::ChainMessage::AddTransactionToBlock { transaction })
         .await
     {
-        Ok(abci::ChainResponse::ExecuteTransaction { error: None }) => Ok(()),
-        Ok(abci::ChainResponse::ExecuteTransaction { error: Some(e) }) => Err(e),
+        Ok(abci::ChainResponse::AddTransactionToBlock { error: None }) => Ok(()),
+        Ok(abci::ChainResponse::AddTransactionToBlock { error: Some(e) }) => Err(e),
         _ => Err(types::errors::NodeError::Error(
             "Failed to set up test account".to_string(),
         )),

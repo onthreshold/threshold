@@ -103,10 +103,43 @@ impl BlockHeader {
 impl Block {
     /// Create a new block
     #[must_use]
-    pub const fn new(
+    pub fn new(
         previous_block_hash: BlockHash,
-        state_root: StateRoot,
         height: u64,
+        transactions: Vec<Transaction>,
+        proposer: Vec<u8>,
+        timestamp: u64,
+    ) -> Self {
+        let mut hasher = Sha256::new();
+        let state_bytes =
+            bincode::encode_to_vec(&transactions, bincode::config::standard()).unwrap();
+        hasher.update(&state_bytes);
+        hasher.update(&proposer);
+        hasher.update(height.to_le_bytes());
+        let result = hasher.finalize();
+        let mut state_root = [0u8; 32];
+        state_root.copy_from_slice(&result);
+
+        let header = BlockHeader {
+            version: 1,
+            previous_block_hash,
+            state_root,
+            timestamp,
+            height,
+            proposer,
+        };
+
+        Self {
+            header,
+            body: BlockBody { transactions },
+        }
+    }
+
+    #[must_use]
+    pub const fn new_with_state_root(
+        previous_block_hash: BlockHash,
+        height: u64,
+        state_root: StateRoot,
         transactions: Vec<Transaction>,
         proposer: Vec<u8>,
         timestamp: u64,
@@ -182,9 +215,8 @@ impl GenesisBlock {
 
         Block::new(
             [0u8; 32], // No previous block
-            state_root,
-            0,      // Height 0
-            vec![], // No transactions in genesis
+            0,         // Height 0
+            vec![],    // No transactions in genesis
             self.initial_state
                 .validators
                 .first()

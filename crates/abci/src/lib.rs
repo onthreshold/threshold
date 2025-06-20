@@ -1,6 +1,6 @@
 use frost_secp256k1::keys::PublicKeyPackage;
 use protocol::{
-    block::{ChainConfig, GenesisBlock, ValidatorInfo},
+    block::{Block, ChainConfig, GenesisBlock, ValidatorInfo},
     transaction::Transaction,
 };
 use tokio::sync::broadcast;
@@ -26,8 +26,14 @@ pub trait ChainInterface: Send + Sync {
         pubkey: &PublicKeyPackage,
     ) -> Result<(), NodeError>;
 
-    async fn execute_transaction(&mut self, transaction: Transaction) -> Result<(), NodeError>;
+    async fn add_transaction_to_block(&mut self, transaction: Transaction)
+    -> Result<(), NodeError>;
     fn get_account(&self, address: &str) -> Option<Account>;
+    fn get_proposed_block(
+        &self,
+        previous_block: Option<Block>,
+        proposer: Vec<u8>,
+    ) -> Result<Block, NodeError>;
 }
 
 #[derive(Clone)]
@@ -47,8 +53,12 @@ pub enum ChainMessage {
         chain_config: ChainConfig,
         pubkey: PublicKeyPackage,
     },
-    ExecuteTransaction {
+    AddTransactionToBlock {
         transaction: Transaction,
+    },
+    GetProposedBlock {
+        previous_block: Option<Block>,
+        proposer: Vec<u8>,
     },
 }
 
@@ -59,7 +69,8 @@ pub enum ChainResponse {
     GetAllDepositIntents { intents: Vec<DepositIntent> },
     GetDepositIntentByAddress { intent: Option<DepositIntent> },
     CreateGenesisBlock { error: Option<NodeError> },
-    ExecuteTransaction { error: Option<NodeError> },
+    AddTransactionToBlock { error: Option<NodeError> },
+    GetProposedBlock { block: Block },
 }
 
 pub struct ChainInterfaceImpl {
@@ -126,15 +137,22 @@ impl ChainInterface for ChainInterfaceImpl {
         self.db.insert_block(genesis_block.to_block())
     }
 
-    async fn execute_transaction(&mut self, transaction: Transaction) -> Result<(), NodeError> {
-        let new_chain_state = self
-            .executor
-            .execute_transaction(transaction, self.chain_state.clone())
-            .await?;
-
-        self.db.flush_state(&new_chain_state)?;
-        self.chain_state = new_chain_state;
+    async fn add_transaction_to_block(
+        &mut self,
+        transaction: Transaction,
+    ) -> Result<(), NodeError> {
+        self.chain_state.add_transaction_to_block(transaction);
         Ok(())
+    }
+
+    fn get_proposed_block(
+        &self,
+        previous_block: Option<Block>,
+        proposer: Vec<u8>,
+    ) -> Result<Block, NodeError> {
+        Ok(self
+            .chain_state
+            .get_proposed_block(previous_block, proposer))
     }
 }
 

@@ -140,9 +140,9 @@ impl SpendIntentState {
             tx.output[0].value.to_sat() + fee,
         )?;
 
-        let ChainResponse::ExecuteTransaction { error: None } = node
+        let ChainResponse::AddTransactionToBlock { error: None } = node
             .chain_interface_tx
-            .send_message_with_response(ChainMessage::ExecuteTransaction { transaction })
+            .send_message_with_response(ChainMessage::AddTransactionToBlock { transaction })
             .await?
         else {
             return Err(NodeError::Error(
@@ -186,9 +186,9 @@ impl SpendIntentState {
 
         let transaction = Transaction::create_withdrawal_transaction(&pending.user_pubkey, debit)?;
 
-        let ChainResponse::ExecuteTransaction { error: None } = node
+        let ChainResponse::AddTransactionToBlock { error: None } = node
             .chain_interface_tx
-            .send_message_with_response(ChainMessage::ExecuteTransaction { transaction })
+            .send_message_with_response(ChainMessage::AddTransactionToBlock { transaction })
             .await?
         else {
             return Err(NodeError::Error(

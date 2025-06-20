@@ -59,11 +59,17 @@ impl ChainInterfaceImpl {
                         .create_genesis_block(validators, chain_config, &pubkey)
                         .err(),
                 },
-                ChainMessage::ExecuteTransaction { transaction } => {
-                    ChainResponse::ExecuteTransaction {
-                        error: self.execute_transaction(transaction).await.err(),
+                ChainMessage::AddTransactionToBlock { transaction } => {
+                    ChainResponse::AddTransactionToBlock {
+                        error: self.add_transaction_to_block(transaction).await.err(),
                     }
                 }
+                ChainMessage::GetProposedBlock {
+                    previous_block,
+                    proposer,
+                } => ChainResponse::GetProposedBlock {
+                    block: self.get_proposed_block(previous_block, proposer)?,
+                },
             };
             response_tx
                 .send(response)

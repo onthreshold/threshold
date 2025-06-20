@@ -185,9 +185,9 @@ impl DepositIntentState {
                         output.value.to_sat(),
                     )?;
 
-                    let ChainResponse::ExecuteTransaction { error: None } = node
+                    let ChainResponse::AddTransactionToBlock { error: None } = node
                         .chain_interface_tx
-                        .send_message_with_response(ChainMessage::ExecuteTransaction {
+                        .send_message_with_response(ChainMessage::AddTransactionToBlock {
                             transaction,
                         })
                         .await?

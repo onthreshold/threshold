@@ -4,10 +4,21 @@ use crate::{
     handlers::consensus::{ConsensusPhase, ConsensusState},
     wallet::Wallet,
 };
+use abci::{ChainMessage, ChainResponse};
 use libp2p::PeerId;
+use protocol::block::Block;
 use tracing::info;
 use types::network::network_protocol::Network;
 use types::{network::network_event::NetworkEvent, proto::ProtoDecode};
+
+#[derive(Clone)]
+struct RawBlockBytes(Vec<u8>);
+
+impl types::proto::ProtoEncode for RawBlockBytes {
+    fn encode(&self) -> Result<Vec<u8>, String> {
+        Ok(self.0.clone())
+    }
+}
 
 #[async_trait::async_trait]
 impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
@@ -16,6 +27,39 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
         node: &mut NodeState<N, W>,
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
+        if self.is_leader && self.current_state == ConsensusPhase::WaitingForPropose {
+            if let Ok(ChainResponse::GetProposedBlock { block }) = node
+                .chain_interface_tx
+                .send_message_with_response(ChainMessage::GetProposedBlock {
+                    previous_block: None,
+                    proposer: node.peer_id.to_bytes(),
+                })
+                .await
+            {
+                if !block.body.transactions.is_empty() {
+                    let bytes = block.serialize()?;
+
+                    let raw = RawBlockBytes(bytes);
+
+                    node.network_handle
+                        .send_broadcast(self.block_topic.clone(), raw)
+                        .map_err(|e| {
+                            types::errors::NodeError::Error(format!(
+                                "Failed to broadcast block proposal: {e:?}"
+                            ))
+                        })?;
+
+                    info!(
+                        "📦 Proposed block for round {} with {} txs",
+                        self.current_round,
+                        block.body.transactions.len()
+                    );
+
+                    self.current_state = ConsensusPhase::Propose;
+                }
+            }
+        }
+
         if let Some(start_time) = self.round_start_time {
             if start_time.elapsed() >= self.round_timeout && self.is_leader {
                 info!("Round timeout reached. I am current leader. Proposing new round.");
@@ -63,6 +107,28 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                 }
                                 types::consensus::ConsensusMessage::NewRound(round) => {
                                     self.handle_new_round(node, peer, round)?;
+                                }
+                            }
+                        }
+
+                        // Handle proposed blocks coming over the dedicated topic
+                        if message.topic == self.block_topic.hash() {
+                            match Block::deserialize(&message.data) {
+                                Ok(block) => {
+                                    info!(
+                                        "📥 Received block proposal for round {} from {} with {} txs",
+                                        self.current_round,
+                                        peer,
+                                        block.body.transactions.len()
+                                    );
+                                    // TODO: verify block, move to Prevote phase, etc.
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        "Failed to deserialize proposed block from {}: {}",
+                                        peer,
+                                        e
+                                    );
                                 }
                             }
                         }
