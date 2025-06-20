@@ -14,6 +14,8 @@ use tonic::transport::Server;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
+use std::sync::Arc;
+
 pub async fn start_node(
     config: NodeConfig,
     grpc_port: Option<u16>,
@@ -120,8 +122,10 @@ pub async fn start_node(
 
     let db = RocksDb::new(config_database_path.to_str().unwrap());
 
+    let db_arc: Arc<RocksDb> = Arc::new(db.clone());
+
     let (mut chain_interface, chain_message_tx) = ChainInterfaceImpl::new(
-        Box::new(db),
+        Box::new(db.clone()),
         Box::new(TransactionExecutorImpl::new(oracle.clone())),
     );
 
@@ -135,18 +139,23 @@ pub async fn start_node(
         &swarm.network_events,
         deposit_intent_tx,
         oracle.clone(),
-        TaprootWallet::new(oracle.clone(), Vec::new(), {
-            let is_testnet: bool = std::env::var("IS_TESTNET")
-                .unwrap_or_else(|_| String::from("false"))
-                .parse()
-                .unwrap_or(false);
+        TaprootWallet::new_with_db(
+            oracle.clone(),
+            Vec::new(),
+            {
+                let is_testnet: bool = std::env::var("IS_TESTNET")
+                    .unwrap_or_else(|_| String::from("false"))
+                    .parse()
+                    .unwrap_or(false);
 
-            if is_testnet {
-                bitcoin::Network::Testnet
-            } else {
-                bitcoin::Network::Bitcoin
-            }
-        }),
+                if is_testnet {
+                    bitcoin::Network::Testnet
+                } else {
+                    bitcoin::Network::Bitcoin
+                }
+            },
+            db_arc.clone(),
+        ),
         chain_message_tx,
     )
     .await

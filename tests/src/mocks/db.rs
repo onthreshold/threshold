@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::RwLock};
 
 use abci::{chain_state::ChainState, db::Db};
 use protocol::block::{Block, BlockHash};
-use types::{errors::NodeError, intents::DepositIntent};
+use types::{errors::NodeError, intents::DepositIntent, utxo::Utxo};
 
 pub struct MockDb {
     pub blocks: RwLock<HashMap<BlockHash, Block>>,
@@ -10,6 +10,7 @@ pub struct MockDb {
     pub height_map: RwLock<HashMap<u64, BlockHash>>,
     pub tip_block_hash: RwLock<Option<BlockHash>>,
     pub deposit_intents: RwLock<HashMap<String, DepositIntent>>,
+    pub utxos: RwLock<HashMap<String, Utxo>>,
 }
 
 impl Default for MockDb {
@@ -26,6 +27,7 @@ impl MockDb {
             height_map: RwLock::new(HashMap::new()),
             tip_block_hash: RwLock::new(None),
             deposit_intents: RwLock::new(HashMap::new()),
+            utxos: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -97,5 +99,18 @@ impl Db for MockDb {
             .values()
             .find(|intent| intent.deposit_address == address)
             .cloned())
+    }
+
+    fn store_utxos(&self, utxos: Vec<Utxo>) -> Result<(), NodeError> {
+        let mut utxos_map = self.utxos.write().unwrap();
+        for utxo in utxos {
+            utxos_map.insert(utxo.outpoint.txid.to_string(), utxo);
+        }
+        Ok(())
+    }
+
+    fn get_utxos(&self) -> Result<Vec<Utxo>, NodeError> {
+        let utxos = self.utxos.read().unwrap();
+        Ok(utxos.values().cloned().collect())
     }
 }
