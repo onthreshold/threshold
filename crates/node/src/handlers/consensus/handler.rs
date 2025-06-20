@@ -121,7 +121,26 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                         peer,
                                         block.body.transactions.len()
                                     );
-                                    // TODO: verify block, move to Prevote phase, etc.
+                                    let Ok(ChainResponse::GetProposedBlock { block: local_block }) =
+                                        node.chain_interface_tx
+                                            .send_message_with_response(
+                                                ChainMessage::GetProposedBlock {
+                                                    previous_block: None,
+                                                    proposer: node.peer_id.to_bytes(),
+                                                },
+                                            )
+                                            .await
+                                    else {
+                                        return Err(types::errors::NodeError::Error(
+                                            "Failed to get proposed block".to_string(),
+                                        ));
+                                    };
+
+                                    if local_block == block {
+                                        info!("Block is valid");
+                                    } else {
+                                        info!("Block is invalid");
+                                    }
                                 }
                                 Err(e) => {
                                     tracing::warn!(
