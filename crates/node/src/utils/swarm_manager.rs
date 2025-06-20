@@ -164,6 +164,7 @@ pub struct SwarmManager {
     pub withdrawls_topic: gossipsub::IdentTopic,
     pub leader_topic: gossipsub::IdentTopic,
     pub block_proposals_topic: gossipsub::IdentTopic,
+    pub vote_topic: gossipsub::IdentTopic,
 }
 
 impl SwarmManager {
@@ -234,6 +235,13 @@ impl SwarmManager {
             .subscribe(&block_proposals_topic)
             .map_err(|e| NodeError::Error(e.to_string()))?;
 
+        let vote_topic = gossipsub::IdentTopic::new("votes");
+        swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&vote_topic)
+            .map_err(|e| NodeError::Error(e.to_string()))?;
+
         Ok((
             Self {
                 round1_topic,
@@ -243,6 +251,7 @@ impl SwarmManager {
                 withdrawls_topic,
                 leader_topic,
                 block_proposals_topic,
+                vote_topic,
                 inner: swarm,
                 network_manager_rx: receiving_commands,
                 network_events: network_events_emitter,

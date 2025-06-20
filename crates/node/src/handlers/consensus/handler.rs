@@ -7,9 +7,12 @@ use crate::{
 use abci::{ChainMessage, ChainResponse};
 use libp2p::PeerId;
 use protocol::block::Block;
+use sha2::{Digest, Sha256};
 use tracing::info;
+use types::consensus::{ConsensusMessage, LeaderAnnouncement, Vote};
+use types::errors::NodeError;
 use types::network::network_protocol::Network;
-use types::{network::network_event::NetworkEvent, proto::ProtoDecode};
+use types::{consensus::VoteType, network::network_event::NetworkEvent, proto::ProtoDecode};
 
 #[derive(Clone)]
 struct RawBlockBytes(Vec<u8>);
@@ -26,7 +29,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
         &mut self,
         node: &mut NodeState<N, W>,
         message: Option<NetworkEvent>,
-    ) -> Result<(), types::errors::NodeError> {
+    ) -> Result<(), NodeError> {
         if self.is_leader && self.current_state == ConsensusPhase::WaitingForPropose {
             if let Ok(ChainResponse::GetProposedBlock { block }) = node
                 .chain_interface_tx
@@ -44,9 +47,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                     node.network_handle
                         .send_broadcast(self.block_topic.clone(), raw)
                         .map_err(|e| {
-                            types::errors::NodeError::Error(format!(
-                                "Failed to broadcast block proposal: {e:?}"
-                            ))
+                            NodeError::Error(format!("Failed to broadcast block proposal: {e:?}"))
                         })?;
 
                     info!(
@@ -64,14 +65,12 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
             if start_time.elapsed() >= self.round_timeout && self.is_leader {
                 info!("Round timeout reached. I am current leader. Proposing new round.");
                 let next_round = self.current_round + 1;
-                let new_round_message = types::consensus::ConsensusMessage::NewRound(next_round);
+                let new_round_message = ConsensusMessage::NewRound(next_round);
 
                 node.network_handle
                     .send_broadcast(self.leader_topic.clone(), new_round_message)
                     .map_err(|e| {
-                        types::errors::NodeError::Error(format!(
-                            "Failed to broadcast new round message: {e:?}"
-                        ))
+                        NodeError::Error(format!("Failed to broadcast new round message: {e:?}"))
                     })?;
             }
         }
@@ -90,23 +89,22 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                 NetworkEvent::GossipsubMessage(message) => {
                     if let Some(peer) = message.source {
                         if message.topic == self.leader_topic.hash() {
-                            let consensus_message: types::consensus::ConsensusMessage =
-                                types::consensus::ConsensusMessage::decode(&message.data).map_err(
-                                    |e| {
-                                        types::errors::NodeError::Error(format!(
-                                            "Failed to decode consensus message: {e}"
-                                        ))
-                                    },
-                                )?;
+                            let consensus_message: ConsensusMessage =
+                                ConsensusMessage::decode(&message.data).map_err(|e| {
+                                    NodeError::Error(format!(
+                                        "Failed to decode consensus message: {e}"
+                                    ))
+                                })?;
 
                             match consensus_message {
-                                types::consensus::ConsensusMessage::LeaderAnnouncement(
-                                    announcement,
-                                ) => {
+                                ConsensusMessage::LeaderAnnouncement(announcement) => {
                                     self.handle_leader_announcement(node, &announcement)?;
                                 }
-                                types::consensus::ConsensusMessage::NewRound(round) => {
+                                ConsensusMessage::NewRound(round) => {
                                     self.handle_new_round(node, peer, round)?;
+                                }
+                                ConsensusMessage::Vote(vote) => {
+                                    self.handle_vote(node, peer, &vote);
                                 }
                             }
                         }
@@ -131,15 +129,16 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                             )
                                             .await
                                     else {
-                                        return Err(types::errors::NodeError::Error(
+                                        return Err(NodeError::Error(
                                             "Failed to get proposed block".to_string(),
                                         ));
                                     };
 
                                     if local_block == block {
-                                        info!("Block is valid");
+                                        info!("Block is valid. Sending prevote.");
+                                        self.send_vote(node, &block, VoteType::Prevote)?;
                                     } else {
-                                        info!("Block is invalid");
+                                        info!("Block is invalid. Not voting");
                                     }
                                 }
                                 Err(e) => {
@@ -149,6 +148,17 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                         e
                                     );
                                 }
+                            }
+                        }
+
+                        if message.topic == self.vote_topic.hash() {
+                            let vote_message: ConsensusMessage =
+                                ConsensusMessage::decode(&message.data).map_err(|e| {
+                                    NodeError::Error(format!("Failed to decode vote message: {e}"))
+                                })?;
+
+                            if let ConsensusMessage::Vote(vote) = vote_message {
+                                self.handle_vote(node, peer, &vote);
                             }
                         }
                     }
@@ -166,19 +176,17 @@ impl ConsensusState {
         node: &NodeState<N, W>,
         sender: PeerId,
         round: u32,
-    ) -> Result<(), types::errors::NodeError> {
+    ) -> Result<(), NodeError> {
         if round <= self.current_round {
-            return Ok(()); // Old or current round, ignore
+            return Ok(());
         }
 
-        // Verify sender is the leader of the previous round
         if let Some(expected_leader) = self.proposer {
             if expected_leader != sender {
                 info!("Ignoring NewRound message from non-leader {}", sender);
                 return Ok(());
             }
         } else if self.current_round > 0 {
-            // We should have a leader for any round > 0
             return Ok(());
         }
 
@@ -189,7 +197,7 @@ impl ConsensusState {
     fn start_new_round<N: Network, W: Wallet>(
         &mut self,
         node: &NodeState<N, W>,
-    ) -> Result<(), types::errors::NodeError> {
+    ) -> Result<(), NodeError> {
         self.current_round += 1;
 
         if let Some(new_leader) = self.select_leader(self.current_round) {
@@ -197,17 +205,15 @@ impl ConsensusState {
             self.is_leader = new_leader == node.peer_id;
 
             if self.is_leader {
-                let announcement = types::consensus::LeaderAnnouncement {
+                let announcement = LeaderAnnouncement {
                     leader: new_leader.to_bytes(),
                     round: self.current_round,
                 };
-                let message = types::consensus::ConsensusMessage::LeaderAnnouncement(announcement);
+                let message = ConsensusMessage::LeaderAnnouncement(announcement);
 
                 node.network_handle
                     .send_broadcast(self.leader_topic.clone(), message)
-                    .map_err(|e| {
-                        types::errors::NodeError::Error(format!("Failed to publish leader: {e:?}"))
-                    })?;
+                    .map_err(|e| NodeError::Error(format!("Failed to publish leader: {e:?}")))?;
             }
 
             info!(
@@ -219,17 +225,19 @@ impl ConsensusState {
         self.current_state = ConsensusPhase::WaitingForPropose;
         self.round_start_time = Some(tokio::time::Instant::now());
 
+        self.prevotes.clear();
+        self.current_block_hash = None;
+
         Ok(())
     }
 
     fn handle_leader_announcement<N: Network, W: Wallet>(
         &mut self,
         node: &NodeState<N, W>,
-        announcement: &types::consensus::LeaderAnnouncement,
-    ) -> Result<(), types::errors::NodeError> {
-        let leader = PeerId::from_bytes(&announcement.leader).map_err(|e| {
-            types::errors::NodeError::Error(format!("Failed to decode leader bytes: {e}"))
-        })?;
+        announcement: &LeaderAnnouncement,
+    ) -> Result<(), NodeError> {
+        let leader = PeerId::from_bytes(&announcement.leader)
+            .map_err(|e| NodeError::Error(format!("Failed to decode leader bytes: {e}")))?;
 
         if announcement.round >= self.current_round {
             self.current_round = announcement.round;
@@ -246,5 +254,75 @@ impl ConsensusState {
         }
 
         Ok(())
+    }
+
+    fn send_vote(
+        &self,
+        node: &NodeState<impl Network, impl Wallet>,
+        block: &Block,
+        vote_type: VoteType,
+    ) -> Result<(), NodeError> {
+        let block_bytes = block.serialize()?;
+        let mut hasher = Sha256::new();
+        hasher.update(&block_bytes);
+        let block_hash = hasher.finalize().to_vec();
+
+        let vote_type_clone = vote_type.clone();
+        let vote = Vote {
+            round: self.current_round,
+            height: self.current_height,
+            block_hash: block_hash.clone(),
+            voter: node.peer_id.to_bytes(),
+            vote_type,
+        };
+
+        let vote_message = ConsensusMessage::Vote(vote);
+
+        node.network_handle
+            .send_broadcast(self.vote_topic.clone(), vote_message)
+            .map_err(|e| NodeError::Error(format!("Failed to broadcast vote: {e:?}")))?;
+
+        info!(
+            "Sending {:?} vote for block hash {:?} in round {}",
+            vote_type_clone, block_hash, self.current_round
+        );
+
+        Ok(())
+    }
+
+    fn handle_vote(
+        &mut self,
+        node: &NodeState<impl Network, impl Wallet>,
+        sender: PeerId,
+        vote: &Vote,
+    ) {
+        if vote.round != self.current_round || vote.height != self.current_height {
+            return;
+        }
+
+        if !self.validators.contains(&sender) {
+            info!("Ignoring vote from non-validator {}", sender);
+            return;
+        }
+
+        match vote.vote_type {
+            VoteType::Prevote => {
+                if self.prevotes.insert(sender) {
+                    info!(
+                        "Got prevote from {} for block hash {:?}. Total: {}/{}",
+                        node.network_handle.peer_name(&sender),
+                        vote.block_hash,
+                        self.prevotes.len(),
+                        self.validators.len()
+                    );
+
+                    if self.prevotes.len() > (self.validators.len() * 2) / 3 {
+                        info!("Got 2/3+ prevotes.");
+
+                        todo!("Send precommit vote here");
+                    }
+                }
+            }
+        }
     }
 }

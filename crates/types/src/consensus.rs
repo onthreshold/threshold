@@ -6,12 +6,27 @@ use crate::proto::{ProtoDecode, ProtoEncode, p2p_proto};
 pub enum ConsensusMessage {
     LeaderAnnouncement(LeaderAnnouncement),
     NewRound(u32),
+    Vote(Vote),
 }
 
 #[derive(Debug, Clone)]
 pub struct LeaderAnnouncement {
     pub leader: Vec<u8>,
     pub round: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct Vote {
+    pub round: u32,
+    pub height: u64,
+    pub block_hash: Vec<u8>,
+    pub voter: Vec<u8>,
+    pub vote_type: VoteType,
+}
+
+#[derive(Debug, Clone)]
+pub enum VoteType {
+    Prevote,
 }
 
 impl ProtoEncode for ConsensusMessage {
@@ -30,6 +45,15 @@ impl ProtoEncode for ConsensusMessage {
                     round: *round,
                 })
             }
+            Self::Vote(vote) => p2p_proto::consensus_message::Message::Vote(p2p_proto::Vote {
+                round: vote.round,
+                height: vote.height,
+                block_hash: vote.block_hash.clone(),
+                voter: vote.voter.clone(),
+                vote_type: match vote.vote_type {
+                    VoteType::Prevote => p2p_proto::VoteType::Prevote as i32,
+                },
+            }),
         };
 
         let consensus_msg = p2p_proto::ConsensusMessage {
@@ -59,6 +83,19 @@ impl ProtoDecode for ConsensusMessage {
             }
             p2p_proto::consensus_message::Message::NewRound(new_round) => {
                 Ok(Self::NewRound(new_round.round))
+            }
+            p2p_proto::consensus_message::Message::Vote(vote) => {
+                let vote_type = match vote.vote_type {
+                    0 => VoteType::Prevote,
+                    _ => return Err("Invalid vote type".to_string()),
+                };
+                Ok(Self::Vote(Vote {
+                    round: vote.round,
+                    height: vote.height,
+                    block_hash: vote.block_hash,
+                    voter: vote.voter,
+                    vote_type,
+                }))
             }
         }
     }
