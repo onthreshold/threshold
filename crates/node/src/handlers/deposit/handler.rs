@@ -2,11 +2,16 @@ use libp2p::gossipsub::{IdentTopic, Message};
 use tracing::info;
 use types::errors::NodeError;
 use types::intents::DepositIntent;
+
+use crate::{
+    NodeState,
+    handlers::{deposit::DepositIntentState, Handler},
+    wallet::Wallet,
+};
+
+use types::network::Network;
 use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 use types::proto::ProtoDecode;
-
-use crate::swarm_manager::Network;
-use crate::{NodeState, handlers::Handler, handlers::deposit::DepositIntentState, wallet::Wallet};
 
 #[async_trait::async_trait]
 impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {

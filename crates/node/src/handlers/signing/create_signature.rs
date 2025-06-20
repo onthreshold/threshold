@@ -9,13 +9,13 @@ use tracing::{debug, error, info, warn};
 
 use crate::handlers::signing::SigningState;
 use crate::peer_id_to_identifier;
-use crate::swarm_manager::Network;
 use crate::{
     NodeState, handlers::signing::ActiveSigning, handlers::withdrawl::SpendIntentState,
     wallet::Wallet,
 };
 use types::errors::NodeError;
 use types::network_event::DirectMessage;
+use types::network::Network;
 
 impl SigningState {
     pub fn start_signing_session<N: Network, W: Wallet>(

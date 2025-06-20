@@ -1,7 +1,7 @@
-use crate::swarm_manager::NetworkHandle;
+use types::network::NetworkHandle;
 use tonic::{Request, Response, Status};
 
-use crate::grpc::grpc_operator;
+use crate::grpc_operator;
 
 use types::proto::node_proto::{
     CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest, ConfirmWithdrawalResponse,

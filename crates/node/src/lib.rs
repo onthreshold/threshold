@@ -20,12 +20,11 @@ use libp2p::{PeerId, identity::Keypair};
 use oracle::oracle::Oracle;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::PathBuf};
-use swarm_manager::Network;
+use types::network::Network;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 use types::{errors::NodeError, intents::DepositIntent, network_event::NetworkEvent};
 
-pub mod grpc;
 pub mod handlers;
 pub mod main_loop;
 pub mod start_node;

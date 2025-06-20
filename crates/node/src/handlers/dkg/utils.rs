@@ -10,10 +10,9 @@ use crate::{
     DkgKeys, EncryptionParams, NodeConfig, NodeState,
     handlers::dkg::DkgState,
     key_manager::{decrypt_private_key, encrypt_private_key, get_password_from_prompt},
-    swarm_manager::Network,
     wallet::Wallet,
 };
-use types::errors::NodeError;
+use types::{errors::NodeError, network::Network};
 
 impl DkgState {
     pub fn new() -> Result<Self, NodeError> {

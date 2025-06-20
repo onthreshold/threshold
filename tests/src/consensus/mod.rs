@@ -25,7 +25,6 @@ mod consensus_tests {
         }
 
         cluster.run_n_iterations(10).await;
-
         let mut leaders: HashSet<PeerId> = HashSet::new();
         for node in cluster.nodes.values() {
             let cs = node

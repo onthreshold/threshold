@@ -2,9 +2,9 @@ use crate::{
     NodeState,
     handlers::Handler,
     handlers::consensus::{ConsensusPhase, ConsensusState},
-    swarm_manager::Network,
     wallet::Wallet,
 };
+use types::network::Network;
 use libp2p::PeerId;
 use tracing::info;
 use types::{network_event::NetworkEvent, proto::ProtoDecode};

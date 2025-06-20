@@ -1,4 +1,4 @@
-use crate::swarm_manager::Network;
+use types::network::Network;
 use crate::{NodeState, handlers::Handler, handlers::dkg::DkgState, wallet::Wallet};
 use types::network_event::{DirectMessage, NetworkEvent};
 

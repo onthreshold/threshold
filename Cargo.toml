@@ -6,12 +6,11 @@ members = [
     "crates/node",
     "crates/protocol",
     "crates/types",
-    "crates/oracle", "crates/abci", "messenger",
+    "crates/oracle", "crates/abci", "messenger", "crates/grpc",
 ]
 resolver = "2"
 
 [workspace.package]
-name = "threshold"
 version = "0.1.0"
 edition = "2024"
 description = "building the best infrastructure for decentralized multisigs"
@@ -26,7 +25,7 @@ serde = { version = "1.0", features = ["derive"] }
 futures = "0.3.31"
 serde_json = "1.0"
 frost-secp256k1 = "2.1.0"
-bitcoin = { version = "0.32.6", features = ["rand-std"] }
+bitcoin = { version = "0.32.6", features = ["rand-std", "serde"] }
 bitcoin_hashes = "0.14.0"
 bitcoin-internals = "0.3.0"
 libp2p = { version = "0.55", features = [
@@ -65,6 +64,7 @@ prost-types = "0.13.5"
 tempfile = "3.20.0"
 uuid = { version = "1.7.0", features = ["v4", "serde"] }
 tracing = "0.1"
+grpc = { path = "crates/grpc" }
 
 [workspace.lints.rust]
 unsafe_code = "warn"

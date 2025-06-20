@@ -3,8 +3,7 @@ use oracle::{esplora::EsploraOracle, mock::MockOracle, oracle::Oracle};
 use types::{errors::NodeError, intents::DepositIntent};
 
 use crate::{
-    NodeConfig, NodeState, grpc::grpc_handler::NodeControlService,
-    key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm, wallet::TaprootWallet,
+    NodeConfig, NodeState, key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm, wallet::TaprootWallet,
 };
 use bitcoin::Network;
 use std::path::{Path, PathBuf};
@@ -12,6 +11,7 @@ use tokio::sync::broadcast;
 use tonic::transport::Server;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use grpc::grpc_handler::NodeControlService;
 
 pub async fn start_node(
     config: NodeConfig,

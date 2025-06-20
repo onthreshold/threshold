@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod withdrawl_tests {
     use bitcoin::{Address, Amount, CompressedPublicKey, OutPoint, Txid, hashes::Hash};
-    use node::{grpc::grpc_operator, wallet::TrackedUtxo};
+    use node::wallet::TrackedUtxo;
     use types::proto::node_proto::{
         ConfirmWithdrawalRequest, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
     };
@@ -14,7 +14,8 @@ mod withdrawl_tests {
     use tokio::sync::mpsc::unbounded_channel;
     use types::intents::WithdrawlIntent;
     use types::utxo::Utxo;
-
+    use grpc::grpc_operator;
+    
     #[tokio::test]
     async fn propose_withdrawal_returns_quote_and_challenge() {
         // Arrange: create a mock cluster
@@ -273,7 +274,7 @@ mod withdrawl_tests {
         let dest_addr_str = dest_addr.to_string();
         let pubkey_hex_clone = public_key_hex.clone();
         tokio::spawn(async move {
-            let resp = node::grpc::grpc_operator::propose_withdrawal(
+            let resp = grpc_operator::propose_withdrawal(
                 &network_clone,
                 ProposeWithdrawalRequest {
                     amount_satoshis: amount_sat,
@@ -302,7 +303,7 @@ mod withdrawl_tests {
         // --- Step 3: Confirm the withdrawal with the valid signature ---
         let network_clone2 = initiator_network.clone();
         tokio::spawn(async move {
-            let _ = node::grpc::grpc_operator::confirm_withdrawal(
+            let _ = grpc_operator::confirm_withdrawal(
                 &network_clone2,
                 ConfirmWithdrawalRequest {
                     challenge: challenge_hex.clone(),
