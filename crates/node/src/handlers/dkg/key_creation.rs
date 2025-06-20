@@ -1,6 +1,8 @@
+use abci::{ChainMessage, ChainResponse};
 use frost_secp256k1::{self as frost, keys::dkg::round2};
 use libp2p::PeerId;
 use prost::Message as ProstMessage;
+use protocol::block::{ChainConfig, ValidatorInfo};
 use std::time::Duration;
 use types::{errors::NodeError, network::network_event::DirectMessage};
 
@@ -353,8 +355,48 @@ impl DkgState {
                             pubkey_package.verifying_key()
                         );
 
-                        self.save_dkg_keys(node, &private_key_package, &pubkey_package)
-                            .await?;
+                        node.pubkey_package = Some(pubkey_package.clone());
+                        node.private_key_package = Some(private_key_package.clone());
+
+                        node.config
+                            .save_dkg_keys(&private_key_package, &pubkey_package)?;
+
+                        let mut validators: Vec<ValidatorInfo> = node
+                            .peers
+                            .iter()
+                            .map(|peer_id| ValidatorInfo {
+                                pub_key: peer_id.to_bytes(),
+                                stake: 100,
+                            })
+                            .collect();
+
+                        validators.sort_by(|a, b| a.pub_key.cmp(&b.pub_key));
+
+                        let chain_config = ChainConfig {
+                            block_time_seconds: 10,
+                            min_signers: node.config.min_signers.ok_or_else(|| {
+                                NodeError::Error("Min signers not set".to_string())
+                            })?,
+                            max_signers: node.config.max_signers.ok_or_else(|| {
+                                NodeError::Error("Max signers not set".to_string())
+                            })?,
+                            min_stake: 100,
+                            max_block_size: 1000,
+                        };
+
+                        let ChainResponse::CreateGenesisBlock { error: None } = node
+                            .chain_interface_tx
+                            .send_message_with_response(ChainMessage::CreateGenesisBlock {
+                                validators,
+                                chain_config,
+                                pubkey: pubkey_package.clone(),
+                            })
+                            .await?
+                        else {
+                            return Err(NodeError::Error(
+                                "Failed to create genesis block".to_string(),
+                            ));
+                        };
 
                         self.dkg_started = false;
                     }
