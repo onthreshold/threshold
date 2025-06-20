@@ -155,7 +155,8 @@ impl ConsensusState {
 
             info!(
                 "Agreed on leader for round {} is {}",
-                self.current_round, leader
+                self.current_round,
+                node.network_handle.peer_name(&leader)
             );
         }
 

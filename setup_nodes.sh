@@ -19,7 +19,6 @@ NUM_NODES=${1:-5}
 BASE_DIR="test_artifacts/"
 
 CLI_CMD=(cargo run --quiet --bin cli)
-BASE_GRPC_PORT=50056
 DOCKER_COMPOSE_FILE="docker-compose.yaml"
 KEY_PASSWORD="supersecret"
 
@@ -133,7 +132,6 @@ EOL
 for i in $(seq 1 "$NUM_NODES"); do
   node_name="node_${i}"
   node_dir="$CONFIGS_DIR/$node_name"
-  host_port=$((BASE_GRPC_PORT + i - 1))
 
   cat >> "$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_FILE" <<EOL
   node${i}:
@@ -143,12 +141,9 @@ for i in $(seq 1 "$NUM_NODES"); do
       - IS_TESTNET=true
       - RUST_LOG=info
     entrypoint: "/app/cli run --key-file-path /app/configs/${node_name}.json --config-file-path /app/configs/${node_name}.yaml --use-mock-oracle"
-    ports:
-      - "${host_port}:${BASE_GRPC_PORT}"
     volumes:
       - ./${node_name}/${node_name}.json:/app/configs/${node_name}.json
       - ./${node_name}/${node_name}.yaml:/app/configs/${node_name}.yaml
-      - ./nodedb_${i}.db:/app/nodedb.db
     networks:
       - vaultnet
 EOL
