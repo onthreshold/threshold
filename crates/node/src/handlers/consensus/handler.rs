@@ -317,9 +317,40 @@ impl ConsensusState {
                     );
 
                     if self.prevotes.len() > (self.validators.len() * 2) / 3 {
-                        info!("Got 2/3+ prevotes.");
+                        info!("Got 2/3+ prevotes. Sending precommit vote.");
 
-                        todo!("Send precommit vote here");
+                        let vote = Vote {
+                            round: self.current_round,
+                            height: self.current_height,
+                            block_hash: vote.block_hash.clone(),
+                            voter: node.peer_id.to_bytes(),
+                            vote_type: VoteType::Precommit,
+                        };
+
+                        let vote_message = ConsensusMessage::Vote(vote);
+                        node.network_handle
+                            .send_broadcast(self.vote_topic.clone(), vote_message)
+                            .map_err(|e| {
+                                NodeError::Error(format!("Failed to send precommit vote: {e:?}"))
+                            })
+                            .ok();
+                    }
+                }
+            }
+            VoteType::Precommit => {
+                if self.precommits.insert(sender) {
+                    info!(
+                        "Got precommit from {} for block hash {:?}. Total: {}/{}",
+                        node.network_handle.peer_name(&sender),
+                        vote.block_hash,
+                        self.precommits.len(),
+                        self.validators.len()
+                    );
+
+                    if self.precommits.len() > (self.validators.len() * 2) / 3 {
+                        info!("Got 2/3+ precommits");
+
+                        todo!("Finalize block here");
                     }
                 }
             }

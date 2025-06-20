@@ -27,6 +27,7 @@ pub struct Vote {
 #[derive(Debug, Clone)]
 pub enum VoteType {
     Prevote,
+    Precommit,
 }
 
 impl ProtoEncode for ConsensusMessage {
@@ -52,6 +53,7 @@ impl ProtoEncode for ConsensusMessage {
                 voter: vote.voter.clone(),
                 vote_type: match vote.vote_type {
                     VoteType::Prevote => p2p_proto::VoteType::Prevote as i32,
+                    VoteType::Precommit => p2p_proto::VoteType::Precommit as i32,
                 },
             }),
         };
@@ -87,6 +89,7 @@ impl ProtoDecode for ConsensusMessage {
             p2p_proto::consensus_message::Message::Vote(vote) => {
                 let vote_type = match vote.vote_type {
                     0 => VoteType::Prevote,
+                    1 => VoteType::Precommit,
                     _ => return Err("Invalid vote type".to_string()),
                 };
                 Ok(Self::Vote(Vote {
