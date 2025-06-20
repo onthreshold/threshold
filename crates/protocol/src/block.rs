@@ -81,6 +81,20 @@ impl BlockBody {
     }
 }
 
+impl BlockBody {
+    #[must_use]
+    pub fn calculate_hash(&self) -> BlockHash {
+        let mut hasher = Sha256::new();
+        let state_bytes =
+            bincode::encode_to_vec(&self.transactions, bincode::config::standard()).unwrap();
+        hasher.update(&state_bytes);
+        let result = hasher.finalize();
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&result);
+        hash
+    }
+}
+
 impl BlockHeader {
     #[must_use]
     pub fn calculate_hash(&self) -> BlockHash {
@@ -97,6 +111,12 @@ impl BlockHeader {
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&result);
         hash
+    }
+}
+
+impl PartialEq for Block {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash() == other.hash()
     }
 }
 
@@ -161,7 +181,13 @@ impl Block {
 
     #[must_use]
     pub fn hash(&self) -> BlockHash {
-        self.header.calculate_hash()
+        let mut hasher = Sha256::new();
+        hasher.update(self.header.calculate_hash());
+        hasher.update(self.body.calculate_hash());
+        let result = hasher.finalize();
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&result);
+        hash
     }
 
     pub fn serialize(&self) -> Result<Vec<u8>, NodeError> {
