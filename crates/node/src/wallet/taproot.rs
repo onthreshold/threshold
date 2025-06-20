@@ -1,3 +1,4 @@
+use abci::db::Db;
 use bitcoin::PublicKey;
 use bitcoin::hashes::Hash;
 use bitcoin::secp256k1::Scalar;
@@ -10,6 +11,7 @@ use bitcoin::{
     transaction::Version, witness::Witness,
 };
 use oracle::oracle::Oracle;
+use std::sync::Arc;
 use types::errors::NodeError;
 use types::utxo::Utxo;
 
@@ -26,6 +28,7 @@ pub struct TaprootWallet {
     pub utxos: Vec<TrackedUtxo>,
     pub oracle: Box<dyn Oracle>,
     pub network: Network,
+    pub db: Option<Arc<dyn Db + Send + Sync>>,
 }
 
 impl TaprootWallet {
@@ -36,6 +39,34 @@ impl TaprootWallet {
             utxos: Vec::new(),
             oracle,
             network,
+            db: None,
+        }
+    }
+
+    #[must_use]
+    pub fn new_with_db(
+        oracle: Box<dyn Oracle>,
+        addresses: Vec<Address>,
+        network: Network,
+        db: Arc<dyn Db + Send + Sync>,
+    ) -> Self {
+        let stored_utxos = db.get_utxos().unwrap_or_default();
+        let mut tracked = Vec::new();
+        for u in &stored_utxos {
+            if let Ok(addr) = Address::from_script(&u.script_pubkey, network) {
+                tracked.push(TrackedUtxo {
+                    utxo: u.clone(),
+                    address: addr,
+                });
+            }
+        }
+
+        Self {
+            addresses,
+            utxos: tracked,
+            oracle,
+            network,
+            db: Some(db),
         }
     }
 
@@ -85,6 +116,11 @@ impl Wallet for TaprootWallet {
                 .oracle
                 .refresh_utxos(addr.clone(), 3, None, allow_unconfirmed.unwrap_or(false))
                 .await?;
+
+            if let Some(db) = &self.db {
+                db.store_utxos(fetched.clone())?;
+            }
+
             for u in fetched {
                 self.utxos.push(TrackedUtxo {
                     utxo: u.clone(),

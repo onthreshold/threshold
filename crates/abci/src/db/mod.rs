@@ -1,4 +1,4 @@
-use types::{errors::NodeError, intents::DepositIntent};
+use types::{errors::NodeError, intents::DepositIntent, utxo::Utxo};
 
 use protocol::block::{Block, BlockHash};
 
@@ -20,4 +20,6 @@ pub trait Db: Send + Sync {
         address: &str,
     ) -> Result<Option<DepositIntent>, NodeError>;
     fn flush_state(&self, chain_state: &ChainState) -> Result<(), NodeError>;
+    fn store_utxos(&self, utxos: Vec<Utxo>) -> Result<(), NodeError>;
+    fn get_utxos(&self) -> Result<Vec<Utxo>, NodeError>;
 }

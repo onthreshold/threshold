@@ -1,15 +1,15 @@
 use rocksdb::DB;
-
-use protocol::block::{Block, BlockHash};
-use types::errors::NodeError;
-
-use types::intents::DepositIntent;
+use std::sync::Arc;
 
 use crate::chain_state::ChainState;
 use crate::db::Db;
+use protocol::block::{Block, BlockHash};
+use types::intents::DepositIntent;
+use types::{errors::NodeError, utxo::Utxo};
 
+#[derive(Clone)]
 pub struct RocksDb {
-    pub db: DB,
+    pub db: Arc<DB>,
 }
 
 impl RocksDb {
@@ -19,8 +19,8 @@ impl RocksDb {
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
 
-        let cfs = vec!["deposit_intents", "blocks", "chain_state"];
-        let db = DB::open_cf(&opts, path, cfs).unwrap();
+        let cfs = vec!["deposit_intents", "blocks", "chain_state", "utxos"];
+        let db = Arc::new(DB::open_cf(&opts, path, cfs).unwrap());
 
         Self { db }
     }
@@ -188,5 +188,38 @@ impl Db for RocksDb {
 
     fn flush_state(&self, chain_state: &ChainState) -> Result<(), NodeError> {
         self.insert_chain_state(chain_state.clone())
+    }
+
+    fn store_utxos(&self, utxos: Vec<Utxo>) -> Result<(), NodeError> {
+        for utxo in utxos {
+            let serialized = bincode::encode_to_vec(&utxo, bincode::config::standard())
+                .map_err(|e| NodeError::Error(e.to_string()))?;
+            self.db.put_cf(
+                self.db.cf_handle("utxos").unwrap(),
+                format!("utxo:{}", utxo.outpoint.txid),
+                &serialized,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn get_utxos(&self) -> Result<Vec<Utxo>, NodeError> {
+        let cf = self.db.cf_handle("utxos").unwrap();
+        let iter = self.db.iterator_cf(cf, rocksdb::IteratorMode::Start);
+        let mut utxos = Vec::new();
+
+        for item in iter {
+            let (key, value) = item?;
+            if !key.starts_with(b"utxo:") {
+                continue;
+            }
+            let (utxo, _): (Utxo, _) =
+                bincode::decode_from_slice(&value, bincode::config::standard())
+                    .map_err(|e| NodeError::Error(e.to_string()))?;
+            utxos.push(utxo);
+        }
+
+        Ok(utxos)
     }
 }
