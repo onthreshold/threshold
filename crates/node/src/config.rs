@@ -1,4 +1,4 @@
-use crate::{DkgKeys, EncryptionParams, KeyData, NodeError, PeerData};
+use crate::{NodeError, PeerData, key_manager};
 use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use argon2::{
     Argon2,
@@ -54,6 +54,27 @@ pub struct ConfigStore {
     pub monitor_start_block: u32,
     pub min_signers: Option<u16>,
     pub max_signers: Option<u16>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct DkgKeys {
+    pub encrypted_private_key_package_b64: String,
+    pub dkg_encryption_params: EncryptionParams,
+    pub pubkey_package_b64: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct EncryptionParams {
+    pub kdf: String,
+    pub salt_b64: String,
+    pub iv_b64: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct KeyData {
+    pub public_key_b58: String,
+    pub encrypted_private_key_b64: String,
+    pub encryption_params: EncryptionParams,
 }
 
 impl NodeConfig {
@@ -253,5 +274,277 @@ impl NodeConfig {
         };
 
         Ok(node_config)
+    }
+
+    pub fn save_dkg_keys(
+        &mut self,
+        private_key_package: &frost::keys::KeyPackage,
+        pubkey_package: &frost::keys::PublicKeyPackage,
+    ) -> Result<(), NodeError> {
+        let password = match std::env::var("KEY_PASSWORD") {
+            Ok(pw) => pw,
+            Err(_) => crate::utils::key_manager::get_password_from_prompt()?,
+        };
+
+        let private_key_bytes = private_key_package.serialize().map_err(|e| {
+            NodeError::Error(format!("Failed to serialize private key package: {e}"))
+        })?;
+
+        let (encrypted_private_key_b64, iv_b64) = crate::utils::key_manager::encrypt_private_key(
+            &private_key_bytes,
+            &password,
+            &self.key_data.encryption_params.salt_b64,
+        )?;
+
+        let pubkey_bytes = pubkey_package.serialize().map_err(|e| {
+            NodeError::Error(format!("Failed to serialize public key package: {e}"))
+        })?;
+        let pubkey_package_b64 = BASE64.encode(pubkey_bytes);
+
+        let dkg_keys = DkgKeys {
+            encrypted_private_key_package_b64: encrypted_private_key_b64,
+            dkg_encryption_params: EncryptionParams {
+                kdf: "argon2id".to_string(),
+                salt_b64: self.key_data.encryption_params.salt_b64.clone(),
+                iv_b64,
+            },
+            pubkey_package_b64,
+        };
+
+        self.dkg_keys = Some(dkg_keys);
+        self.save_to_keys_file()?;
+
+        Ok(())
+    }
+
+    pub fn load_dkg_keys(
+        &self,
+    ) -> Result<Option<(frost::keys::KeyPackage, frost::keys::PublicKeyPackage)>, NodeError> {
+        if let Some(dkg_keys) = &self.dkg_keys {
+            let password = match std::env::var("KEY_PASSWORD") {
+                Ok(pw) => pw,
+                Err(_) => key_manager::get_password_from_prompt()?,
+            };
+
+            let private_key_bytes = key_manager::decrypt_private_key(
+                &dkg_keys.encrypted_private_key_package_b64,
+                &password,
+                &dkg_keys.dkg_encryption_params,
+            )
+            .map_err(|e| NodeError::Error(format!("Failed to decrypt private key: {e}")))?;
+
+            let private_key =
+                frost::keys::KeyPackage::deserialize(&private_key_bytes).map_err(|e| {
+                    NodeError::Error(format!("Failed to deserialize private key package: {e}"))
+                })?;
+
+            let pubkey_bytes = BASE64.decode(&dkg_keys.pubkey_package_b64).map_err(|e| {
+                NodeError::Error(format!("Failed to decode public key package: {e}"))
+            })?;
+            let pubkey =
+                frost::keys::PublicKeyPackage::deserialize(&pubkey_bytes).map_err(|e| {
+                    NodeError::Error(format!("Failed to deserialize public key package: {e}"))
+                })?;
+
+            Ok(Some((private_key, pubkey)))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+pub struct NodeConfigBuilder {
+    key_file_path: Option<PathBuf>,
+    config_file_path: Option<PathBuf>,
+    log_file_path: Option<PathBuf>,
+    password: Option<String>,
+
+    key_data: Option<KeyData>,
+    dkg_keys: Option<DkgKeys>,
+    allowed_peers: Option<Vec<PeerData>>,
+    database_directory: Option<PathBuf>,
+    grpc_port: Option<u16>,
+    libp2p_udp_port: Option<u16>,
+    libp2p_tcp_port: Option<u16>,
+    confirmation_depth: Option<u32>,
+    monitor_start_block: Option<u32>,
+    min_signers: Option<u16>,
+    max_signers: Option<u16>,
+}
+
+impl Default for NodeConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NodeConfigBuilder {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            key_file_path: None,
+            config_file_path: None,
+            log_file_path: None,
+            password: None,
+
+            key_data: None,
+            dkg_keys: None,
+            allowed_peers: None,
+            database_directory: None,
+            grpc_port: None,
+            libp2p_udp_port: None,
+            libp2p_tcp_port: None,
+            confirmation_depth: None,
+            monitor_start_block: None,
+            min_signers: None,
+            max_signers: None,
+        }
+    }
+    #[must_use]
+    pub fn key_file_path(mut self, path: PathBuf) -> Self {
+        self.key_file_path = Some(path);
+        self
+    }
+
+    #[must_use]
+    pub fn config_file_path(mut self, path: PathBuf) -> Self {
+        self.config_file_path = Some(path);
+        self
+    }
+
+    #[must_use]
+    pub fn log_file_path(mut self, path: Option<PathBuf>) -> Self {
+        self.log_file_path = path;
+        self
+    }
+
+    #[must_use]
+    pub fn password<S: Into<String>>(mut self, password: S) -> Self {
+        self.password = Some(password.into());
+        self
+    }
+
+    #[must_use]
+    pub fn key_data(mut self, data: KeyData) -> Self {
+        self.key_data = Some(data);
+        self
+    }
+
+    #[must_use]
+    pub fn dkg_keys(mut self, keys: DkgKeys) -> Self {
+        self.dkg_keys = Some(keys);
+        self
+    }
+
+    #[must_use]
+    pub fn allowed_peers(mut self, peers: Vec<PeerData>) -> Self {
+        self.allowed_peers = Some(peers);
+        self
+    }
+
+    #[must_use]
+    pub fn database_directory<P: Into<PathBuf>>(mut self, path: P) -> Self {
+        self.database_directory = Some(path.into());
+        self
+    }
+
+    #[must_use]
+    pub const fn grpc_port(mut self, port: u16) -> Self {
+        self.grpc_port = Some(port);
+        self
+    }
+
+    #[must_use]
+    pub const fn libp2p_udp_port(mut self, port: u16) -> Self {
+        self.libp2p_udp_port = Some(port);
+        self
+    }
+
+    #[must_use]
+    pub const fn libp2p_tcp_port(mut self, port: u16) -> Self {
+        self.libp2p_tcp_port = Some(port);
+        self
+    }
+
+    #[must_use]
+    pub const fn confirmation_depth(mut self, depth: u32) -> Self {
+        self.confirmation_depth = Some(depth);
+        self
+    }
+
+    #[must_use]
+    pub const fn monitor_start_block(mut self, block: u32) -> Self {
+        self.monitor_start_block = Some(block);
+        self
+    }
+
+    #[must_use]
+    pub const fn min_signers(mut self, min: u16) -> Self {
+        self.min_signers = Some(min);
+        self
+    }
+
+    #[must_use]
+    pub const fn max_signers(mut self, max: u16) -> Self {
+        self.max_signers = Some(max);
+        self
+    }
+
+    pub fn build(self) -> Result<NodeConfig, NodeError> {
+        let key_file_path = self.key_file_path.ok_or_else(|| {
+            NodeError::Error("key_file_path must be provided when building NodeConfig".into())
+        })?;
+
+        let config_file_path = self.config_file_path.ok_or_else(|| {
+            NodeError::Error("config_file_path must be provided when building NodeConfig".into())
+        })?;
+
+        let password = self.password.ok_or_else(|| {
+            NodeError::Error("password must be provided when building NodeConfig".into())
+        })?;
+
+        let mut cfg = NodeConfig::new(
+            key_file_path,
+            config_file_path,
+            self.log_file_path,
+            &password,
+        )
+        .map_err(|e| NodeError::Error(format!("Failed to create NodeConfig: {e}")))?;
+
+        if let Some(data) = self.key_data {
+            cfg.key_data = data;
+        }
+        if let Some(keys) = self.dkg_keys {
+            cfg.dkg_keys = Some(keys);
+        }
+        if let Some(peers) = self.allowed_peers {
+            cfg.allowed_peers = peers;
+        }
+        if let Some(db_dir) = self.database_directory {
+            cfg.database_directory = db_dir;
+        }
+        if let Some(p) = self.grpc_port {
+            cfg.grpc_port = p;
+        }
+        if let Some(p) = self.libp2p_udp_port {
+            cfg.libp2p_udp_port = p;
+        }
+        if let Some(p) = self.libp2p_tcp_port {
+            cfg.libp2p_tcp_port = p;
+        }
+        if let Some(d) = self.confirmation_depth {
+            cfg.confirmation_depth = d;
+        }
+        if let Some(b) = self.monitor_start_block {
+            cfg.monitor_start_block = b;
+        }
+        if let Some(mn) = self.min_signers {
+            cfg.min_signers = Some(mn);
+        }
+        if let Some(mx) = self.max_signers {
+            cfg.max_signers = Some(mx);
+        }
+
+        Ok(cfg)
     }
 }

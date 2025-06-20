@@ -16,7 +16,7 @@ use tracing::{error, info};
 use types::network::network_protocol::Network;
 use types::{errors::NodeError, intents::DepositIntent, network::network_event::NetworkEvent};
 
-pub use config::{ConfigStore, KeyStore, NodeConfig};
+pub use config::{ConfigStore, KeyStore, NodeConfig, NodeConfigBuilder};
 
 pub mod config;
 pub mod handlers;
@@ -32,27 +32,6 @@ pub mod wallet;
 pub struct PeerData {
     pub name: String,
     pub public_key: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct DkgKeys {
-    pub encrypted_private_key_package_b64: String,
-    pub dkg_encryption_params: EncryptionParams,
-    pub pubkey_package_b64: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct EncryptionParams {
-    pub kdf: String,
-    pub salt_b64: String,
-    pub iv_b64: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct KeyData {
-    pub public_key_b58: String,
-    pub encrypted_private_key_b64: String,
-    pub encryption_params: EncryptionParams,
 }
 
 pub struct NodeState<N: Network, W: Wallet> {
@@ -87,11 +66,9 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
         wallet: W,
         mut chain_interface_tx: messenger::Sender<ChainMessage, ChainResponse>,
     ) -> Result<Self, NodeError> {
-        let keys = config
-            .load_dkg_keys()
-            .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {e}")))?;
+        let keys = config.load_dkg_keys()?;
         let dkg_state = DkgState::new();
-        let signing_state = SigningState::new()?;
+        let signing_state = SigningState::new();
         let mut consensus_state = ConsensusState::new();
 
         for peer in &config.allowed_peers {
