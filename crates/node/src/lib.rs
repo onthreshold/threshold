@@ -263,6 +263,89 @@ impl NodeConfig {
     pub const fn set_max_signers(&mut self, max: u16) {
         self.max_signers = Some(max);
     }
+
+    pub fn save_dkg_keys(
+        &mut self,
+        private_key: &frost::keys::KeyPackage,
+        pubkey: &frost::keys::PublicKeyPackage,
+    ) -> Result<(), NodeError> {
+        let password = match std::env::var("KEY_PASSWORD") {
+            Ok(pw) => pw,
+            Err(_) => key_manager::get_password_from_prompt()?,
+        };
+
+        // Serialize private key to bytes
+        let private_key_bytes = private_key
+            .serialize()
+            .map_err(|e| NodeError::Error(format!("Failed to serialize private key: {e}")))?;
+
+        // Use existing salt from key_data, or generate a new one if empty
+        let salt_b64 = if self.key_data.encryption_params.salt_b64.is_empty() {
+            // Generate a new salt
+            use frost::rand_core::RngCore;
+            let mut salt = [0u8; 16];
+            frost::rand_core::OsRng.fill_bytes(&mut salt);
+            BASE64.encode(salt)
+        } else {
+            self.key_data.encryption_params.salt_b64.clone()
+        };
+
+        // Encrypt the private key package
+        let (encrypted_private_key_b64, iv_b64) =
+            key_manager::encrypt_private_key(&private_key_bytes, &password, &salt_b64)
+                .map_err(|e| NodeError::Error(format!("Failed to encrypt private key: {e}")))?;
+
+        // Serialize and base64 encode the public key package
+        let pubkey_bytes = pubkey
+            .serialize()
+            .map_err(|e| NodeError::Error(format!("Failed to serialize public key: {e}")))?;
+        let pubkey_package_b64 = BASE64.encode(pubkey_bytes);
+
+        self.set_dkg_keys(DkgKeys {
+            encrypted_private_key_package_b64: encrypted_private_key_b64,
+            dkg_encryption_params: EncryptionParams {
+                kdf: "argon2id".to_string(),
+                salt_b64,
+                iv_b64,
+            },
+            pubkey_package_b64,
+        });
+
+        self.save_to_keys_file()?;
+        Ok(())
+    }
+
+    pub fn load_dkg_keys(
+        &self,
+    ) -> Result<
+        Option<(frost::keys::KeyPackage, frost::keys::PublicKeyPackage)>,
+        Box<dyn std::error::Error>,
+    > {
+        if let Some(dkg_keys) = &self.dkg_keys {
+            let password = match std::env::var("KEY_PASSWORD") {
+                Ok(pw) => pw,
+                Err(_) => key_manager::get_password_from_prompt()?,
+            };
+
+            // Decrypt the private key package
+            let private_key_bytes = key_manager::decrypt_private_key(
+                &dkg_keys.encrypted_private_key_package_b64,
+                &password,
+                &dkg_keys.dkg_encryption_params,
+            )?;
+
+            // Deserialize the private key from decrypted bytes
+            let private_key = frost::keys::KeyPackage::deserialize(&private_key_bytes)?;
+
+            // Deserialize the public key from base64
+            let pubkey_bytes = BASE64.decode(&dkg_keys.pubkey_package_b64)?;
+            let pubkey = frost::keys::PublicKeyPackage::deserialize(&pubkey_bytes)?;
+
+            Ok(Some((private_key, pubkey)))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 pub struct NodeState<N: Network, W: Wallet> {
@@ -297,9 +380,10 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
         wallet: W,
         mut chain_interface_tx: messenger::Sender<ChainMessage, ChainResponse>,
     ) -> Result<Self, NodeError> {
-        let keys = key_manager::load_dkg_keys(config.clone())
+        let keys = config
+            .load_dkg_keys()
             .map_err(|e| NodeError::Error(format!("Failed to load DKG keys: {e}")))?;
-        let dkg_state = DkgState::new()?;
+        let dkg_state = DkgState::new();
         let signing_state = SigningState::new()?;
         let mut consensus_state = ConsensusState::new();
 

@@ -4,11 +4,10 @@ use frost_secp256k1::{
     Identifier,
     keys::dkg::{round1, round2},
 };
-use libp2p::PeerId;
+use libp2p::{PeerId, gossipsub};
 
 pub mod handler;
 pub mod key_creation;
-pub mod utils;
 
 pub struct DkgState {
     pub dkg_started: bool,
@@ -23,4 +22,27 @@ pub struct DkgState {
 
     pub r1_secret_package: Option<round1::SecretPackage>,
     pub r2_secret_package: Option<round2::SecretPackage>,
+}
+
+impl Default for DkgState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DkgState {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            dkg_listeners: HashSet::new(),
+            round1_listeners: HashSet::new(),
+            start_dkg_topic: gossipsub::IdentTopic::new("start-dkg"),
+            round1_topic: gossipsub::IdentTopic::new("round1_topic"),
+            round1_peer_packages: BTreeMap::new(),
+            round2_peer_packages: BTreeMap::new(),
+            r1_secret_package: None,
+            r2_secret_package: None,
+            dkg_started: false,
+        }
+    }
 }
