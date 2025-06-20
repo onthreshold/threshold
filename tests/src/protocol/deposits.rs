@@ -3,7 +3,7 @@ mod deposit_test {
     use bitcoin::{Txid, hashes::Hash};
     use std::collections::HashMap;
     use tokio::sync::broadcast;
-    use types::network_event::NetworkEvent;
+    use types::network::network_event::NetworkEvent;
 
     use abci::{
         chain_state::{Account, ChainState},

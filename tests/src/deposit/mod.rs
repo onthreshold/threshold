@@ -2,12 +2,12 @@
 mod deposit_tests {
     use std::str::FromStr;
 
-    use grpc::grpc_operator;
     use crate::mocks::abci::setup_test_account;
     use crate::mocks::network::MockNodeCluster;
     use abci::chain_state::Account;
     use bitcoin::Address;
     use bitcoin::hashes::Hash;
+    use grpc::grpc_operator;
     use node::{handlers::deposit::DepositIntentState, wallet::Wallet};
     use tokio::sync::broadcast;
     use tokio::sync::mpsc::unbounded_channel;

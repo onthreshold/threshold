@@ -1,10 +1,10 @@
-use types::network::Network;
 use crate::wallet::Wallet;
 use crate::{NodeState, handlers::Handler, handlers::withdrawl::SpendIntentState};
 use libp2p::gossipsub::Message;
 use types::errors::NodeError;
 use types::intents::PendingSpend;
-use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
+use types::network::network_event::{NetworkEvent, SelfRequest, SelfResponse};
+use types::network::network_protocol::Network;
 use types::proto::ProtoDecode;
 
 #[async_trait::async_trait]

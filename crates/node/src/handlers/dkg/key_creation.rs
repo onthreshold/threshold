@@ -2,13 +2,13 @@ use frost_secp256k1::{self as frost, keys::dkg::round2};
 use libp2p::PeerId;
 use prost::Message as ProstMessage;
 use std::time::Duration;
-use types::{errors::NodeError, network_event::DirectMessage};
+use types::{errors::NodeError, network::network_event::DirectMessage};
 
 use crate::peer_id_to_identifier;
 use crate::{NodeState, handlers::dkg::DkgState, wallet::Wallet};
-use types::network::Network;
+use types::network::network_protocol::Network;
 use types::proto::p2p_proto::{
-    dkg_message::Message, DkgMessage, GossipsubMessage, StartDkgMessage,
+    DkgMessage, GossipsubMessage, StartDkgMessage, dkg_message::Message,
 };
 
 fn decode_gossipsub_dkg_message(

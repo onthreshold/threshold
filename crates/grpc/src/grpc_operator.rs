@@ -1,8 +1,8 @@
-use types::network::{Network, NetworkHandle};
 use tonic::Status;
 use tracing::{debug, info};
 use types::intents::WithdrawlIntent;
-use types::network_event::{SelfRequest, SelfResponse};
+use types::network::network_event::{SelfRequest, SelfResponse};
+use types::network::network_protocol::{Network, NetworkHandle};
 use types::proto::node_proto::{
     self, CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest,
     ConfirmWithdrawalResponse, CreateDepositIntentRequest, CreateDepositIntentResponse,

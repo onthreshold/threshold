@@ -10,7 +10,7 @@ use tracing::{error, info};
 use types::{
     errors::NodeError,
     intents::DepositIntent,
-    network_event::{NetworkEvent, SelfRequest},
+    network::network_event::{NetworkEvent, SelfRequest},
     utxo::Utxo,
 };
 

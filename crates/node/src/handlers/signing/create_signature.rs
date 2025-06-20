@@ -14,8 +14,8 @@ use crate::{
     wallet::Wallet,
 };
 use types::errors::NodeError;
-use types::network_event::DirectMessage;
-use types::network::Network;
+use types::network::network_event::DirectMessage;
+use types::network::network_protocol::Network;
 
 impl SigningState {
     pub fn start_signing_session<N: Network, W: Wallet>(

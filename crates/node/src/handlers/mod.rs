@@ -10,7 +10,7 @@ use types::errors::NodeError;
 
 use crate::wallet::Wallet;
 use crate::{Network, NodeState};
-use types::network_event::NetworkEvent;
+use types::network::network_event::NetworkEvent;
 
 #[async_trait::async_trait]
 pub trait Handler<N: Network, W: Wallet>: Send + Any {

@@ -4,10 +4,10 @@ use crate::{
     handlers::consensus::{ConsensusPhase, ConsensusState},
     wallet::Wallet,
 };
-use types::network::Network;
 use libp2p::PeerId;
 use tracing::info;
-use types::{network_event::NetworkEvent, proto::ProtoDecode};
+use types::network::network_protocol::Network;
+use types::{network::network_event::NetworkEvent, proto::ProtoDecode};
 
 #[async_trait::async_trait]
 impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {

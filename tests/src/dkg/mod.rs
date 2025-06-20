@@ -10,7 +10,7 @@ mod dkg_test {
     use tracing_subscriber::EnvFilter;
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
-    use types::network_event::{DirectMessage, NetworkEvent};
+    use types::network::network_event::{DirectMessage, NetworkEvent};
 
     fn setup() {
         let env_filter =

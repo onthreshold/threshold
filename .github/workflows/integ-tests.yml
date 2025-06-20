@@ -46,6 +46,8 @@ jobs:
       #     cache-from: type=gha
       #     cache-to: type=gha,mode=max
 
+      - run: cargo clean
+
       - name: Start 5-node stack (docker-compose)
         run: |
           docker compose -f docker-compose.yaml up -d --build

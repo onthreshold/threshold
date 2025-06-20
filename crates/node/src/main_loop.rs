@@ -3,7 +3,7 @@ use tracing::{error, info};
 use crate::wallet::Wallet;
 use crate::{Network, NodeState};
 use types::errors::NodeError;
-use types::network_event::{NetworkEvent, SelfRequest};
+use types::network::network_event::{NetworkEvent, SelfRequest};
 
 impl<N: Network + 'static, W: Wallet + 'static> NodeState<N, W> {
     pub async fn try_poll(&mut self) -> Result<bool, NodeError> {
