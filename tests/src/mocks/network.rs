@@ -238,6 +238,10 @@ impl MockNodeCluster {
                     peer_id: *peer_id,
                     topic: libp2p::gossipsub::IdentTopic::new("start-dkg").hash(),
                 });
+                sender.queue(NetworkEvent::Subscribed {
+                    peer_id: *peer_id,
+                    topic: libp2p::gossipsub::IdentTopic::new("round1_topic").hash(),
+                });
             }
 
             sender.flush();

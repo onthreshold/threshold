@@ -28,9 +28,15 @@ impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
                         peer_id,
                         self.round1_listeners.len()
                     );
+                    if let Err(e) = self.handle_dkg_start(node) {
+                        tracing::error!("❌ Failed to handle DKG start: {}", e);
+                    }
                 }
             }
             Some(NetworkEvent::GossipsubMessage(message)) => {
+                if message.topic == self.start_dkg_topic.hash() {
+                    self.handle_dkg_start(node)?;
+                }
                 if message.topic == self.round1_topic.hash() {
                     if let Some(source_peer) = message.source {
                         self.handle_round1_payload(node, source_peer, &message.data)?;

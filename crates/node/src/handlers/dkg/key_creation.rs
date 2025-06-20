@@ -50,44 +50,36 @@ impl DkgState {
             return Ok(());
         }
 
-        if self.dkg_listeners.len() + 1
-            != node
-                .config
-                .max_signers
-                .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
-                as usize
-            && self.round1_listeners.len() + 1
-                == node
-                    .config
-                    .max_signers
-                    .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
-                    as usize
+        let max_signers = node
+            .config
+            .max_signers
+            .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
+            as usize;
+
+        if self.dkg_listeners.len() + 1 < max_signers
+            || self.round1_listeners.len() + 1 < max_signers
         {
             tracing::debug!(
-                "Not all listeners have subscribed to the DKG topic, not starting DKG process. Listeners: {:?}",
-                self.dkg_listeners.len()
+                "Not all listeners have subscribed to the DKG topic, not starting DKG process. DKG Listeners: {}/{}, Round1 Listeners: {}/{}",
+                self.dkg_listeners.len() + 1,
+                max_signers,
+                self.round1_listeners.len() + 1,
+                max_signers,
             );
             return Ok(());
         }
 
-        tracing::info!("🚀 -------------------- Finally starting DKG ---------------------------");
-
         self.dkg_started = true;
 
-        tracing::info!(
-            "🚀 -------------------- Sleeping for DKG step delay ---------------------------"
-        );
-
-        // tokio::time::sleep(dkg_step_delay()).await;
-
-        tracing::info!(
-            "🚀 -------------------- Generating round1 package ---------------------------"
-        );
         // Run the DKG initialization code
         let participant_identifier = peer_id_to_identifier(&node.peer_id);
 
         tracing::info!(
-            "🚀 -------------------- Generating round1 package YESSS ---------------------------"
+            "Starting DKG NOW. DKG Listeners: {}/{}, Round1 Listeners: {}/{}",
+            self.dkg_listeners.len() + 1,
+            max_signers,
+            self.round1_listeners.len() + 1,
+            max_signers,
         );
 
         let (round1_secret_package, round1_package) = frost::keys::dkg::part1(
@@ -207,14 +199,17 @@ impl DkgState {
         // Add package to peer packages
         self.round1_peer_packages.insert(identifier, package);
 
+        let max_signers = node
+            .config
+            .max_signers
+            .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
+            as usize;
+
         tracing::info!(
             "Received round1 package from {} ({}/{})",
             node.network_handle.peer_name(&sender_peer_id),
             self.round1_peer_packages.len(),
-            node.config
-                .max_signers
-                .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
-                - 1
+            max_signers - 1
         );
 
         self.try_enter_round2(node)?;
@@ -234,7 +229,9 @@ impl DkgState {
                     .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
                     as usize
             {
-                tracing::info!("Received all round1 packages, entering part2");
+                tracing::info!(
+                    "🚀 -------------------- Starting round2 ---------------------------"
+                );
                 // all packages received
                 let part2_result =
                     frost::keys::dkg::part2(r1_secret_package.clone(), &self.round1_peer_packages);
@@ -287,6 +284,7 @@ impl DkgState {
                         std::thread::sleep(dkg_step_delay());
                     }
                     Err(e) => {
+                        tracing::error!("DKG round2 failed: {e}");
                         return Err(NodeError::Error(format!("DKG round2 failed: {e}")));
                     }
                 }
@@ -328,6 +326,7 @@ impl DkgState {
                 .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
                 - 1
         );
+
         if let Some(r2_secret_package) = self.r2_secret_package.as_ref() {
             if self.round2_peer_packages.len() + 1
                 == node
