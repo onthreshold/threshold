@@ -7,9 +7,7 @@ use libp2p::{
 use std::{
     collections::{BTreeMap, HashSet, hash_map::DefaultHasher},
     fmt::Debug,
-    future::Future,
     hash::{Hash, Hasher},
-    pin::Pin,
     time::Duration,
 };
 use tracing::info;
@@ -36,6 +34,7 @@ use crate::PeerData;
 use types::{
     errors::{NetworkError, NodeError},
     proto::p2p_proto,
+    network::{NetworkHandle, NetworkMessage, NetworkResponseFuture},
 };
 use types::{
     network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
@@ -54,29 +53,6 @@ pub struct MyBehaviour {
     pub gossipsub: gossipsub::Behaviour,
     pub mdns: mdns::tokio::Behaviour,
     pub request_response: request_response::Behaviour<ProtobufCodec>,
-}
-
-#[derive(Clone, Debug)]
-pub enum NetworkMessage {
-    SendBroadcast {
-        topic: gossipsub::IdentTopic,
-        message: Vec<u8>,
-    },
-    SendPrivateMessage(PeerId, DirectMessage),
-    SendSelfRequest {
-        request: SelfRequest,
-        response_channel: Option<mpsc::UnboundedSender<SelfResponse>>,
-    },
-}
-
-pub type NetworkResponseFuture =
-    Pin<Box<dyn Future<Output = Result<SelfResponse, NetworkError>> + Send>>;
-
-#[derive(Debug, Clone)]
-pub struct NetworkHandle {
-    peer_id: PeerId,
-    tx: mpsc::UnboundedSender<NetworkMessage>,
-    peers_to_names: BTreeMap<PeerId, String>,
 }
 
 pub trait Network: Clone + Debug + Sync + Send {

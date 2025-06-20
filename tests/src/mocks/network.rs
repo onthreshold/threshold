@@ -3,19 +3,19 @@ use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 use frost_secp256k1::Identifier;
 use node::{
     NodeState,
-    swarm_manager::{Network, NetworkResponseFuture},
     wallet::TaprootWallet,
+};
+use types::{
+    errors::{self, NetworkError},
+    intents::DepositIntent,
+    network::{Network, NetworkResponseFuture},
+    network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
+    proto::ProtoEncode,
 };
 pub use oracle::mock::MockOracle;
 use tokio::sync::{
     broadcast,
     mpsc::{self, unbounded_channel},
-};
-use types::{
-    errors::{self, NetworkError},
-    intents::DepositIntent,
-    network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
-    proto::ProtoEncode,
 };
 
 // MockChainInterface import removed - no longer needed with message-passing architecture

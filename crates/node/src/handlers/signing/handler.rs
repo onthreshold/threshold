@@ -1,8 +1,6 @@
-use crate::NodeState;
-use crate::handlers::Handler;
-use crate::handlers::signing::SigningState;
-use crate::swarm_manager::Network;
 use crate::wallet::Wallet;
+use crate::{NodeState, handlers::Handler, handlers::signing::SigningState};
+use types::network::Network;
 use types::errors::NodeError;
 use types::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
 

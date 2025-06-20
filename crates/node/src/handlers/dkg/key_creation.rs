@@ -2,13 +2,14 @@ use frost_secp256k1::{self as frost, keys::dkg::round2};
 use libp2p::PeerId;
 use prost::Message as ProstMessage;
 use std::time::Duration;
-use types::errors::NodeError;
-use types::network_event::DirectMessage;
+use types::{errors::NodeError, network_event::DirectMessage};
 
-use crate::swarm_manager::Network;
-use crate::{NodeState, handlers::dkg::DkgState, peer_id_to_identifier, wallet::Wallet};
-use types::proto::p2p_proto::dkg_message::Message;
-use types::proto::p2p_proto::{DkgMessage, StartDkgMessage};
+use crate::peer_id_to_identifier;
+use crate::{NodeState, handlers::dkg::DkgState, wallet::Wallet};
+use types::network::Network;
+use types::proto::p2p_proto::{
+    dkg_message::Message, DkgMessage, GossipsubMessage, StartDkgMessage,
+};
 
 fn decode_gossipsub_dkg_message(
     data: &[u8],
@@ -112,7 +113,7 @@ impl DkgState {
             })),
         };
 
-        let gossipsub_message = types::proto::p2p_proto::GossipsubMessage {
+        let gossipsub_message = GossipsubMessage {
             message: Some(types::proto::p2p_proto::gossipsub_message::Message::Dkg(
                 start_dkg_message,
             )),
@@ -144,7 +145,7 @@ impl DkgState {
             )),
         };
 
-        let round1_gossipsub_message = types::proto::p2p_proto::GossipsubMessage {
+        let round1_gossipsub_message = GossipsubMessage {
             message: Some(types::proto::p2p_proto::gossipsub_message::Message::Dkg(
                 round1_dkg_message,
             )),

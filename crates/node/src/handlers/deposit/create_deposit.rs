@@ -10,11 +10,11 @@ use protocol::transaction::Transaction;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
-use types::errors::NodeError;
+use types::{errors::NodeError, network::Network};
 use uuid::Uuid;
 
 use crate::{
-    NodeState, handlers::deposit::DepositIntentState, swarm_manager::Network, wallet::Wallet,
+    NodeState, handlers::deposit::DepositIntentState, wallet::Wallet,
 };
 use types::intents::DepositIntent;
 

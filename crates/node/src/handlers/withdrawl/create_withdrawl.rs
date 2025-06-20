@@ -1,4 +1,4 @@
-use crate::swarm_manager::Network;
+use types::network::Network;
 use crate::{NodeState, handlers::withdrawl::SpendIntentState, wallet::Wallet};
 use abci::{ChainMessage, ChainResponse};
 use bitcoin::{

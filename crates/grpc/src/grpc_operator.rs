@@ -1,4 +1,4 @@
-use crate::swarm_manager::{Network, NetworkHandle};
+use types::network::{Network, NetworkHandle};
 use tonic::Status;
 use tracing::{debug, info};
 use types::intents::WithdrawlIntent;

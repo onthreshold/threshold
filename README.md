@@ -21,8 +21,10 @@ cargo run --bin cli -- --help
 Generate a new keypair and save it to a file:
 
 ```bash
-cargo run --bin cli setup --help
+cargo run --bin cli setup
 ```
+
+The config file is by default saved to the "/home/<username>/.config/thevault/" folder.
 
 **Options:**
 
@@ -34,7 +36,7 @@ cargo run --bin cli setup --help
 Run the node and connect to the network:
 
 ```bash
-cargo run --bin cli run --help
+cargo run --bin cli run
 ```
 
 **Options:**
@@ -60,7 +62,7 @@ cargo run --bin cli run --help
 - `get-pending-deposit-intents` - Get pending deposit intents
 - `check-balance <address>` - Check balance of an address
 
-## Installation
+## Compiling
 
 #### 1. Install pre-requisites
 
@@ -135,7 +137,8 @@ docker-compose down
 ### Run Tests
 
 ```bash
-# Run integration tests
+# Run integration tests.
+# Ensure that you are running the docker compose file before running the tests (`docker-compose up -d --build`)
 cargo test -p integration-tests
 
 # Run all tests

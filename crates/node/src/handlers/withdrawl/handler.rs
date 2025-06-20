@@ -1,4 +1,4 @@
-use crate::swarm_manager::Network;
+use types::network::Network;
 use crate::wallet::Wallet;
 use crate::{NodeState, handlers::Handler, handlers::withdrawl::SpendIntentState};
 use libp2p::gossipsub::Message;
