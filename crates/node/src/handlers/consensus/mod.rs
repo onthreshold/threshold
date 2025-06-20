@@ -20,6 +20,7 @@ pub struct ConsensusState {
     pub validators: HashSet<PeerId>,
 
     pub leader_topic: IdentTopic,
+    pub block_topic: IdentTopic,
 
     pub round_timeout: Duration,
     pub round_start_time: Option<Instant>,
@@ -42,6 +43,7 @@ impl ConsensusState {
             proposer: None,
             validators: HashSet::new(),
             leader_topic: IdentTopic::new("leader"),
+            block_topic: IdentTopic::new("block-proposals"),
             round_timeout: Duration::from_secs(10),
             round_start_time: None,
             is_leader: false,

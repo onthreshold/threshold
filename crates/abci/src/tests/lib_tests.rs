@@ -192,7 +192,7 @@ async fn test_execute_deposit_transaction() {
     );
 
     // Execute transaction
-    let result = chain_interface.execute_transaction(transaction).await;
+    let result = chain_interface.add_transaction_to_block(transaction).await;
     assert!(result.is_ok());
 
     // Verify account was created with correct balance
@@ -235,7 +235,7 @@ async fn test_execute_withdrawal_transaction() {
     );
 
     chain_interface
-        .execute_transaction(deposit_transaction)
+        .add_transaction_to_block(deposit_transaction)
         .await
         .unwrap();
 
@@ -255,7 +255,7 @@ async fn test_execute_withdrawal_transaction() {
 
     // Execute withdrawal
     let result = chain_interface
-        .execute_transaction(withdrawal_transaction)
+        .add_transaction_to_block(withdrawal_transaction)
         .await;
     assert!(result.is_ok());
 
@@ -286,7 +286,7 @@ async fn test_execute_transaction_insufficient_balance() {
     );
 
     // Should fail due to insufficient balance
-    let result = chain_interface.execute_transaction(transaction).await;
+    let result = chain_interface.add_transaction_to_block(transaction).await;
     assert!(result.is_err());
     assert!(
         result
@@ -329,7 +329,7 @@ async fn test_execute_transaction_state_persistence() {
     );
 
     chain_interface
-        .execute_transaction(transaction)
+        .add_transaction_to_block(transaction)
         .await
         .unwrap();
 
@@ -374,7 +374,7 @@ async fn test_execute_multiple_transactions() {
         );
 
         chain_interface
-            .execute_transaction(transaction)
+            .add_transaction_to_block(transaction)
             .await
             .unwrap();
     }
@@ -402,7 +402,7 @@ async fn test_transaction_error_propagation() {
         ],
     );
 
-    let result = chain_interface.execute_transaction(transaction).await;
+    let result = chain_interface.add_transaction_to_block(transaction).await;
     assert!(result.is_err());
     assert!(
         result
@@ -459,7 +459,7 @@ async fn test_concurrent_operations() {
     );
 
     chain_interface
-        .execute_transaction(transaction)
+        .add_transaction_to_block(transaction)
         .await
         .unwrap();
 

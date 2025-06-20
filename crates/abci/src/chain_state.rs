@@ -1,6 +1,10 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use bincode::{Decode, Encode};
+use protocol::{block::Block, transaction::Transaction};
 use serde::{Deserialize, Serialize};
 use types::{errors::NodeError, intents::DepositIntent};
 
@@ -41,6 +45,7 @@ pub struct ChainState {
     // address -> account
     accounts: HashMap<String, Account>,
     deposit_intents: Vec<DepositIntent>,
+    proposed_transactions: Vec<Transaction>,
     block_height: u64,
 }
 
@@ -57,6 +62,7 @@ impl ChainState {
         Self {
             accounts: HashMap::new(),
             deposit_intents: Vec::new(),
+            proposed_transactions: Vec::new(),
             block_height: 0,
         }
     }
@@ -66,6 +72,7 @@ impl ChainState {
         Self {
             accounts,
             deposit_intents: Vec::new(),
+            proposed_transactions: Vec::new(),
             block_height,
         }
     }
@@ -98,6 +105,24 @@ impl ChainState {
     #[must_use]
     pub const fn get_block_height(&self) -> u64 {
         self.block_height
+    }
+
+    pub fn add_transaction_to_block(&mut self, transaction: Transaction) {
+        self.proposed_transactions.push(transaction);
+    }
+
+    #[must_use]
+    pub fn get_proposed_block(&self, previous_block: Option<Block>, proposer: Vec<u8>) -> Block {
+        Block::new(
+            previous_block.map_or([0u8; 32], |b| b.hash()),
+            self.block_height,
+            self.proposed_transactions.clone(),
+            proposer,
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        )
     }
 
     pub fn serialize(&self) -> Result<Vec<u8>, NodeError> {
