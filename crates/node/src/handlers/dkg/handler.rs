@@ -1,6 +1,6 @@
-use types::network::Network;
 use crate::{NodeState, handlers::Handler, handlers::dkg::DkgState, wallet::Wallet};
-use types::network_event::{DirectMessage, NetworkEvent};
+use types::network::network_event::{DirectMessage, NetworkEvent};
+use types::network::network_protocol::Network;
 
 #[async_trait::async_trait]
 impl<N: Network, W: Wallet> Handler<N, W> for DkgState {

@@ -1,9 +1,9 @@
 use std::{collections::BTreeMap, str::FromStr};
 
+use crate::{NodeState, handlers::signing::SigningState, wallet::Wallet};
 use frost_secp256k1::{self as frost};
 use tracing::{error, info};
-use types::{errors::NodeError, intents::PendingSpend, network::Network};
-use crate::{NodeState, handlers::signing::SigningState, wallet::Wallet};
+use types::{errors::NodeError, intents::PendingSpend, network::network_protocol::Network};
 
 impl SigningState {
     pub const fn new() -> Result<Self, NodeError> {

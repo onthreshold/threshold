@@ -76,6 +76,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
       - run: rustup update 1.87
       - run: rustup default 1.87
+      - run: cargo clean
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
       - run: rustup component add clippy

@@ -1,4 +1,3 @@
-use types::network::Network;
 use crate::{NodeState, handlers::withdrawl::SpendIntentState, wallet::Wallet};
 use abci::{ChainMessage, ChainResponse};
 use bitcoin::{
@@ -13,7 +12,8 @@ use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use types::errors::NodeError;
 use types::intents::{PendingSpend, WithdrawlIntent};
-use types::network_event::SelfRequest;
+use types::network::network_event::SelfRequest;
+use types::network::network_protocol::Network;
 
 impl SpendIntentState {
     pub async fn propose_withdrawal<N: Network, W: Wallet>(

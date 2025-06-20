@@ -10,12 +10,10 @@ use protocol::transaction::Transaction;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
-use types::{errors::NodeError, network::Network};
+use types::{errors::NodeError, network::network_protocol::Network};
 use uuid::Uuid;
 
-use crate::{
-    NodeState, handlers::deposit::DepositIntentState, wallet::Wallet,
-};
+use crate::{NodeState, handlers::deposit::DepositIntentState, wallet::Wallet};
 use types::intents::DepositIntent;
 
 impl DepositIntentState {

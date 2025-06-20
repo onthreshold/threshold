@@ -9,7 +9,7 @@ pub mod signing_tests {
 
     use crate::mocks::network::MockNodeCluster;
     use rand::RngCore;
-    use types::network_event::{DirectMessage, NetworkEvent, SelfRequest};
+    use types::network::network_event::{DirectMessage, NetworkEvent, SelfRequest};
 
     #[tokio::test]
     async fn signing_flow_completes_and_produces_shares() {

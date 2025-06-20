@@ -33,11 +33,11 @@ use tokio::{
 use crate::PeerData;
 use types::{
     errors::{NetworkError, NodeError},
+    network::network_protocol::{NetworkHandle, NetworkMessage, NetworkResponseFuture},
     proto::p2p_proto,
-    network::{NetworkHandle, NetworkMessage, NetworkResponseFuture},
 };
 use types::{
-    network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
+    network::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
     proto::ProtoEncode,
 };
 
@@ -427,7 +427,7 @@ pub struct ProtobufCodec;
 #[async_trait::async_trait]
 impl libp2p::request_response::Codec for ProtobufCodec {
     type Protocol = libp2p::StreamProtocol;
-    type Request = types::network_event::DirectMessage;
+    type Request = types::network::network_event::DirectMessage;
     type Response = ();
 
     async fn read_request<T>(
@@ -453,10 +453,11 @@ impl libp2p::request_response::Codec for ProtobufCodec {
                 std::io::Error::new(std::io::ErrorKind::InvalidData, e)
             })?;
 
-        let direct_msg = types::network_event::DirectMessage::try_from(proto_msg).map_err(|e| {
-            tracing::error!("❌ Failed to convert protobuf to DirectMessage: {}", e);
-            std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-        })?;
+        let direct_msg = types::network::network_event::DirectMessage::try_from(proto_msg)
+            .map_err(|e| {
+                tracing::error!("❌ Failed to convert protobuf to DirectMessage: {}", e);
+                std::io::Error::new(std::io::ErrorKind::InvalidData, e)
+            })?;
 
         Ok(direct_msg)
     }

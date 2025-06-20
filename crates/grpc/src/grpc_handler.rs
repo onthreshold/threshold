@@ -1,5 +1,5 @@
-use types::network::NetworkHandle;
 use tonic::{Request, Response, Status};
+use types::network::network_protocol::NetworkHandle;
 
 use crate::grpc_operator;
 

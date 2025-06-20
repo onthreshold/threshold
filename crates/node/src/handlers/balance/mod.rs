@@ -2,7 +2,7 @@ use crate::{Network, NodeState, handlers::Handler, wallet::Wallet};
 use abci::chain_state::Account;
 use abci::{ChainMessage, ChainResponse};
 use types::errors::NodeError;
-use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
+use types::network::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 
 #[derive(Default)]
 pub struct BalanceState;

@@ -5,12 +5,12 @@ use types::intents::DepositIntent;
 
 use crate::{
     NodeState,
-    handlers::{deposit::DepositIntentState, Handler},
+    handlers::{Handler, deposit::DepositIntentState},
     wallet::Wallet,
 };
 
-use types::network::Network;
-use types::network_event::{NetworkEvent, SelfRequest, SelfResponse};
+use types::network::network_event::{NetworkEvent, SelfRequest, SelfResponse};
+use types::network::network_protocol::Network;
 use types::proto::ProtoDecode;
 
 #[async_trait::async_trait]

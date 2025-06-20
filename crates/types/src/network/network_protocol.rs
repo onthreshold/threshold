@@ -1,11 +1,11 @@
 use futures::future::Future;
-use libp2p::{gossipsub, PeerId};
+use libp2p::{PeerId, gossipsub};
 use std::{fmt::Debug, pin::Pin};
 use tokio::sync::mpsc;
 
 use crate::{
     errors::NetworkError,
-    network_event::{DirectMessage, SelfRequest, SelfResponse},
+    network::network_event::{DirectMessage, SelfRequest, SelfResponse},
     proto::ProtoEncode,
 };
 
@@ -125,7 +125,8 @@ impl Network for NetworkHandle {
 }
 
 impl NetworkHandle {
-    pub fn new(
+    #[must_use]
+    pub const fn new(
         peer_id: PeerId,
         tx: mpsc::UnboundedSender<NetworkMessage>,
         peers_to_names: std::collections::BTreeMap<PeerId, String>,
@@ -136,4 +137,4 @@ impl NetworkHandle {
             peers_to_names,
         }
     }
-} 
+}

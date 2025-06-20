@@ -12,7 +12,7 @@ use crate::{
     key_manager::{decrypt_private_key, encrypt_private_key, get_password_from_prompt},
     wallet::Wallet,
 };
-use types::{errors::NodeError, network::Network};
+use types::{errors::NodeError, network::network_protocol::Network};
 
 impl DkgState {
     pub fn new() -> Result<Self, NodeError> {

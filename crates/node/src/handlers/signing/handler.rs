@@ -1,8 +1,8 @@
 use crate::wallet::Wallet;
 use crate::{NodeState, handlers::Handler, handlers::signing::SigningState};
-use types::network::Network;
 use types::errors::NodeError;
-use types::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
+use types::network::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse};
+use types::network::network_protocol::Network;
 
 #[async_trait::async_trait]
 impl<N: Network, W: Wallet> Handler<N, W> for SigningState {
