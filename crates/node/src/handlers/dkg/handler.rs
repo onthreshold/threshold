@@ -1,9 +1,10 @@
 use crate::{NodeState, handlers::Handler, handlers::dkg::DkgState, wallet::Wallet};
+use p2p_proto::dkg_message::Message as DkgInner;
 use types::broadcast::BroadcastMessage;
 use types::network::network_event::{DirectMessage, NetworkEvent};
 use types::network::network_protocol::Network;
-use types::proto::{ProtoDecode};
-use types::proto::p2p_proto;
+use types::proto::ProtoDecode;
+use types::proto::p2p_proto::{self, gossipsub_message::Message};
 
 #[async_trait::async_trait]
 impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
@@ -13,28 +14,25 @@ impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
         message: Option<NetworkEvent>,
     ) -> Result<(), types::errors::NodeError> {
         match message {
-            Some(NetworkEvent::Subscribed { peer_id, topic }) => {
-                if topic == libp2p::gossipsub::IdentTopic::new("broadcast").hash() {
-                    self.dkg_listeners.insert(peer_id);
-                    self.round1_listeners.insert(peer_id);
-                }
+            Some(NetworkEvent::Subscribed { peer_id, .. }) => {
+                self.dkg_listeners.insert(peer_id);
+                self.round1_listeners.insert(peer_id);
+                self.handle_dkg_start(node)?;
             }
             Some(NetworkEvent::GossipsubMessage(message)) => {
-                if message.topic == libp2p::gossipsub::IdentTopic::new("broadcast").hash() {
-                    if let Ok(BroadcastMessage::Dkg(gossip_msg)) = BroadcastMessage::decode(&message.data) {
-                        if let Some(source_peer) = message.source {
-                            // Determine inner DKG message variant
-                            if let Some(p2p_proto::gossipsub_message::Message::Dkg(inner_dkg)) = gossip_msg.message {
-                                use p2p_proto::dkg_message::Message as DkgInner;
-                                match inner_dkg.message {
-                                    Some(DkgInner::StartDkg(_)) => {
-                                        self.handle_dkg_start(node)?;
-                                    }
-                                    Some(DkgInner::Round1Package(_)) => {
-                                        self.handle_round1_payload(node, source_peer, &message.data)?;
-                                    }
-                                    _ => {}
+                if let Ok(BroadcastMessage::Dkg(gossip_msg)) =
+                    BroadcastMessage::decode(&message.data)
+                {
+                    if let Some(source_peer) = message.source {
+                        if let Some(Message::Dkg(inner_dkg)) = gossip_msg.message {
+                            match inner_dkg.message {
+                                Some(DkgInner::StartDkg(_)) => {
+                                    self.handle_dkg_start(node)?;
                                 }
+                                Some(DkgInner::Round1Package(_)) => {
+                                    self.handle_round1_payload(node, source_peer, inner_dkg)?;
+                                }
+                                _ => {}
                             }
                         }
                     }

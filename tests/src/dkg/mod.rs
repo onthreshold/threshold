@@ -10,7 +10,11 @@ mod dkg_test {
     use tracing_subscriber::EnvFilter;
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
+    use types::broadcast::BroadcastMessage;
     use types::network::network_event::{DirectMessage, NetworkEvent};
+    use types::proto::ProtoDecode;
+    use types::proto::p2p_proto::dkg_message::Message as DkgInner;
+    use types::proto::p2p_proto::gossipsub_message::Message as GossipsubMessage;
 
     fn setup() {
         let env_filter =
@@ -80,13 +84,24 @@ mod dkg_test {
             for event in pending_events.iter() {
                 match &event {
                     NetworkEvent::GossipsubMessage(msg) => {
-                        let topic_str = format!("{:?}", msg.topic);
-                        let data_str = String::from_utf8_lossy(&msg.data);
-
-                        if topic_str.contains("start-dkg") {
-                            start_dkg_broadcasts += 1;
-                        } else if data_str.contains("Round1") || topic_str.contains("round1") {
-                            round1_broadcasts += 1;
+                        if let Ok(BroadcastMessage::Dkg(gossip_msg)) =
+                            BroadcastMessage::decode(&msg.data)
+                        {
+                            if let Some(GossipsubMessage::Dkg(dkg_msg)) = gossip_msg.message {
+                                match dkg_msg.message {
+                                    Some(DkgInner::StartDkg(_)) => {
+                                        start_dkg_broadcasts += 1;
+                                    }
+                                    Some(DkgInner::Round1Package(_)) => {
+                                        round1_broadcasts += 1;
+                                    }
+                                    _ => {
+                                        other_messages += 1;
+                                    }
+                                }
+                            } else {
+                                other_messages += 1;
+                            }
                         } else {
                             other_messages += 1;
                         }
@@ -143,10 +158,14 @@ mod dkg_test {
                 for event in pending_events.iter() {
                     match &event {
                         NetworkEvent::GossipsubMessage(msg) => {
-                            let data_str = String::from_utf8_lossy(&msg.data);
-                            // This is a broadcast
-                            if data_str.contains("Round1") {
-                                info!("  Still processing Round1 broadcasts");
+                            if let Ok(BroadcastMessage::Dkg(gossip_msg)) =
+                                BroadcastMessage::decode(&msg.data)
+                            {
+                                if let Some(GossipsubMessage::Dkg(dkg_msg)) = gossip_msg.message {
+                                    if matches!(dkg_msg.message, Some(DkgInner::Round1Package(_))) {
+                                        info!("  Still processing Round1 broadcasts");
+                                    }
+                                }
                             }
                         }
                         NetworkEvent::MessageEvent((_, direct_message)) => {
@@ -258,7 +277,6 @@ mod dkg_test {
             "🎉 DKG completed successfully on all {} nodes!",
             cluster.nodes.len()
         );
-        cluster.tear_down().await;
     }
 
     #[tokio::test]

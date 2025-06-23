@@ -4,23 +4,22 @@ use crate::{
     proto::{ProtoDecode, ProtoEncode, p2p_proto},
 };
 
-use prost::Message as ProstMessage;
+use prost::Message as _;
 
 #[derive(Debug, Clone)]
 pub enum BroadcastMessage {
-    /// Messages related to Tendermint-style consensus (leader election, votes, …)
+    /// Messages related to tendermint consensus
     Consensus(ConsensusMessage),
-    /// Raw bytes of a proposed block that needs to be validated by peers.
+    /// Message containing a proposed block that needs to be validated by peers.
     Block(Vec<u8>),
-    /// A user wants to fund their account – broadcast the deposit intent so every node can persist it.
+    /// Message containing a deposit intent that needs to be validated by peers.
     DepositIntent(DepositIntent),
-    /// A fully signed withdrawal transaction that should be broadcast to the Bitcoin network and accounted locally.
+    /// Message containing a fully signed withdrawal transaction that should be broadcast to the Bitcoin network and accounted locally.
     PendingSpend(PendingSpend),
-    /// Frost DKG coordination messages wrapped in the existing gossipsub proto container.
+    /// Message containing a Frost DKG coordination message.
     Dkg(p2p_proto::GossipsubMessage),
 }
 
-// Discriminant values – keep stable so we can decode deterministically.
 const CONSENSUS_TAG: u8 = 0;
 const BLOCK_TAG: u8 = 1;
 const DEPOSIT_INTENT_TAG: u8 = 2;
@@ -49,7 +48,7 @@ impl ProtoEncode for BroadcastMessage {
             }
             Self::Dkg(msg) => {
                 buf.push(DKG_TAG);
-                buf.extend(<p2p_proto::GossipsubMessage as ProtoEncode>::encode(msg)?);
+                buf.extend(msg.encode_to_vec());
             }
         }
         Ok(buf)
@@ -69,8 +68,10 @@ impl ProtoDecode for BroadcastMessage {
             BLOCK_TAG => Ok(Self::Block(payload.to_vec())),
             DEPOSIT_INTENT_TAG => Ok(Self::DepositIntent(DepositIntent::decode(payload)?)),
             PENDING_SPEND_TAG => Ok(Self::PendingSpend(PendingSpend::decode(payload)?)),
-            DKG_TAG => Ok(Self::Dkg(p2p_proto::GossipsubMessage::decode(payload).map_err(|e| e.to_string())?)),
+            DKG_TAG => Ok(Self::Dkg(
+                p2p_proto::GossipsubMessage::decode(payload).map_err(|e| e.to_string())?,
+            )),
             other => Err(format!("Unknown BroadcastMessage tag: {other}")),
         }
     }
-} 
+}

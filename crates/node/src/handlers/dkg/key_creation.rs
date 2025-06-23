@@ -1,11 +1,10 @@
 use abci::{ChainMessage, ChainResponse};
 use frost_secp256k1::{self as frost, keys::dkg::round2};
 use libp2p::PeerId;
-use prost::Message as ProstMessage;
 use protocol::block::{ChainConfig, ValidatorInfo};
 use std::time::Duration;
-use types::{errors::NodeError, network::network_event::DirectMessage};
 use types::broadcast::BroadcastMessage;
+use types::{errors::NodeError, network::network_event::DirectMessage};
 
 use crate::peer_id_to_identifier;
 use crate::{NodeState, handlers::dkg::DkgState, wallet::Wallet};
@@ -13,21 +12,6 @@ use types::network::network_protocol::Network;
 use types::proto::p2p_proto::{
     DkgMessage, GossipsubMessage, StartDkgMessage, dkg_message::Message,
 };
-
-fn decode_gossipsub_dkg_message(
-    data: &[u8],
-) -> Result<types::proto::p2p_proto::DkgMessage, String> {
-    let gossipsub_msg = <types::proto::p2p_proto::GossipsubMessage as ProstMessage>::decode(data)
-        .map_err(|e| format!("Failed to decode GossipsubMessage: {e}"))?;
-
-    if let Some(types::proto::p2p_proto::gossipsub_message::Message::Dkg(dkg_msg)) =
-        gossipsub_msg.message
-    {
-        Ok(dkg_msg)
-    } else {
-        Err("Expected DKG message in GossipsubMessage".to_string())
-    }
-}
 
 fn dkg_step_delay() -> Duration {
     std::env::var("DKG_STEP_DELAY_SECS")
@@ -114,13 +98,10 @@ impl DkgState {
             )),
         };
 
-        match node
-            .network_handle
-            .send_broadcast(
-                libp2p::gossipsub::IdentTopic::new("broadcast"),
-                BroadcastMessage::Dkg(gossipsub_message),
-            )
-        {
+        match node.network_handle.send_broadcast(
+            libp2p::gossipsub::IdentTopic::new("broadcast"),
+            BroadcastMessage::Dkg(gossipsub_message),
+        ) {
             Ok(()) => (),
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to send broadcast: {e:?}")));
@@ -149,13 +130,10 @@ impl DkgState {
             )),
         };
 
-        match node
-            .network_handle
-            .send_broadcast(
-                libp2p::gossipsub::IdentTopic::new("broadcast"),
-                BroadcastMessage::Dkg(round1_gossipsub_message),
-            )
-        {
+        match node.network_handle.send_broadcast(
+            libp2p::gossipsub::IdentTopic::new("broadcast"),
+            BroadcastMessage::Dkg(round1_gossipsub_message),
+        ) {
             Ok(()) => tracing::info!("Broadcast round1"),
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to send broadcast: {e:?}")));
@@ -178,12 +156,8 @@ impl DkgState {
         &mut self,
         node: &mut NodeState<N, W>,
         sender_peer_id: PeerId,
-        protobuf_data: &[u8],
+        dkg_message: DkgMessage,
     ) -> Result<(), NodeError> {
-        // Decode the protobuf message first
-        let dkg_message = decode_gossipsub_dkg_message(protobuf_data)
-            .map_err(|e| NodeError::Error(format!("Failed to decode DKG message: {e}")))?;
-
         // Extract the round1 package from the protobuf message
         let Some(types::proto::p2p_proto::dkg_message::Message::Round1Package(round1_pkg)) =
             dkg_message.message

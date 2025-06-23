@@ -119,10 +119,6 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                 }
                 NetworkEvent::GossipsubMessage(message) => {
                     if let Some(peer) = message.source {
-                        if message.topic != self.broadcast_topic.hash() {
-                            return Ok(());
-                        }
-
                         let broadcast = BroadcastMessage::decode(&message.data).map_err(|e| {
                             NodeError::Error(format!("Failed to decode broadcast message: {e}"))
                         })?;
@@ -148,15 +144,17 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                             peer,
                                             block.body.transactions.len()
                                         );
-                                        let Ok(ChainResponse::GetProposedBlock { block: local_block }) =
-                                            node.chain_interface_tx
-                                                .send_message_with_response(
-                                                    ChainMessage::GetProposedBlock {
-                                                        previous_block: None,
-                                                        proposer: node.peer_id.to_bytes(),
-                                                    },
-                                                )
-                                                .await
+                                        let Ok(ChainResponse::GetProposedBlock {
+                                            block: local_block,
+                                        }) = node
+                                            .chain_interface_tx
+                                            .send_message_with_response(
+                                                ChainMessage::GetProposedBlock {
+                                                    previous_block: None,
+                                                    proposer: node.peer_id.to_bytes(),
+                                                },
+                                            )
+                                            .await
                                         else {
                                             return Err(NodeError::Error(
                                                 "Failed to get proposed block".to_string(),
