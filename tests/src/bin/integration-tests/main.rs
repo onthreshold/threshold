@@ -61,7 +61,7 @@ enum Commands {
     },
     CheckDkg {
         #[arg(short, long)]
-        ports: String,
+        port_range: String,
     },
     /// Run a consensus end-to-end test that creates multiple deposits to trigger block creation
     ConsensusTest {
@@ -123,8 +123,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             run_end_to_end_test(amount, endpoint, use_testnet).await?;
         }
-        Commands::CheckDkg { ports } => {
-            check_if_dkg_keys_exist(ports).await?;
+        Commands::CheckDkg { port_range } => {
+            check_if_dkg_keys_exist(port_range).await?;
         }
         Commands::ConsensusTest {
             amount,
@@ -320,8 +320,25 @@ async fn run_end_to_end_test(
     Ok(())
 }
 
-async fn check_if_dkg_keys_exist(ports: String) -> Result<(), Box<dyn std::error::Error>> {
-    for port in ports.split(",") {
+async fn check_if_dkg_keys_exist(port_range: String) -> Result<(), Box<dyn std::error::Error>> {
+    let parts: Vec<&str> = port_range.split('-').collect();
+    if parts.len() != 2 {
+        return Err(
+            "Invalid port range format. Expected format: start-end (e.g., 50051-50055)".into(),
+        );
+    }
+
+    let start_port: u16 = parts[0].parse().map_err(|_| "Invalid start port")?;
+    let end_port: u16 = parts[1].parse().map_err(|_| "Invalid end port")?;
+
+    if start_port > end_port {
+        return Err("Start port must be less than or equal to end port".into());
+    }
+
+    let mut failed_nodes = Vec::new();
+
+    for (index, port) in (start_port..=end_port).enumerate() {
+        let node_number = index + 1;
         let mut client = NodeControlClient::connect(format!("http://127.0.0.1:{port}")).await?;
 
         let mnemonic = std::env::var("MNEMONIC").expect("MNEMONIC env variable not set");
@@ -336,14 +353,22 @@ async fn check_if_dkg_keys_exist(ports: String) -> Result<(), Box<dyn std::error
         let response = client.create_deposit_intent(req).await;
 
         match response {
-            Ok(_) => {}
+            Ok(_) => {
+                println!("✅ DKG key exists for node{node_number}");
+            }
             Err(e) => {
-                panic!("Deposit intent creation failed for node on port {port}: {e}");
+                println!("❌ DKG key missing for node{node_number}: {e}");
+                failed_nodes.push(node_number);
             }
         }
     }
 
-    println!("✅ DKG keys exist");
+    assert!(
+        failed_nodes.is_empty(),
+        "DKG keys missing for nodes: {:?}",
+        failed_nodes
+    );
+    println!("✅ All DKG keys exist");
 
     Ok(())
 }

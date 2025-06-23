@@ -72,6 +72,16 @@ docker-compose down
 
 # Build container
 docker build -t vault-node .
+
+# Multi-node DKG testing workflow
+# 1. Start n nodes using setup script
+./setup_nodes.sh <n>
+
+# 2. Run DKG integration test (note: port range is 50057 to 50057+n-1)
+cargo run --bin integration-tests check-dkg --port-range 50057-50063  # for 7 nodes
+
+# 3. Clean up containers
+docker ps -q | xargs docker stop
 ```
 
 ### Integration Testing
