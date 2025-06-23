@@ -76,3 +76,5 @@ nodedb_5.db
 CLAUDE.md
 
 test_artifacts/
+
+tarpaulin-report.html
