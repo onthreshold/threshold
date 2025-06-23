@@ -6,15 +6,18 @@ use crate::{
     NodeConfig, NodeState, key_manager::load_and_decrypt_keypair, swarm_manager::build_swarm,
     wallet::TaprootWallet,
 };
+use actix_web::{App, HttpResponse, HttpServer, web};
 use bitcoin::Network;
 use grpc::grpc_handler::NodeControlService;
+use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio::sync::broadcast;
 use tonic::transport::Server;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-use std::sync::Arc;
+type PrometheusHandler = Arc<PrometheusHandle>;
 
 pub async fn start_node(
     config: NodeConfig,
@@ -75,6 +78,43 @@ pub async fn start_node(
         registry.with(console_layer).init();
         tracing::info!("Logging initialized with console output only");
     }
+
+    let prometheus_handle: Arc<PrometheusHandle> = {
+        let builder = PrometheusBuilder::new();
+        Arc::new(
+            builder
+                .install_recorder()
+                .expect("failed to install Prometheus recorder"),
+        )
+    };
+
+    let metrics_server_handle = tokio::spawn(async move {
+        async fn metrics_endpoint(handler: web::Data<PrometheusHandler>) -> HttpResponse {
+            metrics::counter!("metrics_scrape_requests_total").increment(1);
+            HttpResponse::Ok()
+                .content_type("text/plain")
+                .body(handler.render())
+        }
+
+        async fn health_endpoint() -> HttpResponse {
+            HttpResponse::Ok().content_type("text/plain").body("OK")
+        }
+
+        tracing::info!("Starting metrics server on 0.0.0.0:8080");
+
+        let server = HttpServer::new(move || {
+            App::new()
+                .app_data(web::Data::new(prometheus_handle.clone()))
+                .route("/metrics", web::get().to(metrics_endpoint))
+                .route("/health", web::get().to(health_endpoint))
+        })
+        .bind(("0.0.0.0", 8080))
+        .expect("Failed to bind metrics endpoint");
+
+        tracing::info!("Metrics server bound successfully, starting to serve");
+
+        server.run().await.expect("Metrics server failed");
+    });
 
     let keypair = match load_and_decrypt_keypair(&config) {
         Ok(kp) => kp,
@@ -216,6 +256,12 @@ pub async fn start_node(
             match result {
                 Ok(()) => tracing::info!("Chain interface stopped"),
                 Err(e) => tracing::error!("Chain interface error: {}", e),
+            }
+        }
+        result = metrics_server_handle => {
+            match result {
+                Ok(()) => tracing::info!("Metrics server stopped"),
+                Err(e) => tracing::error!("Metrics server error: {}", e),
             }
         }
     }

@@ -18,6 +18,7 @@ tokio = { workspace = true, features = ["full"] }
 tonic = { workspace = true }
 types = { path = "../types" }
 tracing = { workspace = true }
+metrics = "0.24"
 
 [lints]
 workspace = true
