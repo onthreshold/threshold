@@ -89,8 +89,14 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<CheckBalanceRequest>,
     ) -> Result<Response<CheckBalanceResponse>, Status> {
-        let request = request.into_inner();
-        let response = grpc_operator::check_balance(&self.network, request).await?;
-        Ok(Response::new(response))
+        let result = {
+            let request = request.into_inner();
+            grpc_operator::check_balance(&self.network, request).await
+        };
+
+        match result {
+            Ok(resp) => Ok(Response::new(resp)),
+            Err(status) => Err(status),
+        }
     }
 }

@@ -61,6 +61,9 @@ num-traits = "0.2.19"
 abci = { path = "../abci" }
 messenger = { path = "../../messenger" }
 grpc = { path = "../grpc" }
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.17", features = ["http-listener"] }
+actix-web = "4"
 
 [dev-dependencies]
 tempfile = "3.8"

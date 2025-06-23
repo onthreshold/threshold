@@ -36,7 +36,6 @@ pub struct PeerData {
 
 pub struct NodeState<N: Network, W: Wallet> {
     pub handlers: Vec<Box<dyn Handler<N, W>>>,
-
     pub peer_id: PeerId,
     pub peers: HashSet<PeerId>,
 
