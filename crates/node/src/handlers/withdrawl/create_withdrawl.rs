@@ -10,11 +10,11 @@ use num_traits::cast::ToPrimitive;
 use protocol::transaction::Transaction;
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
+use types::broadcast::BroadcastMessage;
 use types::errors::NodeError;
 use types::intents::{PendingSpend, WithdrawlIntent};
 use types::network::network_event::SelfRequest;
 use types::network::network_protocol::Network;
-use types::broadcast::BroadcastMessage;
 
 impl SpendIntentState {
     pub async fn propose_withdrawal<N: Network, W: Wallet>(

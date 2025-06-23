@@ -1,8 +1,8 @@
 use crate::wallet::Wallet;
 use crate::{NodeState, handlers::Handler, handlers::withdrawl::SpendIntentState};
 use libp2p::gossipsub::Message;
+use types::broadcast::BroadcastMessage;
 use types::errors::NodeError;
-use types::{broadcast::BroadcastMessage};
 use types::network::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 use types::network::network_protocol::Network;
 use types::proto::ProtoDecode;
@@ -45,13 +45,11 @@ impl<N: Network, W: Wallet> Handler<N, W> for SpendIntentState {
                         .map_err(|e| NodeError::Error(e.to_string()))?;
                 }
             }
-            Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {
-                if topic == libp2p::gossipsub::IdentTopic::new("broadcast").hash() {
-                    let broadcast = BroadcastMessage::decode(&data).map_err(NodeError::Error)?;
+            Some(NetworkEvent::GossipsubMessage(Message { data, .. })) => {
+                let broadcast = BroadcastMessage::decode(&data).map_err(NodeError::Error)?;
 
-                    if let BroadcastMessage::PendingSpend(spend_intent) = broadcast {
-                        self.handle_withdrawl_message(node, spend_intent).await?;
-                    }
+                if let BroadcastMessage::PendingSpend(spend_intent) = broadcast {
+                    self.handle_withdrawl_message(node, spend_intent).await?;
                 }
             }
             _ => {}
