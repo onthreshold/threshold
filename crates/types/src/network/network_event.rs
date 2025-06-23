@@ -8,6 +8,14 @@ use tokio::sync::mpsc;
 
 use crate::intents::{DepositIntent, WithdrawlIntent};
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BlockInfo {
+    pub height: u64,
+    pub hash: String,
+    pub timestamp: u64,
+    pub transaction_count: u32,
+}
+
 #[derive(Debug, Clone)]
 pub enum NetworkEvent {
     SelfRequest {
@@ -82,6 +90,13 @@ pub enum SelfRequest {
     ConfirmDeposit {
         confirmed_tx: Transaction,
     },
+    GetChainInfo,
+    TriggerConsensusRound {
+        force_round: bool,
+    },
+    GetLatestBlocks {
+        count: u32,
+    },
     Tick,
 }
 
@@ -113,5 +128,22 @@ pub enum SelfResponse {
     CheckBalanceResponse {
         balance_satoshis: u64,
     },
+<<<<<<< Updated upstream
     NodeError(crate::errors::NodeError),
+=======
+    GetChainInfoResponse {
+        latest_height: u64,
+        latest_block_hash: String,
+        pending_transactions: u64,
+        total_blocks: u64,
+    },
+    TriggerConsensusRoundResponse {
+        success: bool,
+        message: String,
+        round_number: u64,
+    },
+    GetLatestBlocksResponse {
+        blocks: Vec<BlockInfo>,
+    },
+>>>>>>> Stashed changes
 }

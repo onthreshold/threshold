@@ -24,6 +24,11 @@ service NodeControl {
 
     // Check account balance
     rpc CheckBalance(CheckBalanceRequest) returns (CheckBalanceResponse);
+
+    // Development endpoints
+    rpc GetChainInfo(GetChainInfoRequest) returns (GetChainInfoResponse);
+    rpc TriggerConsensusRound(TriggerConsensusRoundRequest) returns (TriggerConsensusRoundResponse);
+    rpc GetLatestBlocks(GetLatestBlocksRequest) returns (GetLatestBlocksResponse);
 }
 
 message SpendFundsRequest {
@@ -99,4 +104,39 @@ message CheckBalanceRequest {
 
 message CheckBalanceResponse {
     uint64 balance_satoshis = 1;
+}
+
+// Development endpoints messages
+message GetChainInfoRequest {}
+
+message GetChainInfoResponse {
+    uint64 latest_height = 1;
+    string latest_block_hash = 2;
+    uint64 pending_transactions = 3;
+    uint64 total_blocks = 4;
+}
+
+message TriggerConsensusRoundRequest {
+    bool force_round = 1;
+}
+
+message TriggerConsensusRoundResponse {
+    bool success = 1;
+    string message = 2;
+    uint64 round_number = 3;
+}
+
+message GetLatestBlocksRequest {
+    uint32 count = 1;
+}
+
+message BlockInfo {
+    uint64 height = 1;
+    string hash = 2;
+    uint64 timestamp = 3;
+    uint32 transaction_count = 4;
+}
+
+message GetLatestBlocksResponse {
+    repeated BlockInfo blocks = 1;
 }

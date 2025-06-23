@@ -111,6 +111,15 @@ impl ChainState {
         self.proposed_transactions.push(transaction);
     }
 
+    pub fn clear_pending_transactions(&mut self) {
+        self.proposed_transactions.clear();
+    }
+
+    #[must_use]
+    pub fn get_pending_transactions(&self) -> &[Transaction] {
+        &self.proposed_transactions
+    }
+
     #[must_use]
     pub fn get_proposed_block(&self, previous_block: Option<Block>, proposer: Vec<u8>) -> Block {
         Block::new(

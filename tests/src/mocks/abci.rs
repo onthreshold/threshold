@@ -224,54 +224,41 @@ impl ChainInterface for MockChainInterface {
     fn get_account(&self, address: &str) -> Option<Account> {
         self.chain_state.get_account(address).cloned()
     }
+
+    async fn finalize_and_store_block(&mut self, block: Block) -> Result<(), NodeError> {
+        // Execute all transactions in the block
+        let mut new_chain_state = self.chain_state.clone();
+        for transaction in &block.body.transactions {
+            new_chain_state = self
+                .executor
+                .execute_transaction(transaction.clone(), new_chain_state)
+                .await?;
+        }
+
+        // Store the block in the database
+        self.db.insert_block(block.clone())?;
+
+        // Update chain state
+        self.db.flush_state(&new_chain_state)?;
+        self.chain_state = new_chain_state;
+
+        // Clear pending transactions
+        self.chain_state.clear_pending_transactions();
+
+        Ok(())
+    }
+
+    fn get_pending_transactions(&self) -> Vec<Transaction> {
+        self.chain_state.get_pending_transactions().to_vec()
+    }
+
+    fn get_chain_state(&self) -> ChainState {
+        self.chain_state.clone()
+    }
 }
 
 impl TestChainInterface for MockChainInterface {
     fn as_mock_mut(&mut self) -> Option<&mut MockChainInterface> {
         Some(self)
-    }
-}
-
-// Helper function for tests to set up accounts
-// Updated to work with the message-passing architecture
-pub async fn setup_test_account(
-    node: &mut crate::mocks::network::MockNodeState,
-    address: &str,
-    account: Account,
-) -> Result<(), types::errors::NodeError> {
-    // Since there's no direct "create account" message in the current ChainMessage enum,
-    // we need to set up accounts through transactions.
-    // For testing purposes, we'll create a deposit transaction to establish the account balance.
-
-    use protocol::transaction::{Operation, Transaction, TransactionType};
-
-    let transaction = Transaction {
-        r#type: TransactionType::Deposit,
-        operations: vec![
-            Operation::OpPush {
-                value: account.balance.to_be_bytes().to_vec(),
-            },
-            Operation::OpPush {
-                value: address.as_bytes().to_vec(),
-            },
-            Operation::OpIncrementBalance,
-        ],
-        timestamp: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
-            .as_secs(),
-        version: 1,
-    };
-
-    match node
-        .chain_interface_tx
-        .send_message_with_response(abci::ChainMessage::AddTransactionToBlock { transaction })
-        .await
-    {
-        Ok(abci::ChainResponse::AddTransactionToBlock { error: None }) => Ok(()),
-        Ok(abci::ChainResponse::AddTransactionToBlock { error: Some(e) }) => Err(e),
-        _ => Err(types::errors::NodeError::Error(
-            "Failed to set up test account".to_string(),
-        )),
     }
 }

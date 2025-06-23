@@ -34,6 +34,9 @@ pub trait ChainInterface: Send + Sync {
         previous_block: Option<Block>,
         proposer: Vec<u8>,
     ) -> Result<Block, NodeError>;
+    async fn finalize_and_store_block(&mut self, block: Block) -> Result<(), NodeError>;
+    fn get_pending_transactions(&self) -> Vec<Transaction>;
+    fn get_chain_state(&self) -> chain_state::ChainState;
 }
 
 #[derive(Clone)]
@@ -60,6 +63,11 @@ pub enum ChainMessage {
         previous_block: Option<Block>,
         proposer: Vec<u8>,
     },
+    FinalizeBlock {
+        block: Block,
+    },
+    GetPendingTransactions,
+    GetChainState,
 }
 
 #[derive(Clone)]
@@ -71,6 +79,9 @@ pub enum ChainResponse {
     CreateGenesisBlock { error: Option<NodeError> },
     AddTransactionToBlock { error: Option<NodeError> },
     GetProposedBlock { block: Block },
+    FinalizeAndStoreBlock { error: Option<NodeError> },
+    GetPendingTransactions { transactions: Vec<Transaction> },
+    GetChainState { state: chain_state::ChainState },
 }
 
 pub struct ChainInterfaceImpl {
@@ -141,15 +152,8 @@ impl ChainInterface for ChainInterfaceImpl {
         &mut self,
         transaction: Transaction,
     ) -> Result<(), NodeError> {
-        self.chain_state
-            .add_transaction_to_block(transaction.clone());
-        // TODO: this is a hack to get the chain state to update.
-        let new_chain_state = self
-            .executor
-            .execute_transaction(transaction, self.chain_state.clone())
-            .await?;
-        self.db.flush_state(&new_chain_state)?;
-        self.chain_state = new_chain_state;
+        self.chain_state.add_transaction_to_block(transaction);
+
         Ok(())
     }
 
@@ -161,6 +165,43 @@ impl ChainInterface for ChainInterfaceImpl {
         Ok(self
             .chain_state
             .get_proposed_block(previous_block, proposer))
+    }
+
+    async fn finalize_and_store_block(&mut self, block: Block) -> Result<(), NodeError> {
+        // Execute all transactions in the block
+        let mut new_chain_state = self.chain_state.clone();
+        for transaction in &block.body.transactions {
+            new_chain_state = self
+                .executor
+                .execute_transaction(transaction.clone(), new_chain_state)
+                .await?;
+        }
+
+        // Store the block in the database
+        self.db.insert_block(block.clone())?;
+
+        // Update chain state with executed transactions
+        self.db.flush_state(&new_chain_state)?;
+        self.chain_state = new_chain_state;
+
+        // Clear pending transactions since they're now finalized
+        self.chain_state.clear_pending_transactions();
+
+        tracing::info!(
+            "✅ Finalized and stored block at height {} with {} transactions",
+            block.header.height,
+            block.body.transactions.len()
+        );
+
+        Ok(())
+    }
+
+    fn get_pending_transactions(&self) -> Vec<Transaction> {
+        self.chain_state.get_pending_transactions().to_vec()
+    }
+
+    fn get_chain_state(&self) -> chain_state::ChainState {
+        self.chain_state.clone()
     }
 }
 

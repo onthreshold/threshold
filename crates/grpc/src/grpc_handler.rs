@@ -8,6 +8,8 @@ use types::proto::node_proto::{
     CreateDepositIntentRequest, CreateDepositIntentResponse, GetPendingDepositIntentsRequest,
     GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
     SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
+    GetChainInfoRequest, GetChainInfoResponse, TriggerConsensusRoundRequest, TriggerConsensusRoundResponse,
+    GetLatestBlocksRequest, GetLatestBlocksResponse,
     node_control_server::{NodeControl, NodeControlServer},
 };
 
@@ -91,6 +93,33 @@ impl NodeControl for NodeControlService {
     ) -> Result<Response<CheckBalanceResponse>, Status> {
         let request = request.into_inner();
         let response = grpc_operator::check_balance(&self.network, request).await?;
+        Ok(Response::new(response))
+    }
+
+    async fn get_chain_info(
+        &self,
+        request: Request<GetChainInfoRequest>,
+    ) -> Result<Response<GetChainInfoResponse>, Status> {
+        let request = request.into_inner();
+        let response = grpc_operator::get_chain_info(&self.network, request).await?;
+        Ok(Response::new(response))
+    }
+
+    async fn trigger_consensus_round(
+        &self,
+        request: Request<TriggerConsensusRoundRequest>,
+    ) -> Result<Response<TriggerConsensusRoundResponse>, Status> {
+        let request = request.into_inner();
+        let response = grpc_operator::trigger_consensus_round(&self.network, request).await?;
+        Ok(Response::new(response))
+    }
+
+    async fn get_latest_blocks(
+        &self,
+        request: Request<GetLatestBlocksRequest>,
+    ) -> Result<Response<GetLatestBlocksResponse>, Status> {
+        let request = request.into_inner();
+        let response = grpc_operator::get_latest_blocks(&self.network, request).await?;
         Ok(Response::new(response))
     }
 }

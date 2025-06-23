@@ -8,6 +8,8 @@ use types::proto::node_proto::{
     ConfirmWithdrawalResponse, CreateDepositIntentRequest, CreateDepositIntentResponse,
     GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
     SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
+    GetChainInfoRequest, GetChainInfoResponse, TriggerConsensusRoundRequest, TriggerConsensusRoundResponse,
+    GetLatestBlocksRequest, GetLatestBlocksResponse, BlockInfo,
 };
 
 pub async fn spend_funds(
@@ -234,4 +236,110 @@ pub async fn check_balance(
     };
 
     Ok(CheckBalanceResponse { balance_satoshis })
+}
+
+pub async fn get_chain_info(
+    network: &impl Network,
+    _request: GetChainInfoRequest,
+) -> Result<GetChainInfoResponse, Status> {
+    let response = network
+        .send_self_request(SelfRequest::GetChainInfo, true)
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
+
+    let Some(response_handle) = response else {
+        return Err(Status::internal("No response from node"));
+    };
+
+    let response = response_handle
+        .await
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
+
+    let SelfResponse::GetChainInfoResponse {
+        latest_height,
+        latest_block_hash,
+        pending_transactions,
+        total_blocks,
+    } = response
+    else {
+        return Err(Status::internal("Invalid response from node"));
+    };
+
+    Ok(GetChainInfoResponse {
+        latest_height,
+        latest_block_hash,
+        pending_transactions,
+        total_blocks,
+    })
+}
+
+pub async fn trigger_consensus_round(
+    network: &impl Network,
+    request: TriggerConsensusRoundRequest,
+) -> Result<TriggerConsensusRoundResponse, Status> {
+    let response = network
+        .send_self_request(
+            SelfRequest::TriggerConsensusRound {
+                force_round: request.force_round,
+            },
+            true,
+        )
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
+
+    let Some(response_handle) = response else {
+        return Err(Status::internal("No response from node"));
+    };
+
+    let response = response_handle
+        .await
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
+
+    let SelfResponse::TriggerConsensusRoundResponse {
+        success,
+        message,
+        round_number,
+    } = response
+    else {
+        return Err(Status::internal("Invalid response from node"));
+    };
+
+    Ok(TriggerConsensusRoundResponse {
+        success,
+        message,
+        round_number,
+    })
+}
+
+pub async fn get_latest_blocks(
+    network: &impl Network,
+    request: GetLatestBlocksRequest,
+) -> Result<GetLatestBlocksResponse, Status> {
+    let count = request.count.max(1).min(100); // Limit to reasonable range
+
+    let response = network
+        .send_self_request(SelfRequest::GetLatestBlocks { count }, true)
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
+
+    let Some(response_handle) = response else {
+        return Err(Status::internal("No response from node"));
+    };
+
+    let response = response_handle
+        .await
+        .map_err(|e| Status::internal(format!("Network error: {e:?}")))?;
+
+    let SelfResponse::GetLatestBlocksResponse { blocks } = response else {
+        return Err(Status::internal("Invalid response from node"));
+    };
+
+    let block_infos = blocks
+        .into_iter()
+        .map(|block| BlockInfo {
+            height: block.height,
+            hash: block.hash,
+            timestamp: block.timestamp,
+            transaction_count: block.transaction_count,
+        })
+        .collect();
+
+    Ok(GetLatestBlocksResponse { blocks: block_infos })
 }
