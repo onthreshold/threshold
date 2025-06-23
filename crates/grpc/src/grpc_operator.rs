@@ -4,12 +4,12 @@ use types::intents::WithdrawlIntent;
 use types::network::network_event::{SelfRequest, SelfResponse};
 use types::network::network_protocol::{Network, NetworkHandle};
 use types::proto::node_proto::{
-    self, CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest,
+    self, BlockInfo, CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest,
     ConfirmWithdrawalResponse, CreateDepositIntentRequest, CreateDepositIntentResponse,
+    GetChainInfoRequest, GetChainInfoResponse, GetLatestBlocksRequest, GetLatestBlocksResponse,
     GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
     SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
-    GetChainInfoRequest, GetChainInfoResponse, TriggerConsensusRoundRequest, TriggerConsensusRoundResponse,
-    GetLatestBlocksRequest, GetLatestBlocksResponse, BlockInfo,
+    TriggerConsensusRoundRequest, TriggerConsensusRoundResponse,
 };
 
 pub async fn spend_funds(
@@ -313,7 +313,7 @@ pub async fn get_latest_blocks(
     network: &impl Network,
     request: GetLatestBlocksRequest,
 ) -> Result<GetLatestBlocksResponse, Status> {
-    let count = request.count.max(1).min(100); // Limit to reasonable range
+    let count = request.count.clamp(1, 100); // Limit to reasonable range
 
     let response = network
         .send_self_request(SelfRequest::GetLatestBlocks { count }, true)
@@ -341,5 +341,7 @@ pub async fn get_latest_blocks(
         })
         .collect();
 
-    Ok(GetLatestBlocksResponse { blocks: block_infos })
+    Ok(GetLatestBlocksResponse {
+        blocks: block_infos,
+    })
 }

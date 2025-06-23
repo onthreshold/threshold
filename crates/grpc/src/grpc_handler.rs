@@ -5,11 +5,11 @@ use crate::grpc_operator;
 
 use types::proto::node_proto::{
     CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest, ConfirmWithdrawalResponse,
-    CreateDepositIntentRequest, CreateDepositIntentResponse, GetPendingDepositIntentsRequest,
-    GetPendingDepositIntentsResponse, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
-    SpendFundsRequest, SpendFundsResponse, StartSigningRequest, StartSigningResponse,
-    GetChainInfoRequest, GetChainInfoResponse, TriggerConsensusRoundRequest, TriggerConsensusRoundResponse,
-    GetLatestBlocksRequest, GetLatestBlocksResponse,
+    CreateDepositIntentRequest, CreateDepositIntentResponse, GetChainInfoRequest,
+    GetChainInfoResponse, GetLatestBlocksRequest, GetLatestBlocksResponse,
+    GetPendingDepositIntentsRequest, GetPendingDepositIntentsResponse, ProposeWithdrawalRequest,
+    ProposeWithdrawalResponse, SpendFundsRequest, SpendFundsResponse, StartSigningRequest,
+    StartSigningResponse, TriggerConsensusRoundRequest, TriggerConsensusRoundResponse,
     node_control_server::{NodeControl, NodeControlServer},
 };
 

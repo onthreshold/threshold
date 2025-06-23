@@ -128,9 +128,7 @@ pub enum SelfResponse {
     CheckBalanceResponse {
         balance_satoshis: u64,
     },
-<<<<<<< Updated upstream
     NodeError(crate::errors::NodeError),
-=======
     GetChainInfoResponse {
         latest_height: u64,
         latest_block_hash: String,
@@ -145,5 +143,4 @@ pub enum SelfResponse {
     GetLatestBlocksResponse {
         blocks: Vec<BlockInfo>,
     },
->>>>>>> Stashed changes
 }

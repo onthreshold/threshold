@@ -2,7 +2,7 @@ use crate::{Network, NodeState, handlers::Handler, wallet::Wallet};
 use abci::chain_state::Account;
 use abci::{ChainMessage, ChainResponse};
 use types::errors::NodeError;
-use types::network::network_event::{NetworkEvent, SelfRequest, SelfResponse, BlockInfo};
+use types::network::network_event::{BlockInfo, NetworkEvent, SelfRequest, SelfResponse};
 
 #[derive(Default)]
 pub struct BalanceState;
@@ -26,27 +26,27 @@ impl<N: Network, W: Wallet> Handler<N, W> for BalanceState {
                 request: SelfRequest::CheckBalance { address },
                 response_channel,
             }) => {
-            let ChainResponse::GetAccount { account } = node
-                .chain_interface_tx
-                .send_message_with_response(ChainMessage::GetAccount {
-                    address: address.clone(),
-                })
-                .await?
-            else {
-                return Err(NodeError::Error("Failed to get account".to_string()));
-            };
-
-            let account = account.unwrap_or_else(|| Account::new(address, 0));
-
-            let balance = account.balance;
-
-            if let Some(response_channel) = response_channel {
-                response_channel
-                    .send(SelfResponse::CheckBalanceResponse {
-                        balance_satoshis: balance,
+                let ChainResponse::GetAccount { account } = node
+                    .chain_interface_tx
+                    .send_message_with_response(ChainMessage::GetAccount {
+                        address: address.clone(),
                     })
-                    .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
-            }
+                    .await?
+                else {
+                    return Err(NodeError::Error("Failed to get account".to_string()));
+                };
+
+                let account = account.unwrap_or_else(|| Account::new(address, 0));
+
+                let balance = account.balance;
+
+                if let Some(response_channel) = response_channel {
+                    response_channel
+                        .send(SelfResponse::CheckBalanceResponse {
+                            balance_satoshis: balance,
+                        })
+                        .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
+                }
             }
             Some(NetworkEvent::SelfRequest {
                 request: SelfRequest::GetChainInfo,
@@ -90,17 +90,17 @@ impl<N: Network, W: Wallet> Handler<N, W> for BalanceState {
 
                 let mut blocks = Vec::new();
                 let current_height = state.get_block_height();
-                
-                // For now, return a simple mock response since we don't store historical blocks in ChainState
+
                 if current_height > 0 {
                     blocks.push(BlockInfo {
                         height: current_height,
-                        hash: format!("block_hash_{}", current_height),
+                        hash: format!("block_hash_{current_height}"),
                         timestamp: std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap()
                             .as_secs(),
-                        transaction_count: state.get_pending_transactions().len() as u32,
+                        transaction_count: u32::try_from(state.get_pending_transactions().len())
+                            .unwrap(),
                     });
                 }
 
