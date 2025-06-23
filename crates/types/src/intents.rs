@@ -54,7 +54,7 @@ pub struct WithdrawlIntent {
     pub blocks_to_confirm: Option<u16>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PendingSpend {
     pub tx: Transaction,
     pub user_pubkey: String,

@@ -10,7 +10,7 @@ use protocol::transaction::Transaction;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
-use types::{errors::NodeError, network::network_protocol::Network};
+use types::{errors::NodeError, network::network_protocol::Network, broadcast::BroadcastMessage};
 use uuid::Uuid;
 
 use crate::{NodeState, handlers::deposit::DepositIntentState, wallet::Wallet};
@@ -122,7 +122,10 @@ impl DepositIntentState {
 
         if let Err(e) = node
             .network_handle
-            .send_broadcast(IdentTopic::new("deposit-intents"), deposit_intent)
+            .send_broadcast(
+                IdentTopic::new("broadcast"),
+                BroadcastMessage::DepositIntent(deposit_intent.clone()),
+            )
         {
             info!("Failed to broadcast new deposit address: {e:?}");
         }

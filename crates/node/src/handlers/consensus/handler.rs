@@ -9,6 +9,7 @@ use libp2p::PeerId;
 use protocol::block::Block;
 use sha2::{Digest, Sha256};
 use tracing::info;
+use types::broadcast::BroadcastMessage;
 use types::consensus::{ConsensusMessage, LeaderAnnouncement, Vote};
 use types::errors::NodeError;
 use types::network::network_protocol::Network;
@@ -46,10 +47,10 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                 if !block.body.transactions.is_empty() {
                     let bytes = block.serialize()?;
 
-                    let raw = RawBlockBytes(bytes);
+                    let broadcast_msg = BroadcastMessage::Block(bytes);
 
                     node.network_handle
-                        .send_broadcast(self.block_topic.clone(), raw)
+                        .send_broadcast(self.broadcast_topic.clone(), broadcast_msg)
                         .map_err(|e| {
                             NodeError::Error(format!("Failed to broadcast block proposal: {e:?}"))
                         })?;
@@ -72,7 +73,10 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                 let new_round_message = ConsensusMessage::NewRound(next_round);
 
                 node.network_handle
-                    .send_broadcast(self.leader_topic.clone(), new_round_message)
+                    .send_broadcast(
+                        self.broadcast_topic.clone(),
+                        BroadcastMessage::Consensus(new_round_message),
+                    )
                     .map_err(|e| {
                         NodeError::Error(format!("Failed to broadcast new round message: {e:?}"))
                     })?;
@@ -105,7 +109,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                     }
                 }
                 NetworkEvent::Subscribed { peer_id, topic } => {
-                    if topic == self.leader_topic.hash() {
+                    if topic == self.broadcast_topic.hash() {
                         self.validators.insert(peer_id);
 
                         if self.current_round == 0 {
@@ -115,15 +119,16 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                 }
                 NetworkEvent::GossipsubMessage(message) => {
                     if let Some(peer) = message.source {
-                        if message.topic == self.leader_topic.hash() {
-                            let consensus_message: ConsensusMessage =
-                                ConsensusMessage::decode(&message.data).map_err(|e| {
-                                    NodeError::Error(format!(
-                                        "Failed to decode consensus message: {e}"
-                                    ))
-                                })?;
+                        if message.topic != self.broadcast_topic.hash() {
+                            return Ok(());
+                        }
 
-                            match consensus_message {
+                        let broadcast = BroadcastMessage::decode(&message.data).map_err(|e| {
+                            NodeError::Error(format!("Failed to decode broadcast message: {e}"))
+                        })?;
+
+                        match broadcast {
+                            BroadcastMessage::Consensus(consensus_message) => match consensus_message {
                                 ConsensusMessage::LeaderAnnouncement(announcement) => {
                                     self.handle_leader_announcement(node, &announcement)?;
                                 }
@@ -133,33 +138,30 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                 ConsensusMessage::Vote(vote) => {
                                     self.handle_vote(node, peer, &vote).await;
                                 }
-                            }
-                        }
-
-                        // Handle proposed blocks coming over the dedicated topic
-                        if message.topic == self.block_topic.hash() {
-                            match Block::deserialize(&message.data) {
-                                Ok(block) => {
-                                    info!(
-                                        "📥 Received block proposal for round {} from {} with {} txs",
-                                        self.current_round,
-                                        peer,
-                                        block.body.transactions.len()
-                                    );
-                                    let Ok(ChainResponse::GetProposedBlock { block: local_block }) =
-                                        node.chain_interface_tx
-                                            .send_message_with_response(
-                                                ChainMessage::GetProposedBlock {
-                                                    previous_block: None,
-                                                    proposer: node.peer_id.to_bytes(),
-                                                },
-                                            )
-                                            .await
-                                    else {
-                                        return Err(NodeError::Error(
-                                            "Failed to get proposed block".to_string(),
-                                        ));
-                                    };
+                            },
+                            BroadcastMessage::Block(raw_block) => {
+                                match Block::deserialize(&raw_block) {
+                                    Ok(block) => {
+                                        info!(
+                                            "📥 Received block proposal for round {} from {} with {} txs",
+                                            self.current_round,
+                                            peer,
+                                            block.body.transactions.len()
+                                        );
+                                        let Ok(ChainResponse::GetProposedBlock { block: local_block }) =
+                                            node.chain_interface_tx
+                                                .send_message_with_response(
+                                                    ChainMessage::GetProposedBlock {
+                                                        previous_block: None,
+                                                        proposer: node.peer_id.to_bytes(),
+                                                    },
+                                                )
+                                                .await
+                                        else {
+                                            return Err(NodeError::Error(
+                                                "Failed to get proposed block".to_string(),
+                                            ));
+                                        };
 
                                     // Validate block by comparing transactions rather than entire block
                                     // (timestamps and proposers will be different for each node)
@@ -248,7 +250,10 @@ impl ConsensusState {
                 let message = ConsensusMessage::LeaderAnnouncement(announcement);
 
                 node.network_handle
-                    .send_broadcast(self.leader_topic.clone(), message)
+                    .send_broadcast(
+                        self.broadcast_topic.clone(),
+                        BroadcastMessage::Consensus(message),
+                    )
                     .map_err(|e| NodeError::Error(format!("Failed to publish leader: {e:?}")))?;
             }
 
@@ -315,7 +320,10 @@ impl ConsensusState {
         let vote_message = ConsensusMessage::Vote(vote);
 
         node.network_handle
-            .send_broadcast(self.vote_topic.clone(), vote_message)
+            .send_broadcast(
+                self.broadcast_topic.clone(),
+                BroadcastMessage::Consensus(vote_message),
+            )
             .map_err(|e| NodeError::Error(format!("Failed to broadcast vote: {e:?}")))?;
 
         info!(
@@ -365,7 +373,10 @@ impl ConsensusState {
 
                         let vote_message = ConsensusMessage::Vote(vote);
                         node.network_handle
-                            .send_broadcast(self.vote_topic.clone(), vote_message)
+                            .send_broadcast(
+                                self.broadcast_topic.clone(),
+                                BroadcastMessage::Consensus(vote_message),
+                            )
                             .map_err(|e| {
                                 NodeError::Error(format!("Failed to send precommit vote: {e:?}"))
                             })

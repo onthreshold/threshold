@@ -1,7 +1,7 @@
-use libp2p::gossipsub::{IdentTopic, Message};
+use libp2p::gossipsub::Message;
 use tracing::info;
 use types::errors::NodeError;
-use types::intents::DepositIntent;
+use types::{broadcast::BroadcastMessage};
 
 use crate::{
     NodeState,
@@ -88,13 +88,17 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                 }
             }
             Some(NetworkEvent::GossipsubMessage(Message { data, topic, .. })) => {
-                if topic == IdentTopic::new("deposit-intents").hash() {
-                    let deposit_intent = DepositIntent::decode(&data).map_err(|e| {
-                        NodeError::Error(format!("Failed to parse deposit intent: {e}"))
+                if topic == libp2p::gossipsub::IdentTopic::new("broadcast").hash() {
+                    let broadcast = BroadcastMessage::decode(&data).map_err(|e| {
+                        NodeError::Error(format!("Failed to decode broadcast message: {e}"))
                     })?;
 
-                    if let Err(e) = self.create_deposit_from_intent(node, deposit_intent).await {
-                        info!("Failed to store deposit intent: {}", e);
+                    if let BroadcastMessage::DepositIntent(deposit_intent) = broadcast {
+                        if let Err(e) =
+                            self.create_deposit_from_intent(node, deposit_intent).await
+                        {
+                            info!("Failed to store deposit intent: {}", e);
+                        }
                     }
                 }
             }
