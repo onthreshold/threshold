@@ -258,7 +258,6 @@ pub async fn get_chain_info(
         latest_height,
         latest_block_hash,
         pending_transactions,
-        total_blocks,
     } = response
     else {
         return Err(Status::internal("Invalid response from node"));
@@ -268,7 +267,6 @@ pub async fn get_chain_info(
         latest_height,
         latest_block_hash,
         pending_transactions,
-        total_blocks,
     })
 }
 

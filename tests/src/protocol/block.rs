@@ -4,7 +4,7 @@ mod block_test {
 
     #[test]
     fn test_block_creation_and_hashing() {
-        let block = Block::new([0u8; 32], 1, vec![], vec![1, 2, 3], 0);
+        let block = Block::new([0u8; 32], 1, vec![], vec![1, 2, 3]);
 
         let hash1 = block.hash();
         let hash2 = block.hash();

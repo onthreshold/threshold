@@ -63,7 +63,6 @@ impl<N: Network, W: Wallet> Handler<N, W> for BalanceState {
                 let latest_height = state.get_block_height();
                 let latest_block_hash = "latest".to_string(); // Simple placeholder
                 let pending_transactions = state.get_pending_transactions().len() as u64;
-                let total_blocks = latest_height + 1; // Simple approximation
 
                 if let Some(response_channel) = response_channel {
                     response_channel
@@ -71,7 +70,6 @@ impl<N: Network, W: Wallet> Handler<N, W> for BalanceState {
                             latest_height,
                             latest_block_hash,
                             pending_transactions,
-                            total_blocks,
                         })
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
                 }

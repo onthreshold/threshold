@@ -51,14 +51,6 @@ enum Commands {
         #[arg(short, long)]
         endpoint: Option<String>,
     },
-    /// Run an end-to-end test of the deposit and withdrawal flows
-    EndToEndTest {
-        amount: u64,
-        #[arg(short, long, default_value_t = false)]
-        use_testnet: bool,
-        #[arg(short, long)]
-        endpoint: Option<String>,
-    },
     CheckDkg {
         #[arg(short, long)]
         port_range: String,
@@ -87,6 +79,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             println!("🧪 Running all integration tests...\n");
 
+            println!("🔄 Running dkg test...");
+            check_if_dkg_keys_exist("50051-50055".to_string()).await?;
+            println!("✅ DKG test completed\n");
+
+            println!("Waiting for deposit intents to be processed...");
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
             println!("📥 Running deposit test...");
             run_deposit_test(amount, 2000, endpoint.clone(), use_testnet).await?;
             println!("✅ Deposit test completed\n");
@@ -94,10 +93,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("📤 Running withdrawal test...");
             run_withdrawal_test(amount / 2, endpoint.clone()).await?;
             println!("✅ Withdrawal test completed\n");
-
-            println!("🔄 Running end-to-end test...");
-            run_end_to_end_test(amount, endpoint.clone(), use_testnet).await?;
-            println!("✅ End-to-end test completed\n");
 
             println!("🏛️ Running consensus test...");
             run_consensus_test(amount, 3, endpoint).await?;
@@ -115,13 +110,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::WithdrawalTest { amount, endpoint } => {
             run_withdrawal_test(amount, endpoint).await?;
-        }
-        Commands::EndToEndTest {
-            amount,
-            endpoint,
-            use_testnet,
-        } => {
-            run_end_to_end_test(amount, endpoint, use_testnet).await?;
         }
         Commands::CheckDkg { port_range } => {
             check_if_dkg_keys_exist(port_range).await?;
@@ -175,6 +163,21 @@ async fn run_deposit_test(
         "✅ Deposit intent created. Address: {} | tracking_id: {}",
         deposit_address_str, resp.deposit_tracking_id
     );
+
+    // Wait for deposit intent to be processed --------------------------------------
+    let resp = client
+        .trigger_consensus_round(TriggerConsensusRoundRequest { force_round: true })
+        .await?
+        .into_inner();
+    if resp.success {
+        println!(
+            "  ✅ Node triggered consensus round {}: {}",
+            resp.round_number, resp.message
+        );
+    } else {
+        println!("  ❌ Node failed to trigger consensus: {}", resp.message);
+    }
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     if use_testnet {
         println!("🔑 Sender address: {}. Refreshing UTXOs...", sender_address);
@@ -291,7 +294,19 @@ async fn run_withdrawal_test(
     );
 
     // Wait for withdrawal to be processed --------------------------------------
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    let resp = client
+        .trigger_consensus_round(TriggerConsensusRoundRequest { force_round: true })
+        .await?
+        .into_inner();
+    if resp.success {
+        println!(
+            "✅ Node triggered consensus round {}: {}",
+            resp.round_number, resp.message
+        );
+    } else {
+        println!("  ❌ Node failed to trigger consensus: {}", resp.message);
+    }
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // Check balance -------------------------------------------
     let request = CheckBalanceRequest {
@@ -306,17 +321,6 @@ async fn run_withdrawal_test(
     );
 
     println!("✅ Withdrawal test passed");
-    Ok(())
-}
-
-async fn run_end_to_end_test(
-    amount: u64,
-    endpoint: Option<String>,
-    use_testnet: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    run_deposit_test(amount, 2000, endpoint.clone(), use_testnet).await?;
-    run_withdrawal_test(amount / 2, endpoint).await?;
-    println!("✅ End-to-end test passed");
     Ok(())
 }
 
@@ -419,22 +423,17 @@ async fn run_consensus_test(
         clients.len()
     );
 
-    // Generate unique keys for each deposit to test multiple users
     let mut deposit_data = Vec::new();
     for i in 0..num_deposits {
-        // Create deterministic but valid mnemonic by using the base mnemonic with derivation
         let (_, _, sender_pub) = generate_keys_from_mnemonic(&mnemonic);
 
-        // Create unique public key by adding index to the base public key bytes
         let mut pub_bytes = sender_pub.to_bytes();
-        // Modify the last byte to create unique keys (simple but effective for testing)
         pub_bytes[32] = (pub_bytes[32].wrapping_add(i as u8)) % 255;
         let unique_key = encode(pub_bytes);
 
         deposit_data.push((unique_key, i));
     }
 
-    // Phase 1: Create deposit intents on different nodes to trigger consensus
     println!(
         "📝 Phase 1: Creating {} deposit intents across nodes",
         num_deposits
@@ -461,11 +460,9 @@ async fn run_consensus_test(
         deposit_addresses.push((resp.deposit_address, public_key.clone()));
     }
 
-    // Phase 2: Wait for consensus to process the intents
     println!("⏳ Phase 2: Waiting for consensus to process deposit intents...");
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
-    // Phase 3: Verify consensus by checking that all nodes have the same state
     println!("🔍 Phase 3: Verifying consensus across all nodes");
     let mut all_consistent = true;
 
@@ -484,7 +481,6 @@ async fn run_consensus_test(
             pending_resp.intents.len()
         );
 
-        // Check that we can see all the deposit addresses we created
         let mut found_addresses = 0;
         for (expected_address, _) in &deposit_addresses {
             if pending_resp
@@ -512,7 +508,6 @@ async fn run_consensus_test(
         }
     }
 
-    // Phase 4: Get initial chain info using dev endpoints
     println!("🧱 Phase 4: Getting initial chain state using dev endpoints");
     let mut initial_chain_info = Vec::new();
     for (client_idx, client) in clients.iter_mut().enumerate() {
@@ -522,11 +517,10 @@ async fn run_consensus_test(
             .into_inner();
         initial_chain_info.push(chain_info.clone());
         println!(
-            "  📊 Node {} initial state: height={}, pending_txs={}, total_blocks={}",
+            "  📊 Node {} initial state: height={}, pending_txs={}",
             client_idx + 1,
             chain_info.latest_height,
             chain_info.pending_transactions,
-            chain_info.total_blocks
         );
     }
 
@@ -569,7 +563,7 @@ async fn run_consensus_test(
 
     // Wait for mock oracle to process and consensus to complete
     println!("⏳ Waiting for mock oracle processing and block finalization...");
-    tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(20)).await;
 
     // Phase 6: Verify block creation and chain advancement
     println!("🧱 Phase 6: Verifying block creation and chain advancement");
@@ -582,16 +576,13 @@ async fn run_consensus_test(
         let initial_info = &initial_chain_info[client_idx];
 
         println!(
-            "  📊 Node {} final state: height={}, pending_txs={}, total_blocks={}",
+            "  📊 Node {} final state: height={}, pending_txs={}",
             client_idx + 1,
             chain_info.latest_height,
             chain_info.pending_transactions,
-            chain_info.total_blocks
         );
 
-        if chain_info.latest_height > initial_info.latest_height
-            || chain_info.total_blocks > initial_info.total_blocks
-        {
+        if chain_info.latest_height > initial_info.latest_height {
             blocks_created = true;
             println!("    ✅ Node {} created new blocks", client_idx + 1);
 

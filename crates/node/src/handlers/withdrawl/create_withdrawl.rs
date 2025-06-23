@@ -5,7 +5,6 @@ use bitcoin::{
     key::Secp256k1,
     secp256k1::{Message, PublicKey, ecdsa::Signature},
 };
-use libp2p::gossipsub;
 use num_traits::cast::ToPrimitive;
 use protocol::transaction::Transaction;
 use sha2::{Digest, Sha256};
@@ -161,10 +160,7 @@ impl SpendIntentState {
         };
 
         node.network_handle
-            .send_broadcast(
-                gossipsub::IdentTopic::new("broadcast"),
-                BroadcastMessage::PendingSpend(spend_intent),
-            )
+            .send_broadcast(BroadcastMessage::PendingSpend(spend_intent))
             .map_err(|x| NodeError::Error(format!("Failed to send broadcast: {x:?}")))?;
 
         Ok(())

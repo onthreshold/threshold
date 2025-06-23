@@ -3,6 +3,7 @@ use crate::executor::TransactionExecutorImpl;
 use crate::{ChainInterface, ChainInterfaceImpl};
 use bitcoin::hashes::Hash;
 
+use oracle::mock::MockOracle;
 use protocol::transaction::{Operation, Transaction, TransactionType};
 use tempfile::TempDir;
 use types::intents::DepositIntent;
@@ -61,6 +62,14 @@ impl oracle::oracle::Oracle for AlwaysValidOracle {
 
     async fn get_latest_block_height(&self) -> Result<u32, types::errors::NodeError> {
         Ok(800_000) // Mock block height
+    }
+
+    async fn get_transaction_by_address(
+        &self,
+        _address: &str,
+    ) -> Result<bitcoin::Transaction, types::errors::NodeError> {
+        let tx = MockOracle::create_dummy_tx_without_address(1000);
+        Ok(tx)
     }
 }
 

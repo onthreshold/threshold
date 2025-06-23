@@ -46,7 +46,9 @@ impl<N: Network, W: Wallet> Handler<N, W> for SpendIntentState {
                 }
             }
             Some(NetworkEvent::GossipsubMessage(Message { data, .. })) => {
-                let broadcast = BroadcastMessage::decode(&data).map_err(NodeError::Error)?;
+                let broadcast = BroadcastMessage::decode(&data).map_err(|e| {
+                    NodeError::Error(format!("Failed to decode broadcast message: {e}"))
+                })?;
 
                 if let BroadcastMessage::PendingSpend(spend_intent) = broadcast {
                     self.handle_withdrawl_message(node, spend_intent).await?;

@@ -5,7 +5,6 @@ use bitcoin::{
     Address, Network as BitcoinNetwork, Transaction as BitcoinTransaction, hashes::Hash,
     secp256k1::Scalar,
 };
-use libp2p::gossipsub::IdentTopic;
 use protocol::transaction::Transaction;
 use tokio::sync::broadcast;
 use tracing::{error, info};
@@ -120,13 +119,6 @@ impl DepositIntentState {
             }
         }
 
-        if let Err(e) = node.network_handle.send_broadcast(
-            IdentTopic::new("broadcast"),
-            BroadcastMessage::DepositIntent(deposit_intent.clone()),
-        ) {
-            info!("Failed to broadcast new deposit address: {e:?}");
-        }
-
         Ok((deposit_tracking_id, deposit_address.to_string()))
     }
 
@@ -160,19 +152,30 @@ impl DepositIntentState {
                 Address::from_script(&output.script_pubkey, BitcoinNetwork::Testnet)
             {
                 let addr_str = address.to_string();
+                info!(
+                    "🔍 Checking output address: {} | Known addresses: {:?}",
+                    addr_str,
+                    self.deposit_addresses.iter().collect::<Vec<_>>()
+                );
                 if !self.deposit_addresses.contains(&addr_str) {
+                    info!("❌ Address {} not in deposit_addresses, skipping", addr_str);
                     continue;
                 }
+                info!("✅ Address {} found in deposit_addresses", addr_str);
+
+                info!("🔍 Looking up deposit intent for address: {}", addr_str);
+                let chain_response = node
+                    .chain_interface_tx
+                    .send_message_with_response(ChainMessage::GetDepositIntentByAddress {
+                        address: addr_str.clone(),
+                    })
+                    .await?;
 
                 if let ChainResponse::GetDepositIntentByAddress {
                     intent: Some(intent),
-                } = node
-                    .chain_interface_tx
-                    .send_message_with_response(ChainMessage::GetDepositIntentByAddress {
-                        address: addr_str,
-                    })
-                    .await?
+                } = chain_response
                 {
+                    info!("✅ Found deposit intent for address: {}", addr_str);
                     info!(
                         "Updating user balance for address: {} amount: {}",
                         intent.user_pubkey,
@@ -185,17 +188,42 @@ impl DepositIntentState {
                         output.value.to_sat(),
                     )?;
 
-                    let ChainResponse::AddTransactionToBlock { error: None } = node
+                    info!("🔍 Created transaction: {:?}", transaction);
+
+                    let add_tx_response = node
                         .chain_interface_tx
                         .send_message_with_response(ChainMessage::AddTransactionToBlock {
-                            transaction,
+                            transaction: transaction.clone(),
                         })
-                        .await?
+                        .await?;
+
+                    let ChainResponse::AddTransactionToBlock { error: None } = add_tx_response
                     else {
                         return Err(NodeError::Error(
                             "Failed to execute transaction".to_string(),
                         ));
                     };
+
+                    info!("✅ Transaction successfully added to block");
+
+                    // Broadcast the transaction to all other nodes
+                    match bincode::encode_to_vec(&transaction, bincode::config::standard()) {
+                        Ok(transaction_data) => {
+                            if let Err(e) = node
+                                .network_handle
+                                .send_broadcast(BroadcastMessage::Transaction(transaction_data))
+                            {
+                                info!("Failed to broadcast transaction: {e:?}");
+                            } else {
+                                info!("📤 Successfully broadcast transaction to all nodes");
+                            }
+                        }
+                        Err(e) => {
+                            info!("Failed to encode transaction for broadcast: {}", e);
+                        }
+                    }
+                } else {
+                    info!("❌ No deposit intent found for address: {}", addr_str);
                 }
             }
         }

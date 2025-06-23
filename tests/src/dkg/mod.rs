@@ -438,7 +438,6 @@ mod dkg_test {
 
             let mut hasher = Sha256::new();
             hasher.update(b"GENESIS");
-            hasher.update(genesis_block_from_db.header.timestamp.to_le_bytes());
             let state_bytes =
                 bincode::encode_to_vec(&expected_initial_state, bincode::config::standard())
                     .unwrap();

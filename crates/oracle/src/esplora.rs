@@ -1,5 +1,8 @@
 use crate::oracle::Oracle;
-use bitcoin::{Address, Amount, Network, OutPoint, Transaction, Txid, consensus};
+use bitcoin::{
+    Address, Amount, Network, OutPoint, Transaction, TxIn, TxOut, Txid, absolute::LockTime,
+    consensus,
+};
 use esplora_client::{AsyncClient, Builder};
 use std::{collections::HashSet, str::FromStr};
 use tokio::{
@@ -344,5 +347,43 @@ impl Oracle for EsploraOracle {
                 NodeError::Error("Cannot retrieve height of blockchain".to_string())
             })?;
         Ok(height)
+    }
+
+    async fn get_transaction_by_address(&self, tx_id: &str) -> Result<Transaction, NodeError> {
+        let tx_hash = Txid::from_str(tx_id)
+            .map_err(|_| NodeError::Error("Invalid transaction hash".to_string()))?;
+        let tx =
+            self.client.get_tx_info(&tx_hash).await.map_err(|_| {
+                NodeError::Error("Cannot retrieve transaction by address".to_string())
+            })?;
+        let tx = tx.ok_or_else(|| NodeError::Error("Transaction not found".to_string()))?;
+        let transaction = Transaction {
+            version: bitcoin::transaction::Version(tx.version),
+            lock_time: LockTime::from_time(tx.locktime)
+                .map_err(|_| NodeError::Error("Invalid lock time".to_string()))?,
+            input: tx
+                .vin
+                .into_iter()
+                .map(|input| TxIn {
+                    previous_output: OutPoint {
+                        txid: input.txid,
+                        vout: input.vout,
+                    },
+                    script_sig: input.scriptsig,
+                    sequence: bitcoin::Sequence(input.sequence),
+                    witness: input.witness.into(),
+                })
+                .collect(),
+            output: tx
+                .vout
+                .into_iter()
+                .map(|output| TxOut {
+                    value: Amount::from_sat(output.value),
+                    script_pubkey: output.scriptpubkey,
+                })
+                .collect(),
+        };
+
+        Ok(transaction)
     }
 }

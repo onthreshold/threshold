@@ -1,6 +1,9 @@
+use std::str::FromStr;
+
 use crate::chain_state::{Account, ChainState};
 use crate::executor::*;
 use bitcoin::hashes::Hash;
+use oracle::mock::MockOracle;
 use protocol::transaction::{Operation, Transaction, TransactionType};
 use types::errors::NodeError;
 
@@ -52,6 +55,16 @@ impl oracle::oracle::Oracle for AlwaysValidOracle {
 
     async fn get_latest_block_height(&self) -> Result<u32, NodeError> {
         Ok(800_000) // Mock block height
+    }
+
+    async fn get_transaction_by_address(
+        &self,
+        address: &str,
+    ) -> Result<bitcoin::Transaction, NodeError> {
+        let address = bitcoin::Address::from_str(address)
+            .map_err(|e| types::errors::NodeError::Error(format!("Invalid address: {e}")))?
+            .assume_checked();
+        Ok(MockOracle::create_dummy_tx(&address, 1000))
     }
 }
 
@@ -702,6 +715,13 @@ async fn test_op_check_oracle_false_validation() {
 
         async fn get_latest_block_height(&self) -> Result<u32, NodeError> {
             Ok(800_000)
+        }
+
+        async fn get_transaction_by_address(
+            &self,
+            _address: &str,
+        ) -> Result<bitcoin::Transaction, NodeError> {
+            Ok(MockOracle::create_dummy_tx_without_address(1000))
         }
     }
 

@@ -9,7 +9,6 @@ pub type TransactionId = [u8; 32];
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq, Eq)]
 pub struct Transaction {
     pub version: u32,
-    pub timestamp: u64,
     pub r#type: TransactionType,
     pub operations: Vec<Operation>,
 }
@@ -58,13 +57,9 @@ pub enum Operation {
 
 impl Transaction {
     #[must_use]
-    pub fn new(r#type: TransactionType, operations: Vec<Operation>) -> Self {
+    pub const fn new(r#type: TransactionType, operations: Vec<Operation>) -> Self {
         Self {
             version: 1,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
             r#type,
             operations,
         }
@@ -74,7 +69,10 @@ impl Transaction {
     pub fn id(&self) -> TransactionId {
         let mut hasher = Sha256::new();
         hasher.update(self.version.to_le_bytes());
-        hasher.update(self.timestamp.to_le_bytes());
+
+        // Include transaction type in hash for deterministic sorting
+        let type_bytes = bincode::encode_to_vec(&self.r#type, bincode::config::standard()).unwrap();
+        hasher.update(&type_bytes);
 
         for op in &self.operations {
             let op_bytes = bincode::encode_to_vec(op, bincode::config::standard()).unwrap();
@@ -114,6 +112,15 @@ impl Transaction {
                 Operation::OpIncrementBalance,
             ],
         ))
+    }
+
+    pub fn get_deposit_transaction_address(&self) -> Result<String, NodeError> {
+        let Operation::OpPush { value } = &self.operations[2] else {
+            return Err(NodeError::Error("Not a deposit transaction".to_string()));
+        };
+        let txid = bitcoin::Txid::from_slice(value)
+            .map_err(|_| NodeError::Error("Invalid transaction ID length".to_string()))?;
+        Ok(txid.to_string())
     }
 
     pub fn create_withdrawal_transaction(

@@ -157,6 +157,22 @@ impl Oracle for MockOracle {
                             &addr.assume_checked(),
                             deposit_intent.amount_sat,
                         );
+
+                        // Add transaction to internal HashMap for later validation
+                        self.add_transaction(
+                            tx.compute_txid(),
+                            deposit_intent.user_pubkey.clone(),
+                            deposit_intent.amount_sat,
+                            true,
+                        );
+
+                        info!(
+                            "Added transaction {} to oracle for user {} with amount {}",
+                            tx.compute_txid(),
+                            deposit_intent.user_pubkey,
+                            deposit_intent.amount_sat
+                        );
+
                         if let Err(e) = self.tx_channel.send(NetworkEvent::SelfRequest {
                             request: SelfRequest::ConfirmDeposit { confirmed_tx: tx },
                             response_channel: None,
@@ -175,10 +191,16 @@ impl Oracle for MockOracle {
         // Return a constant dummy height
         Ok(0)
     }
+
+    async fn get_transaction_by_address(&self, _tx_id: &str) -> Result<Transaction, NodeError> {
+        let tx = Self::create_dummy_tx_without_address(1000);
+        Ok(tx)
+    }
 }
 
 impl MockOracle {
-    fn create_dummy_tx(address: &Address, value_sat: u64) -> Transaction {
+    #[must_use]
+    pub fn create_dummy_tx(address: &Address, value_sat: u64) -> Transaction {
         let tx_in = TxIn {
             previous_output: OutPoint {
                 txid: Txid::from_slice(&[0u8; 32]).unwrap(),
@@ -200,5 +222,15 @@ impl MockOracle {
             input: vec![tx_in],
             output: vec![tx_out],
         }
+    }
+
+    #[must_use]
+    pub fn create_dummy_tx_without_address(value_sat: u64) -> Transaction {
+        Self::create_dummy_tx(
+            &Address::from_str("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh")
+                .unwrap()
+                .assume_checked(),
+            value_sat,
+        )
     }
 }
