@@ -145,6 +145,32 @@ cargo test -p integration-tests
 cargo test --workspace
 ```
 
+#### Testing DKG
+
+
+To run testing with the default `docker-compose.yml` file:
+
+```bash
+# Clear DKG keys
+./scripts/clear_dkg_keys.sh
+# Start all nodes (DKG should start automatically)
+docker-compose up -d --build
+# Run test to see if all nodes have dkg keys
+cargo run --bin integration-tests check-dkg --ports 50051,50052,50053,50054,50055
+```
+
+To run with n nodes, you can use the `setup_nodes.sh` script.
+
+The `setup_nodes.sh` script automates the creation of multiple test nodes for development and testing.
+
+```bash
+# Generate 5 nodes (default)
+./setup_nodes.sh
+
+# Generate custom number of nodes (8 in this example)
+./setup_nodes.sh 8
+```
+
 ### Test Coverage
 
 Generate test coverage report:
@@ -157,17 +183,6 @@ cargo install cargo-tarpaulin
 cargo tarpaulin --workspace --out Html
 ```
 
-### Run with `n` nodes
-
-The `setup_nodes.sh` script automates the creation of multiple test nodes for development and testing.
-
-```bash
-# Generate 5 nodes (default)
-./setup_nodes.sh
-
-# Generate custom number of nodes (8 in this example)
-./setup_nodes.sh 8
-```
 
 #### Output
 
