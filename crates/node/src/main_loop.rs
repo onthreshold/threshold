@@ -25,7 +25,7 @@ impl<N: Network + 'static, W: Wallet + 'static> NodeState<N, W> {
         info!("Local peer id: {}", self.peer_id);
 
         let mut round_time: tokio::time::Interval =
-            tokio::time::interval(std::time::Duration::from_secs(10));
+            tokio::time::interval(std::time::Duration::from_millis(100));
 
         loop {
             tokio::select! {

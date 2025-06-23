@@ -11,7 +11,6 @@ services:
     entrypoint: "/app/cli run --key-file-path /app/configs/node_1.json --config-file-path /app/configs/node_1.yaml --use-mock-oracle"
     ports:
       - "50051:50051"
-      - "8081:8080"
     volumes:
       - ./keys/node_1/node_1.json:/app/configs/node_1.json
       - ./keys/node_1/node_1.yaml:/app/configs/node_1.yaml
@@ -30,7 +29,6 @@ services:
     entrypoint: "/app/cli run --key-file-path /app/configs/node_2.json --config-file-path /app/configs/node_2.yaml --use-mock-oracle"
     ports:
       - "50052:50051"
-      - "8082:8080"
     volumes:
       - ./keys/node_2/node_2.json:/app/configs/node_2.json
       - ./keys/node_2/node_2.yaml:/app/configs/node_2.yaml
@@ -49,7 +47,6 @@ services:
     entrypoint: "/app/cli run --key-file-path /app/configs/node_3.json --config-file-path /app/configs/node_3.yaml --use-mock-oracle"
     ports:
       - "50053:50051"
-      - "8083:8080"
     volumes:
       - ./keys/node_3/node_3.json:/app/configs/node_3.json
       - ./keys/node_3/node_3.yaml:/app/configs/node_3.yaml
@@ -68,7 +65,6 @@ services:
     entrypoint: "/app/cli run --key-file-path /app/configs/node_4.json --config-file-path /app/configs/node_4.yaml --use-mock-oracle"
     ports:
       - "50054:50051"
-      - "8084:8080"
     volumes:
       - ./keys/node_4/node_4.json:/app/configs/node_4.json
       - ./keys/node_4/node_4.yaml:/app/configs/node_4.yaml
@@ -87,7 +83,6 @@ services:
     entrypoint: "/app/cli run --key-file-path /app/configs/node_5.json --config-file-path /app/configs/node_5.yaml --use-mock-oracle"
     ports:
       - "50055:50051"
-      - "8085:8080"
     volumes:
       - ./keys/node_5/node_5.json:/app/configs/node_5.json
       - ./keys/node_5/node_5.yaml:/app/configs/node_5.yaml

@@ -1,5 +1,8 @@
 use futures::future::Future;
-use libp2p::{PeerId, gossipsub};
+use libp2p::{
+    PeerId,
+    gossipsub::{self, IdentTopic},
+};
 use std::{fmt::Debug, pin::Pin};
 use tokio::sync::mpsc;
 
@@ -34,11 +37,7 @@ pub enum NetworkMessage {
 
 pub trait Network: Clone + Debug + Sync + Send {
     fn peer_id(&self) -> PeerId;
-    fn send_broadcast(
-        &self,
-        topic: gossipsub::IdentTopic,
-        message: impl ProtoEncode,
-    ) -> Result<(), NetworkError>;
+    fn send_broadcast(&self, message: impl ProtoEncode) -> Result<(), NetworkError>;
     fn send_private_message(
         &self,
         peer_id: PeerId,
@@ -57,13 +56,9 @@ impl Network for NetworkHandle {
         self.peer_id
     }
 
-    fn send_broadcast(
-        &self,
-        topic: gossipsub::IdentTopic,
-        message: impl ProtoEncode,
-    ) -> Result<(), NetworkError> {
+    fn send_broadcast(&self, message: impl ProtoEncode) -> Result<(), NetworkError> {
         let network_message = NetworkMessage::SendBroadcast {
-            topic,
+            topic: IdentTopic::new("broadcast"),
             message: message.encode().map_err(NetworkError::SendError)?,
         };
         self.tx

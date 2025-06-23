@@ -9,6 +9,7 @@ use crate::{
     wallet::Wallet,
 };
 
+use abci::ChainMessage;
 use types::network::network_event::{NetworkEvent, SelfRequest, SelfResponse};
 use types::network::network_protocol::Network;
 use types::proto::ProtoDecode;
@@ -83,8 +84,17 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                 request: SelfRequest::ConfirmDeposit { confirmed_tx },
                 ..
             }) => {
+                info!(
+                    "🔔 Deposit handler received ConfirmDeposit event for tx: {}",
+                    confirmed_tx.compute_txid()
+                );
                 if let Err(e) = self.update_user_balance(node, &confirmed_tx).await {
-                    info!("Failed to update user balance: {}", e);
+                    info!("❌ Failed to update user balance: {}", e);
+                } else {
+                    info!(
+                        "✅ Successfully processed deposit transaction: {}",
+                        confirmed_tx.compute_txid()
+                    );
                 }
             }
             Some(NetworkEvent::GossipsubMessage(Message { data, .. })) => {
@@ -92,9 +102,37 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                     NodeError::Error(format!("Failed to decode broadcast message: {e}"))
                 })?;
 
-                if let BroadcastMessage::DepositIntent(deposit_intent) = broadcast {
-                    if let Err(e) = self.create_deposit_from_intent(node, deposit_intent).await {
-                        info!("Failed to store deposit intent: {}", e);
+                // Handle broadcasted transactions
+                if let BroadcastMessage::Transaction(transaction_data) = broadcast {
+                    match bincode::decode_from_slice::<protocol::transaction::Transaction, _>(
+                        &transaction_data,
+                        bincode::config::standard(),
+                    ) {
+                        Ok((transaction, _)) => {
+                            info!("📨 Received broadcasted transaction: {:?}", transaction);
+
+                            if let Err(e) = node
+                                .chain_interface_tx
+                                .send_message_with_response(ChainMessage::AddTransactionToBlock {
+                                    transaction: transaction.clone(),
+                                })
+                                .await
+                            {
+                                info!(
+                                    "Failed to add broadcasted transaction to pending pool: {}",
+                                    e
+                                );
+                            } else {
+                                info!("✅ Added broadcasted transaction to pending pool");
+                            }
+
+                            let address = transaction.get_deposit_transaction_address()?;
+                            let tx = node.oracle.get_transaction_by_address(&address).await?;
+                            node.wallet.ingest_external_tx(&tx)?;
+                        }
+                        Err(e) => {
+                            info!("Failed to decode broadcasted transaction: {}", e);
+                        }
                     }
                 }
             }

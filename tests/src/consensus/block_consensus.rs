@@ -288,12 +288,11 @@ mod block_consensus_tests {
         vote: Vote,
     ) {
         let network = cluster.networks.get(&from_peer).unwrap();
-        let topic = libp2p::gossipsub::IdentTopic::new("broadcast");
 
         // Simulate vote broadcast using ConsensusMessage
         let broadcast_msg =
             BroadcastMessage::Consensus(types::consensus::ConsensusMessage::Vote(vote));
-        let _ = network.send_broadcast(topic, broadcast_msg);
+        let _ = network.send_broadcast(broadcast_msg);
         cluster.run_n_iterations(2).await;
     }
 

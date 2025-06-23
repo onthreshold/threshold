@@ -79,16 +79,12 @@ impl Network for MockNetwork {
         self.peer
     }
 
-    fn send_broadcast(
-        &self,
-        topic: libp2p::gossipsub::IdentTopic,
-        message: impl ProtoEncode,
-    ) -> Result<(), errors::NetworkError> {
+    fn send_broadcast(&self, message: impl ProtoEncode) -> Result<(), errors::NetworkError> {
         let gossip_message = libp2p::gossipsub::Message {
             source: Some(self.peer),
             data: message.encode().map_err(NetworkError::SendError)?,
             sequence_number: None,
-            topic: topic.hash(),
+            topic: libp2p::gossipsub::IdentTopic::new("broadcast").hash(),
         };
 
         // Queue the event instead of sending immediately
@@ -570,10 +566,7 @@ mod node_tests {
             let first_network = cluster.networks.get(&first_peer).unwrap();
 
             // Test broadcast
-            let topic = libp2p::gossipsub::IdentTopic::new("test-topic");
-            first_network
-                .send_broadcast(topic, "broadcast message")
-                .unwrap();
+            first_network.send_broadcast("broadcast message").unwrap();
         }
 
         // Process the events

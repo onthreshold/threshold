@@ -12,6 +12,8 @@ pub trait Oracle: Send + DynClone + Sync {
         tx_hash: Txid,
     ) -> Result<bool, NodeError>;
 
+    async fn get_transaction_by_address(&self, tx_id: &str) -> Result<Transaction, NodeError>;
+
     async fn get_current_fee_per_vb(&self, priority: Option<u16>) -> Result<f64, NodeError>;
     async fn refresh_utxos(
         &self,

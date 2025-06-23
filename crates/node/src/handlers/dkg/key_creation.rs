@@ -98,10 +98,10 @@ impl DkgState {
             )),
         };
 
-        match node.network_handle.send_broadcast(
-            libp2p::gossipsub::IdentTopic::new("broadcast"),
-            BroadcastMessage::Dkg(gossipsub_message),
-        ) {
+        match node
+            .network_handle
+            .send_broadcast(BroadcastMessage::Dkg(gossipsub_message))
+        {
             Ok(()) => (),
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to send broadcast: {e:?}")));
@@ -130,10 +130,10 @@ impl DkgState {
             )),
         };
 
-        match node.network_handle.send_broadcast(
-            libp2p::gossipsub::IdentTopic::new("broadcast"),
-            BroadcastMessage::Dkg(round1_gossipsub_message),
-        ) {
+        match node
+            .network_handle
+            .send_broadcast(BroadcastMessage::Dkg(round1_gossipsub_message))
+        {
             Ok(()) => tracing::info!("Broadcast round1"),
             Err(e) => {
                 return Err(NodeError::Error(format!("Failed to send broadcast: {e:?}")));

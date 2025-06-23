@@ -113,7 +113,6 @@ message GetChainInfoResponse {
     uint64 latest_height = 1;
     string latest_block_hash = 2;
     uint64 pending_transactions = 3;
-    uint64 total_blocks = 4;
 }
 
 message TriggerConsensusRoundRequest {

@@ -331,8 +331,8 @@ pub fn build_swarm(
             let mesh_n_low = std::cmp::max(1, mesh_n / 2);
 
             let gossipsub_config = gossipsub::ConfigBuilder::default()
-                .heartbeat_interval(Duration::from_secs(5))
-                .validation_mode(gossipsub::ValidationMode::Strict)
+                .heartbeat_interval(Duration::from_secs(1))
+                .validation_mode(gossipsub::ValidationMode::Permissive)
                 .message_id_fn(message_id_fn)
                 .mesh_n_low(mesh_n_low)
                 .mesh_n_high(mesh_n_high)

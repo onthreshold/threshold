@@ -14,6 +14,8 @@ pub enum BroadcastMessage {
     Block(Vec<u8>),
     /// Message containing a deposit intent that needs to be validated by peers.
     DepositIntent(DepositIntent),
+    /// Message containing a transaction that needs to be validated by peers.
+    Transaction(Vec<u8>),
     /// Message containing a fully signed withdrawal transaction that should be broadcast to the Bitcoin network and accounted locally.
     PendingSpend(PendingSpend),
     /// Message containing a Frost DKG coordination message.
@@ -25,6 +27,7 @@ const BLOCK_TAG: u8 = 1;
 const DEPOSIT_INTENT_TAG: u8 = 2;
 const PENDING_SPEND_TAG: u8 = 3;
 const DKG_TAG: u8 = 4;
+const TRANSACTION_TAG: u8 = 5;
 
 impl ProtoEncode for BroadcastMessage {
     fn encode(&self) -> Result<Vec<u8>, String> {
@@ -50,6 +53,10 @@ impl ProtoEncode for BroadcastMessage {
                 buf.push(DKG_TAG);
                 buf.extend(msg.encode_to_vec());
             }
+            Self::Transaction(transaction) => {
+                buf.push(TRANSACTION_TAG);
+                buf.extend(transaction);
+            }
         }
         Ok(buf)
     }
@@ -71,6 +78,7 @@ impl ProtoDecode for BroadcastMessage {
             DKG_TAG => Ok(Self::Dkg(
                 p2p_proto::GossipsubMessage::decode(payload).map_err(|e| e.to_string())?,
             )),
+            TRANSACTION_TAG => Ok(Self::Transaction(payload.to_vec())),
             other => Err(format!("Unknown BroadcastMessage tag: {other}")),
         }
     }
