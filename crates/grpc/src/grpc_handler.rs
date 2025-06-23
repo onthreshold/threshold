@@ -35,7 +35,7 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<SpendFundsRequest>,
     ) -> Result<Response<SpendFundsResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("spend_funds", async {
             let req = request.into_inner();
             let resp = grpc_operator::spend_funds(&self.network, req).await?;
             Ok(Response::new(resp))
@@ -46,7 +46,7 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<StartSigningRequest>,
     ) -> Result<Response<StartSigningResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("start_signing", async {
             let req = request.into_inner();
             let resp = grpc_operator::start_signing(&self.network, req).await?;
             Ok(Response::new(resp))
@@ -57,7 +57,7 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<CreateDepositIntentRequest>,
     ) -> Result<Response<CreateDepositIntentResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("create_deposit_intent", async {
             let req = request.into_inner();
             let resp = grpc_operator::create_deposit_intent(&self.network, req).await?;
             Ok(Response::new(resp))
@@ -68,7 +68,7 @@ impl NodeControl for NodeControlService {
         &self,
         _request: Request<GetPendingDepositIntentsRequest>,
     ) -> Result<Response<GetPendingDepositIntentsResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("get_pending_deposit_intents", async {
             let resp = grpc_operator::get_pending_deposit_intents(&self.network).await?;
             Ok(Response::new(resp))
         })
@@ -78,7 +78,7 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<ProposeWithdrawalRequest>,
     ) -> Result<Response<ProposeWithdrawalResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("propose_withdrawal", async {
             let req = request.into_inner();
             let resp = grpc_operator::propose_withdrawal(&self.network, req).await?;
             Ok(Response::new(resp))
@@ -89,7 +89,7 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<ConfirmWithdrawalRequest>,
     ) -> Result<Response<ConfirmWithdrawalResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("confirm_withdrawal", async {
             let req = request.into_inner();
             let resp = grpc_operator::confirm_withdrawal(&self.network, req).await?;
             Ok(Response::new(resp))
@@ -100,7 +100,7 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<CheckBalanceRequest>,
     ) -> Result<Response<CheckBalanceResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("check_balance", async {
             let req = request.into_inner();
             let resp = grpc_operator::check_balance(&self.network, req).await?;
             Ok(Response::new(resp))
@@ -111,7 +111,7 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<GetChainInfoRequest>,
     ) -> Result<Response<GetChainInfoResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("get_chain_info", async {
             let req = request.into_inner();
             let resp = grpc_operator::get_chain_info(&self.network, req).await?;
             Ok(Response::new(resp))
@@ -122,7 +122,7 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<TriggerConsensusRoundRequest>,
     ) -> Result<Response<TriggerConsensusRoundResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("trigger_consensus_round", async {
             let req = request.into_inner();
             let resp = grpc_operator::trigger_consensus_round(&self.network, req).await?;
             Ok(Response::new(resp))
@@ -133,7 +133,7 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<GetLatestBlocksRequest>,
     ) -> Result<Response<GetLatestBlocksResponse>, Status> {
-        route_metrics!(async {
+        route_metrics!("get_latest_blocks", async {
             let req = request.into_inner();
             let resp = grpc_operator::get_latest_blocks(&self.network, req).await?;
             Ok(Response::new(resp))

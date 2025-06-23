@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "vault-nodes"
+    static_configs:
+      - targets:
+          ["node1:8080", "node2:8080", "node3:8080", "node4:8080", "node5:8080"]
+    metrics_path: "/metrics"
+    scrape_interval: 10s
