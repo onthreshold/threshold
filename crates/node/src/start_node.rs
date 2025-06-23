@@ -13,6 +13,7 @@ use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::broadcast;
+use tokio::{signal, sync::broadcast};
 use tonic::transport::Server;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
@@ -229,8 +230,35 @@ pub async fn start_node(
         oracle.poll_new_transactions(vec![]).await;
     });
 
-    // Wait for either task to complete (they should run indefinitely)
+    // Create shutdown signal handler for Docker compatibility
+    let shutdown_signal = async {
+        #[cfg(unix)]
+        {
+            let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
+                .expect("Failed to install SIGTERM handler");
+
+            tokio::select! {
+                _ = signal::ctrl_c() => {
+                    tracing::info!("Received SIGINT, shutting down gracefully...");
+                }
+                _ = sigterm.recv() => {
+                    tracing::info!("Received SIGTERM, shutting down gracefully...");
+                }
+            }
+        }
+
+        #[cfg(not(unix))]
+        {
+            signal::ctrl_c().await.expect("Failed to listen for ctrl-c");
+            tracing::info!("Received SIGINT, shutting down gracefully...");
+        }
+    };
+
+    // Wait for shutdown signal or task completion
     tokio::select! {
+        () = shutdown_signal => {
+            // Shutdown signal received
+        }
         result = grpc_handle => {
             match result {
                 Ok(()) => tracing::info!("gRPC server stopped"),
