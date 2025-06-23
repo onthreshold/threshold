@@ -329,6 +329,10 @@ fn setup_config(output_dir: Option<String>, file_name: Option<String>) -> Result
         .save_to_keys_file()
         .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
 
+    config
+        .save_to_file()
+        .map_err(|e| KeygenError::KeyFileNotFound(e.to_string()))?;
+
     println!(
         "Key data has been saved to {} with the peer id {}. To modify the allowed peers and other configurations, edit the config file here: {}",
         paths.key_file_path.display(),

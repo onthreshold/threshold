@@ -47,7 +47,6 @@ impl<N: Network + 'static, W: Wallet + 'static> NodeState<N, W> {
         let mut handlers = std::mem::take(&mut self.handlers);
 
         for handler in &mut handlers {
-            info!("Handling event: {:?}", send_message);
             handler.handle(self, send_message.clone()).await?;
         }
 

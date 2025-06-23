@@ -12,7 +12,6 @@ use grpc::grpc_handler::NodeControlService;
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::sync::broadcast;
 use tokio::{signal, sync::broadcast};
 use tonic::transport::Server;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
