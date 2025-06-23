@@ -5,6 +5,7 @@ use prost::Message as ProstMessage;
 use protocol::block::{ChainConfig, ValidatorInfo};
 use std::time::Duration;
 use types::{errors::NodeError, network::network_event::DirectMessage};
+use types::broadcast::BroadcastMessage;
 
 use crate::peer_id_to_identifier;
 use crate::{NodeState, handlers::dkg::DkgState, wallet::Wallet};
@@ -115,7 +116,10 @@ impl DkgState {
 
         match node
             .network_handle
-            .send_broadcast(self.start_dkg_topic.clone(), gossipsub_message)
+            .send_broadcast(
+                libp2p::gossipsub::IdentTopic::new("broadcast"),
+                BroadcastMessage::Dkg(gossipsub_message),
+            )
         {
             Ok(()) => (),
             Err(e) => {
@@ -147,7 +151,10 @@ impl DkgState {
 
         match node
             .network_handle
-            .send_broadcast(self.round1_topic.clone(), round1_gossipsub_message)
+            .send_broadcast(
+                libp2p::gossipsub::IdentTopic::new("broadcast"),
+                BroadcastMessage::Dkg(round1_gossipsub_message),
+            )
         {
             Ok(()) => tracing::info!("Broadcast round1"),
             Err(e) => {

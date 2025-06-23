@@ -14,6 +14,7 @@ use types::errors::NodeError;
 use types::intents::{PendingSpend, WithdrawlIntent};
 use types::network::network_event::SelfRequest;
 use types::network::network_protocol::Network;
+use types::broadcast::BroadcastMessage;
 
 impl SpendIntentState {
     pub async fn propose_withdrawal<N: Network, W: Wallet>(
@@ -160,7 +161,10 @@ impl SpendIntentState {
         };
 
         node.network_handle
-            .send_broadcast(gossipsub::IdentTopic::new("withdrawls"), spend_intent)
+            .send_broadcast(
+                gossipsub::IdentTopic::new("broadcast"),
+                BroadcastMessage::PendingSpend(spend_intent),
+            )
             .map_err(|x| NodeError::Error(format!("Failed to send broadcast: {x:?}")))?;
 
         Ok(())

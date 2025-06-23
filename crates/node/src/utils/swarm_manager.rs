@@ -158,13 +158,7 @@ pub struct SwarmManager {
 
     pub live_peers: HashSet<PeerId>,
 
-    pub round1_topic: gossipsub::IdentTopic,
-    pub start_dkg_topic: gossipsub::IdentTopic,
-    pub deposit_intents_topic: gossipsub::IdentTopic,
-    pub withdrawls_topic: gossipsub::IdentTopic,
-    pub leader_topic: gossipsub::IdentTopic,
-    pub block_proposals_topic: gossipsub::IdentTopic,
-    pub vote_topic: gossipsub::IdentTopic,
+    pub broadcast_topic: gossipsub::IdentTopic,
 }
 
 impl SwarmManager {
@@ -176,12 +170,11 @@ impl SwarmManager {
 
         let (network_events_emitter, _) = broadcast::channel::<NetworkEvent>(200);
 
-        // Read full lines from stdin
-        let round1_topic = gossipsub::IdentTopic::new("round1_topic");
+        let broadcast_topic = gossipsub::IdentTopic::new("broadcast");
         swarm
             .behaviour_mut()
             .gossipsub
-            .subscribe(&round1_topic)
+            .subscribe(&broadcast_topic)
             .map_err(|e| NodeError::Error(e.to_string()))?;
 
         let allowed_peers: Vec<PeerId> = peer_data
@@ -200,63 +193,15 @@ impl SwarmManager {
             peers_to_names: peers_to_names.clone(),
         };
 
-        let start_dkg_topic = gossipsub::IdentTopic::new("start-dkg");
-        swarm
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&start_dkg_topic)
-            .map_err(|e| NodeError::Error(e.to_string()))?;
-
-        let deposit_intents_topic = gossipsub::IdentTopic::new("deposit-intents");
-        swarm
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&deposit_intents_topic)
-            .map_err(|e| NodeError::Error(e.to_string()))?;
-
-        let withdrawls_topic = gossipsub::IdentTopic::new("withdrawls");
-        swarm
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&withdrawls_topic)
-            .map_err(|e| NodeError::Error(e.to_string()))?;
-
-        let leader_topic = gossipsub::IdentTopic::new("leader");
-        swarm
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&leader_topic)
-            .map_err(|e| NodeError::Error(e.to_string()))?;
-
-        let block_proposals_topic = gossipsub::IdentTopic::new("block-proposals");
-        swarm
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&block_proposals_topic)
-            .map_err(|e| NodeError::Error(e.to_string()))?;
-
-        let vote_topic = gossipsub::IdentTopic::new("votes");
-        swarm
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&vote_topic)
-            .map_err(|e| NodeError::Error(e.to_string()))?;
-
         Ok((
             Self {
-                round1_topic,
-                live_peers: HashSet::new(),
-                start_dkg_topic,
-                deposit_intents_topic,
-                withdrawls_topic,
-                leader_topic,
-                block_proposals_topic,
-                vote_topic,
+                broadcast_topic,
                 inner: swarm,
                 network_manager_rx: receiving_commands,
                 network_events: network_events_emitter,
                 allowed_peers,
                 peers_to_names,
+                live_peers: HashSet::new(),
             },
             network_handle,
         ))
