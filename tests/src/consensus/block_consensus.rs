@@ -9,6 +9,7 @@ mod block_consensus_tests {
     };
     use tokio::sync::mpsc::unbounded_channel;
     use types::{
+        broadcast::BroadcastMessage,
         consensus::{Vote, VoteType},
         intents::DepositIntent,
         network::network_protocol::Network,
@@ -287,11 +288,12 @@ mod block_consensus_tests {
         vote: Vote,
     ) {
         let network = cluster.networks.get(&from_peer).unwrap();
-        let topic = libp2p::gossipsub::IdentTopic::new("consensus");
+        let topic = libp2p::gossipsub::IdentTopic::new("broadcast");
 
         // Simulate vote broadcast using ConsensusMessage
-        let consensus_msg = types::consensus::ConsensusMessage::Vote(vote);
-        let _ = network.send_broadcast(topic, consensus_msg);
+        let broadcast_msg =
+            BroadcastMessage::Consensus(types::consensus::ConsensusMessage::Vote(vote));
+        let _ = network.send_broadcast(topic, broadcast_msg);
         cluster.run_n_iterations(2).await;
     }
 
