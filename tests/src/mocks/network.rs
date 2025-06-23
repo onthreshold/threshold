@@ -237,11 +237,11 @@ impl MockNodeCluster {
             for peer_id in peers.iter().filter(|peer_id| *peer_id != receipient_peer) {
                 sender.queue(NetworkEvent::Subscribed {
                     peer_id: *peer_id,
-                    topic: libp2p::gossipsub::IdentTopic::new("start-dkg").hash(),
+                    topic: libp2p::gossipsub::IdentTopic::new("broadcast").hash(),
                 });
                 sender.queue(NetworkEvent::Subscribed {
                     peer_id: *peer_id,
-                    topic: libp2p::gossipsub::IdentTopic::new("round1_topic").hash(),
+                    topic: libp2p::gossipsub::IdentTopic::new("broadcast").hash(),
                 });
             }
 

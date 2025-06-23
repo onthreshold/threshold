@@ -19,15 +19,6 @@ use types::{
     proto::ProtoDecode,
 };
 
-#[derive(Clone)]
-struct RawBlockBytes(Vec<u8>);
-
-impl types::proto::ProtoEncode for RawBlockBytes {
-    fn encode(&self) -> Result<Vec<u8>, String> {
-        Ok(self.0.clone())
-    }
-}
-
 #[async_trait::async_trait]
 impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
     async fn handle(
@@ -124,17 +115,19 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                         })?;
 
                         match broadcast {
-                            BroadcastMessage::Consensus(consensus_message) => match consensus_message {
-                                ConsensusMessage::LeaderAnnouncement(announcement) => {
-                                    self.handle_leader_announcement(node, &announcement)?;
+                            BroadcastMessage::Consensus(consensus_message) => {
+                                match consensus_message {
+                                    ConsensusMessage::LeaderAnnouncement(announcement) => {
+                                        self.handle_leader_announcement(node, &announcement)?;
+                                    }
+                                    ConsensusMessage::NewRound(round) => {
+                                        self.handle_new_round(node, peer, round)?;
+                                    }
+                                    ConsensusMessage::Vote(vote) => {
+                                        self.handle_vote(node, peer, &vote).await;
+                                    }
                                 }
-                                ConsensusMessage::NewRound(round) => {
-                                    self.handle_new_round(node, peer, round)?;
-                                }
-                                ConsensusMessage::Vote(vote) => {
-                                    self.handle_vote(node, peer, &vote).await;
-                                }
-                            },
+                            }
                             BroadcastMessage::Block(raw_block) => {
                                 match Block::deserialize(&raw_block) {
                                     Ok(block) => {
@@ -161,41 +154,33 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                             ));
                                         };
 
-                                    // Validate block by comparing transactions rather than entire block
-                                    // (timestamps and proposers will be different for each node)
-                                    if local_block.body.transactions == block.body.transactions {
-                                        info!("Block is valid. Sending prevote.");
-                                        self.send_vote(node, &block, VoteType::Prevote)?;
-                                    } else {
-                                        info!(
-                                            "Block is invalid. Not voting - transaction mismatch"
-                                        );
-                                        info!(
-                                            "Local txs: {}, Received txs: {}",
-                                            local_block.body.transactions.len(),
-                                            block.body.transactions.len()
+                                        // Validate block by comparing transactions rather than entire block
+                                        // (timestamps and proposers will be different for each node)
+                                        if local_block.body.transactions == block.body.transactions
+                                        {
+                                            info!("Block is valid. Sending prevote.");
+                                            self.send_vote(node, &block, VoteType::Prevote)?;
+                                        } else {
+                                            info!(
+                                                "Block is invalid. Not voting - transaction mismatch"
+                                            );
+                                            info!(
+                                                "Local txs: {}, Received txs: {}",
+                                                local_block.body.transactions.len(),
+                                                block.body.transactions.len()
+                                            );
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            "Failed to deserialize proposed block from {}: {}",
+                                            peer,
+                                            e
                                         );
                                     }
                                 }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "Failed to deserialize proposed block from {}: {}",
-                                        peer,
-                                        e
-                                    );
-                                }
                             }
-                        }
-
-                        if message.topic == self.vote_topic.hash() {
-                            let vote_message: ConsensusMessage =
-                                ConsensusMessage::decode(&message.data).map_err(|e| {
-                                    NodeError::Error(format!("Failed to decode vote message: {e}"))
-                                })?;
-
-                            if let ConsensusMessage::Vote(vote) = vote_message {
-                                self.handle_vote(node, peer, &vote).await;
-                            }
+                            _ => {}
                         }
                     }
                 }
