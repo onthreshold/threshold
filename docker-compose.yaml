@@ -95,6 +95,30 @@ services:
     networks:
       - vaultnet
 
+  grafana:
+    image: grafana/grafana
+    user: "472"
+    depends_on:
+      - node1
+      - node2
+      - node3
+      - node4
+      - node5
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    networks:
+      - vaultnet
+    restart: always
+
 networks:
   vaultnet:
     driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:
