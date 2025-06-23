@@ -7,14 +7,5 @@
       "salt_b64": "oaTmlcyPBpgx5lBLTVAHug",
       "iv_b64": "Op4O8ZCsJcuVqdNF"
     }
-  },
-  "dkg_keys": {
-    "encrypted_private_key_package_b64": "YvztWK1ZI3gY4aqndJo5i17mktnSPpyudDjCs8T2N5zq+Ku3BpKL6uFCOZhZ+nPvYRalivnwHXUEUQgSUMFysvnJeSvHPzVzPowNkA9qYS3rdRu9PeYSiFnbQr4xs0nw6Ny8VpWFFdr+arqqdyHzl7xWqsiRLrgj1YIp9XnhTj81H4kHxKWOEDwbvDEt4PgT3UCqAzNhfxA=",
-    "dkg_encryption_params": {
-      "kdf": "argon2id",
-      "salt_b64": "oaTmlcyPBpgx5lBLTVAHug",
-      "iv_b64": "LmrmRVO+25cH1tkb"
-    },
-    "pubkey_package_b64": "AO7WsbEFQK+RCOvvneJe61Ouza8t3n3r/KV70/gzLFKLhEiV5i4D2VJGp4qB9k3N1gV2KKcu9kzqV2pV2OTfSRnxOQ3yeUl1uUa1e+aRj+a/ChF+lJCohr8CDUug5t3cfFtW9d1LNgJQMrLihZWXALdk9etwnXsgu10SpUpafSF7ZA4h6ACK06IFfZh60nGmt1BX9b4AZi286KYly9vvKM6VbqZSRufJAmfjvVehYqPqY3aQCQJ5nqRUrqYwo9ybXn6qKvFLsQGcrIKJ9N6ZoDiIE39kzwnKdvGMNxZ2Iamed6kX2iLQoKQCmdW4IQ4MZnRTDZTn7NOiKE3gGvcfNI7p8ihYr8Qu2UjE49g+x5GiUa9h3XyeqhjlwgsyCXOsQTYmKe1ncWBjQgOz+0Z8q5nqAP6T/Kob15F8PsAokEISy+ySwzW0/g0bxgMVxjzxduvDWxDqLYKgYKcchAwLVADg4gAcskN5k9D1SQ=="
   }
 }

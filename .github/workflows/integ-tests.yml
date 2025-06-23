@@ -6,7 +6,67 @@ on:
     branches: [main]
 
 jobs:
-  dkg_test:
+  dkg_test-12:
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    env:
+      MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
+      MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
+      IS_TESTNET: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v5
+
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Set up Rust toolchain
+        run: |
+          rustup update 1.87
+          rustup default 1.87
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+
+      - name: Create NodeCluster (3 nodes)
+        run: ./scripts/clear_dkg_keys.sh
+
+      - name: Start 12-node stack (docker-compose)
+        run: |
+          bash setup_nodes.sh 12
+
+      - name: Wait for gRPC endpoints
+        run: |
+          echo "Waiting for nodes to expose ports 50057-50068..."
+          all_ready=false
+          for i in {1..30}; do
+            all_ready=true
+            for port in {50057..50068}; do
+              if ! nc -z localhost $port; then
+                all_ready=false
+                break
+              fi
+            done
+            if $all_ready; then
+              echo "All ports 50057-50068 are open."
+              break
+            fi
+            echo "Ports not ready yet – retry #$i"
+            sleep 5
+          done
+
+      - name: Run end-to-end integration tests
+        run: cargo run --bin integration-tests check-dkg --port-range 50057-50068
+
+  dkg_test_5:
     runs-on: blacksmith-16vcpu-ubuntu-2204
     env:
       MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
@@ -56,7 +116,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests
-        run: cargo run --bin integration-tests check-dkg --ports 50051,50052,50053,50054,50055
+        run: cargo run --bin integration-tests check-dkg --port-range 50051-50055
 
   end-to-end-deposit-withdrawal:
     runs-on: blacksmith-16vcpu-ubuntu-2204
