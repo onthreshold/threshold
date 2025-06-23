@@ -44,8 +44,7 @@ mod withdrawl_tests {
                 proposer: vec![1, 2, 3, 4],
             })
             .await
-            .expect("Failed to get proposed block")
-            .into();
+            .expect("Failed to get proposed block");
 
         if let abci::ChainResponse::GetProposedBlock { block } = setup_block {
             node.chain_interface_tx

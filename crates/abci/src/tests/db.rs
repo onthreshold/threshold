@@ -176,7 +176,6 @@ fn test_insert_multiple_blocks() {
         version: 1,
         height: 1,
         previous_block_hash: block0.hash(),
-        timestamp: 1_234_567_890,
         state_root: [3u8; 32],
         proposer: vec![4, 5, 6],
     };

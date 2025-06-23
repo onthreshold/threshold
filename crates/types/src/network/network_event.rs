@@ -133,7 +133,6 @@ pub enum SelfResponse {
         latest_height: u64,
         latest_block_hash: String,
         pending_transactions: u64,
-        total_blocks: u64,
     },
     TriggerConsensusRoundResponse {
         success: bool,

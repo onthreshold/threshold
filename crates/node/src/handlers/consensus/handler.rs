@@ -144,7 +144,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                             .send_message_with_response(
                                                 ChainMessage::GetProposedBlock {
                                                     previous_block: None,
-                                                    proposer: node.peer_id.to_bytes(),
+                                                    proposer: self.proposer.unwrap().to_bytes(),
                                                 },
                                             )
                                             .await
@@ -154,10 +154,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                             ));
                                         };
 
-                                        // Validate block by comparing transactions rather than entire block
-                                        // (timestamps and proposers will be different for each node)
-                                        if local_block.body.transactions == block.body.transactions
-                                        {
+                                        if local_block == block {
                                             info!("Block is valid. Sending prevote.");
                                             self.send_vote(node, &block, VoteType::Prevote)?;
                                         } else {
@@ -165,19 +162,13 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                                 "Block is invalid. Not voting - transaction mismatch"
                                             );
                                             info!(
-                                                "Local txs: {}, Received txs: {}",
+                                                "Local txs: {:?}, Received txs: {:?}",
                                                 local_block.body.transactions.len(),
                                                 block.body.transactions.len()
                                             );
                                         }
                                     }
-                                    Err(e) => {
-                                        tracing::warn!(
-                                            "Failed to deserialize proposed block from {}: {}",
-                                            peer,
-                                            e
-                                        );
-                                    }
+                                    Err(e) => warn!("Failed to deserialize block: {e}"),
                                 }
                             }
                             _ => {}
@@ -338,12 +329,12 @@ impl ConsensusState {
                     info!(
                         "Got prevote from {} for block hash {:?}. Total: {}/{}",
                         node.network_handle.peer_name(&sender),
-                        vote.block_hash,
+                        hex::encode(&vote.block_hash),
                         self.prevotes.len(),
                         self.validators.len()
                     );
 
-                    if self.prevotes.len() > (self.validators.len() * 2) / 3 {
+                    if self.prevotes.len() >= (self.validators.len() * 2) / 3 {
                         info!("Got 2/3+ prevotes. Sending precommit vote.");
 
                         let vote = Vote {
@@ -377,7 +368,7 @@ impl ConsensusState {
                         self.validators.len()
                     );
 
-                    if self.precommits.len() > (self.validators.len() * 2) / 3 {
+                    if self.precommits.len() >= (self.validators.len() * 2) / 3 {
                         info!("Got 2/3+ precommits. Finalizing block...");
 
                         // Get the proposed block to finalize
@@ -407,8 +398,6 @@ impl ConsensusState {
                                     block.header.height,
                                     block.body.transactions.len()
                                 );
-
-                                self.start_new_round(node).ok();
                             }
                             Ok(ChainResponse::FinalizeAndStoreBlock { error: Some(e) }) => {
                                 tracing::error!("Failed to finalize block: {}", e);

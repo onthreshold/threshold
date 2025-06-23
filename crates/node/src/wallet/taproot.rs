@@ -12,6 +12,7 @@ use bitcoin::{
 };
 use oracle::oracle::Oracle;
 use std::sync::Arc;
+use tracing::info;
 use types::errors::NodeError;
 use types::utxo::Utxo;
 
@@ -75,6 +76,8 @@ impl TaprootWallet {
         let mut total_val: u64 = 0;
         let mut sorted_utxos = self.utxos.clone();
         sorted_utxos.sort_by(|a, b| b.utxo.value.cmp(&a.utxo.value));
+        info!("Sorted utxos: {:?}", sorted_utxos);
+        info!("target: {}", target);
 
         for utxo in sorted_utxos {
             if total_val < target {

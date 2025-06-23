@@ -157,6 +157,22 @@ impl Oracle for MockOracle {
                             &addr.assume_checked(),
                             deposit_intent.amount_sat,
                         );
+                        
+                        // Add transaction to internal HashMap for later validation
+                        self.add_transaction(
+                            tx.compute_txid(),
+                            deposit_intent.user_pubkey.clone(),
+                            deposit_intent.amount_sat,
+                            true,
+                        );
+                        
+                        info!(
+                            "Added transaction {} to oracle for user {} with amount {}",
+                            tx.compute_txid(),
+                            deposit_intent.user_pubkey,
+                            deposit_intent.amount_sat
+                        );
+                        
                         if let Err(e) = self.tx_channel.send(NetworkEvent::SelfRequest {
                             request: SelfRequest::ConfirmDeposit { confirmed_tx: tx },
                             response_channel: None,

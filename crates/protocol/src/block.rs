@@ -22,9 +22,6 @@ pub struct BlockHeader {
     /// Merkle root of the transactions in the block
     pub state_root: StateRoot,
 
-    /// Unix timestamp when block was created
-    pub timestamp: u64,
-
     /// Block height/number in the chain
     pub height: u64,
 
@@ -103,7 +100,6 @@ impl BlockHeader {
         hasher.update(self.version.to_le_bytes());
         hasher.update(self.previous_block_hash);
         hasher.update(self.state_root);
-        hasher.update(self.timestamp.to_le_bytes());
         hasher.update(self.height.to_le_bytes());
         hasher.update(&self.proposer);
 
@@ -128,7 +124,6 @@ impl Block {
         height: u64,
         transactions: Vec<Transaction>,
         proposer: Vec<u8>,
-        timestamp: u64,
     ) -> Self {
         let mut hasher = Sha256::new();
         let state_bytes =
@@ -144,7 +139,6 @@ impl Block {
             version: 1,
             previous_block_hash,
             state_root,
-            timestamp,
             height,
             proposer,
         };
@@ -162,13 +156,11 @@ impl Block {
         state_root: StateRoot,
         transactions: Vec<Transaction>,
         proposer: Vec<u8>,
-        timestamp: u64,
     ) -> Self {
         let header = BlockHeader {
             version: 1,
             previous_block_hash,
             state_root,
-            timestamp,
             height,
             proposer,
         };
@@ -248,7 +240,6 @@ impl GenesisBlock {
                 .first()
                 .map(|v| v.pub_key.clone())
                 .unwrap_or_default(),
-            self.timestamp,
         )
     }
 

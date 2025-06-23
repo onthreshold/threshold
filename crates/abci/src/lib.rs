@@ -168,8 +168,7 @@ impl ChainInterface for ChainInterfaceImpl {
     }
 
     async fn finalize_and_store_block(&mut self, block: Block) -> Result<(), NodeError> {
-        // Execute all transactions in the block
-        let mut new_chain_state = self.chain_state.clone();
+        let mut new_chain_state = self.chain_state.create_new_chain_state();
         for transaction in &block.body.transactions {
             new_chain_state = self
                 .executor
@@ -177,10 +176,8 @@ impl ChainInterface for ChainInterfaceImpl {
                 .await?;
         }
 
-        // Store the block in the database
         self.db.insert_block(block.clone())?;
 
-        // Update chain state with executed transactions
         self.db.flush_state(&new_chain_state)?;
         self.chain_state = new_chain_state;
 

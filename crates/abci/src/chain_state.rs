@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::HashMap;
 
 use bincode::{Decode, Encode};
 use protocol::{block::Block, transaction::Transaction};
@@ -78,6 +75,16 @@ impl ChainState {
     }
 
     #[must_use]
+    pub fn create_new_chain_state(&mut self) -> Self {
+        Self {
+            accounts: self.accounts.clone(),
+            deposit_intents: self.deposit_intents.clone(),
+            proposed_transactions: self.proposed_transactions.clone(),
+            block_height: self.block_height + 1,
+        }
+    }
+
+    #[must_use]
     pub fn get_account(&self, address: &str) -> Option<&Account> {
         self.accounts.get(address)
     }
@@ -122,15 +129,14 @@ impl ChainState {
 
     #[must_use]
     pub fn get_proposed_block(&self, previous_block: Option<Block>, proposer: Vec<u8>) -> Block {
+        let mut sorted_transactions = self.proposed_transactions.clone();
+        sorted_transactions.sort_by_key(protocol::transaction::Transaction::id);
+
         Block::new(
             previous_block.map_or([0u8; 32], |b| b.hash()),
-            self.block_height,
-            self.proposed_transactions.clone(),
+            self.block_height + 1,
+            sorted_transactions,
             proposer,
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
         )
     }
 

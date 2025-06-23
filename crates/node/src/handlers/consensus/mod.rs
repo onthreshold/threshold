@@ -46,7 +46,7 @@ impl ConsensusState {
             proposer: None,
             validators: HashSet::new(),
             broadcast_topic: IdentTopic::new("broadcast"),
-            round_timeout: Duration::from_secs(10),
+            round_timeout: Duration::from_secs(20),
             round_start_time: None,
             is_leader: false,
             prevotes: HashSet::new(),
