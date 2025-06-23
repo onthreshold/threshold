@@ -1,7 +1,7 @@
 use tonic::{Request, Response, Status};
 use types::network::network_protocol::NetworkHandle;
 
-use crate::grpc_operator;
+use crate::{grpc_operator, route_metrics};
 
 use types::proto::node_proto::{
     CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest, ConfirmWithdrawalResponse,
@@ -35,97 +35,108 @@ impl NodeControl for NodeControlService {
         &self,
         request: Request<SpendFundsRequest>,
     ) -> Result<Response<SpendFundsResponse>, Status> {
-        let request = request.into_inner();
-        let response = grpc_operator::spend_funds(&self.network, request).await?;
-
-        Ok(Response::new(response))
+        route_metrics!(async {
+            let req = request.into_inner();
+            let resp = grpc_operator::spend_funds(&self.network, req).await?;
+            Ok(Response::new(resp))
+        })
     }
 
     async fn start_signing(
         &self,
         request: Request<StartSigningRequest>,
     ) -> Result<Response<StartSigningResponse>, Status> {
-        let request = request.into_inner();
-        let response = grpc_operator::start_signing(&self.network, request).await?;
-
-        Ok(Response::new(response))
+        route_metrics!(async {
+            let req = request.into_inner();
+            let resp = grpc_operator::start_signing(&self.network, req).await?;
+            Ok(Response::new(resp))
+        })
     }
 
     async fn create_deposit_intent(
         &self,
         request: Request<CreateDepositIntentRequest>,
     ) -> Result<Response<CreateDepositIntentResponse>, Status> {
-        let request = request.into_inner();
-        let response = grpc_operator::create_deposit_intent(&self.network, request).await?;
-
-        Ok(Response::new(response))
+        route_metrics!(async {
+            let req = request.into_inner();
+            let resp = grpc_operator::create_deposit_intent(&self.network, req).await?;
+            Ok(Response::new(resp))
+        })
     }
 
     async fn get_pending_deposit_intents(
         &self,
         _request: Request<GetPendingDepositIntentsRequest>,
     ) -> Result<Response<GetPendingDepositIntentsResponse>, Status> {
-        let response = grpc_operator::get_pending_deposit_intents(&self.network).await?;
-        Ok(Response::new(response))
+        route_metrics!(async {
+            let resp = grpc_operator::get_pending_deposit_intents(&self.network).await?;
+            Ok(Response::new(resp))
+        })
     }
 
     async fn propose_withdrawal(
         &self,
         request: Request<ProposeWithdrawalRequest>,
     ) -> Result<Response<ProposeWithdrawalResponse>, Status> {
-        let request = request.into_inner();
-        let response = grpc_operator::propose_withdrawal(&self.network, request).await?;
-        Ok(Response::new(response))
+        route_metrics!(async {
+            let req = request.into_inner();
+            let resp = grpc_operator::propose_withdrawal(&self.network, req).await?;
+            Ok(Response::new(resp))
+        })
     }
 
     async fn confirm_withdrawal(
         &self,
         request: Request<ConfirmWithdrawalRequest>,
     ) -> Result<Response<ConfirmWithdrawalResponse>, Status> {
-        let request = request.into_inner();
-        let response = grpc_operator::confirm_withdrawal(&self.network, request).await?;
-        Ok(Response::new(response))
+        route_metrics!(async {
+            let req = request.into_inner();
+            let resp = grpc_operator::confirm_withdrawal(&self.network, req).await?;
+            Ok(Response::new(resp))
+        })
     }
 
     async fn check_balance(
         &self,
         request: Request<CheckBalanceRequest>,
     ) -> Result<Response<CheckBalanceResponse>, Status> {
-        let result = {
-            let request = request.into_inner();
-            grpc_operator::check_balance(&self.network, request).await
-        };
-
-        match result {
-            Ok(resp) => Ok(Response::new(resp)),
-            Err(status) => Err(status),
-        }
+        route_metrics!(async {
+            let req = request.into_inner();
+            let resp = grpc_operator::check_balance(&self.network, req).await?;
+            Ok(Response::new(resp))
+        })
     }
 
     async fn get_chain_info(
         &self,
         request: Request<GetChainInfoRequest>,
     ) -> Result<Response<GetChainInfoResponse>, Status> {
-        let request = request.into_inner();
-        let response = grpc_operator::get_chain_info(&self.network, request).await?;
-        Ok(Response::new(response))
+        route_metrics!(async {
+            let req = request.into_inner();
+            let resp = grpc_operator::get_chain_info(&self.network, req).await?;
+            Ok(Response::new(resp))
+        })
     }
 
     async fn trigger_consensus_round(
         &self,
         request: Request<TriggerConsensusRoundRequest>,
     ) -> Result<Response<TriggerConsensusRoundResponse>, Status> {
-        let request = request.into_inner();
-        let response = grpc_operator::trigger_consensus_round(&self.network, request).await?;
-        Ok(Response::new(response))
+        route_metrics!(async {
+            let req = request.into_inner();
+            let resp = grpc_operator::trigger_consensus_round(&self.network, req).await?;
+            Ok(Response::new(resp))
+        })
     }
 
     async fn get_latest_blocks(
         &self,
         request: Request<GetLatestBlocksRequest>,
     ) -> Result<Response<GetLatestBlocksResponse>, Status> {
-        let request = request.into_inner();
-        let response = grpc_operator::get_latest_blocks(&self.network, request).await?;
-        Ok(Response::new(response))
+        route_metrics!(async {
+            let req = request.into_inner();
+            let resp = grpc_operator::get_latest_blocks(&self.network, req).await?;
+            Ok(Response::new(resp))
+        })
     }
 }
