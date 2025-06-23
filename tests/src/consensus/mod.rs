@@ -1,3 +1,5 @@
+pub mod block_consensus;
+
 #[cfg(test)]
 mod consensus_tests {
     use std::collections::HashSet;

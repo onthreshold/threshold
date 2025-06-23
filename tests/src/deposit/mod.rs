@@ -2,9 +2,7 @@
 mod deposit_tests {
     use std::str::FromStr;
 
-    use crate::mocks::abci::setup_test_account;
     use crate::mocks::network::MockNodeCluster;
-    use abci::chain_state::Account;
     use bitcoin::Address;
     use bitcoin::hashes::Hash;
     use grpc::grpc_operator;
@@ -243,15 +241,6 @@ mod deposit_tests {
         let user_btc_pubkey = bitcoin::PublicKey::from_slice(&user_pubkey.serialize()).unwrap();
         let user_address = Address::p2pkh(user_btc_pubkey, bitcoin::Network::Testnet);
 
-        // Insert user account with zero balance
-        setup_test_account(
-            node,
-            &user_address.to_string(),
-            Account::new(user_address.to_string(), 0),
-        )
-        .await
-        .unwrap();
-
         // ----- Prepare deposit address affiliated with node pubkey -----
         let frost_pubkey_bytes = node
             .pubkey_package
@@ -312,26 +301,11 @@ mod deposit_tests {
             output: vec![tx_out],
         };
 
-        // ----- Call update_user_balance -----
-        let balance_before = match node
-            .chain_interface_tx
-            .send_message_with_response(abci::ChainMessage::GetAccount {
-                address: user_address.to_string(),
-            })
-            .await
-        {
-            Ok(abci::ChainResponse::GetAccount {
-                account: Some(account),
-            }) => account.balance,
-            _ => panic!("Failed to get account balance"),
-        };
-
         state
             .update_user_balance(node, &tx)
             .await
             .expect("balance update failed");
 
-        // --- Assert wallet updated with the new UTXO ---
         let txid = tx.compute_txid();
         let utxo_found = node.wallet.utxos.iter().any(|u| {
             u.utxo.outpoint.txid == txid
@@ -340,20 +314,52 @@ mod deposit_tests {
         });
         assert!(utxo_found, "wallet did not ingest expected UTXO");
 
-        let balance_after = match node
+        let pending_transactions = match node
             .chain_interface_tx
-            .send_message_with_response(abci::ChainMessage::GetAccount {
-                address: user_address.to_string(),
-            })
+            .send_message_with_response(abci::ChainMessage::GetPendingTransactions)
             .await
         {
-            Ok(abci::ChainResponse::GetAccount {
-                account: Some(account),
-            }) => account.balance,
-            _ => panic!("Failed to get account balance"),
+            Ok(abci::ChainResponse::GetPendingTransactions { transactions }) => transactions,
+            _ => panic!("Failed to get pending transactions"),
         };
 
-        assert_eq!(balance_after, balance_before + deposit_amount_sat);
+        assert_eq!(
+            pending_transactions.len(),
+            1,
+            "Expected exactly one pending transaction"
+        );
+
+        let transaction = &pending_transactions[0];
+        assert_eq!(
+            transaction.r#type,
+            protocol::transaction::TransactionType::Deposit
+        );
+
+        let operations = &transaction.operations;
+        assert!(
+            operations.len() >= 6,
+            "Expected at least 6 operations for deposit transaction"
+        );
+
+        if let protocol::transaction::Operation::OpPush { value } = &operations[1] {
+            let address_from_tx =
+                String::from_utf8(value.clone()).expect("Invalid address in transaction");
+            assert_eq!(address_from_tx, user_address.to_string());
+        } else {
+            panic!("Expected OpPush with address as second operation");
+        }
+
+        if let protocol::transaction::Operation::OpPush { value } = &operations[4] {
+            let amount_from_tx = u64::from_be_bytes(
+                value
+                    .as_slice()
+                    .try_into()
+                    .expect("Invalid amount in transaction"),
+            );
+            assert_eq!(amount_from_tx, deposit_amount_sat);
+        } else {
+            panic!("Expected OpPush with amount as fifth operation");
+        }
     }
 
     #[tokio::test]
@@ -374,15 +380,6 @@ mod deposit_tests {
         let (_, user_pubkey) = secp.generate_keypair(&mut bitcoin::secp256k1::rand::thread_rng());
         let user_btc_pubkey = bitcoin::PublicKey::from_slice(&user_pubkey.serialize()).unwrap();
         let user_address = Address::p2pkh(user_btc_pubkey, bitcoin::Network::Testnet);
-
-        // Insert user account with zero balance
-        setup_test_account(
-            node,
-            &user_address.to_string(),
-            Account::new(user_address.to_string(), 0),
-        )
-        .await
-        .unwrap();
 
         // ----- Craft transaction -----
         let deposit_amount_sat = 15_000;
@@ -410,28 +407,26 @@ mod deposit_tests {
             output: vec![tx_out],
         };
 
-        // ----- Call update_user_balance -----
         state
             .update_user_balance(node, &tx)
             .await
             .expect("balance update failed");
 
-        // Assert: balance should not have changed
-        let balance = match node
+        let pending_transactions = match node
             .chain_interface_tx
-            .send_message_with_response(abci::ChainMessage::GetAccount {
-                address: user_address.to_string(),
-            })
+            .send_message_with_response(abci::ChainMessage::GetPendingTransactions)
             .await
         {
-            Ok(abci::ChainResponse::GetAccount {
-                account: Some(account),
-            }) => account.balance,
-            _ => 0, // If no account found, balance is 0
+            Ok(abci::ChainResponse::GetPendingTransactions { transactions }) => transactions,
+            _ => panic!("Failed to get pending transactions"),
         };
-        assert_eq!(balance, 0);
 
-        // Wallet UTXOs should remain unchanged (none ingested)
+        assert_eq!(
+            pending_transactions.len(),
+            0,
+            "Expected no pending transactions for non-deposit transaction"
+        );
+
         assert!(
             node.wallet.utxos.is_empty(),
             "wallet should not have ingested any UTXO"

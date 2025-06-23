@@ -12,7 +12,7 @@ use tracing::info;
 use types::consensus::{ConsensusMessage, LeaderAnnouncement, Vote};
 use types::errors::NodeError;
 use types::network::network_protocol::Network;
-use types::{consensus::VoteType, network::network_event::NetworkEvent, proto::ProtoDecode};
+use types::{consensus::VoteType, network::network_event::{NetworkEvent, SelfRequest, SelfResponse}, proto::ProtoDecode};
 
 #[derive(Clone)]
 struct RawBlockBytes(Vec<u8>);
@@ -77,6 +77,33 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
 
         if let Some(message) = message {
             match message {
+                NetworkEvent::SelfRequest {
+                    request: SelfRequest::TriggerConsensusRound { force_round },
+                    response_channel,
+                } => {
+                    let round_number = if force_round {
+                        self.start_new_round(node)?;
+                        self.current_round
+                    } else {
+                        // Regular consensus round trigger
+                        self.start_new_round(node)?;
+                        self.current_round
+                    };
+
+                    if let Some(response_channel) = response_channel {
+                        response_channel
+                            .send(SelfResponse::TriggerConsensusRoundResponse {
+                                success: true,
+                                message: if force_round {
+                                    "Forced consensus round triggered".to_string()
+                                } else {
+                                    "Consensus round triggered".to_string()
+                                },
+                                round_number: round_number as u64,
+                            })
+                            .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
+                    }
+                }
                 NetworkEvent::Subscribed { peer_id, topic } => {
                     if topic == self.leader_topic.hash() {
                         self.validators.insert(peer_id);
@@ -104,7 +131,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                     self.handle_new_round(node, peer, round)?;
                                 }
                                 ConsensusMessage::Vote(vote) => {
-                                    self.handle_vote(node, peer, &vote);
+                                    self.handle_vote(node, peer, &vote).await;
                                 }
                             }
                         }
@@ -134,11 +161,16 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                         ));
                                     };
 
-                                    if local_block == block {
+                                    // Validate block by comparing transactions rather than entire block
+                                    // (timestamps and proposers will be different for each node)
+                                    if local_block.body.transactions == block.body.transactions {
                                         info!("Block is valid. Sending prevote.");
                                         self.send_vote(node, &block, VoteType::Prevote)?;
                                     } else {
-                                        info!("Block is invalid. Not voting");
+                                        info!("Block is invalid. Not voting - transaction mismatch");
+                                        info!("Local txs: {}, Received txs: {}", 
+                                             local_block.body.transactions.len(), 
+                                             block.body.transactions.len());
                                     }
                                 }
                                 Err(e) => {
@@ -158,7 +190,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                 })?;
 
                             if let ConsensusMessage::Vote(vote) = vote_message {
-                                self.handle_vote(node, peer, &vote);
+                                self.handle_vote(node, peer, &vote).await;
                             }
                         }
                     }
@@ -290,9 +322,9 @@ impl ConsensusState {
         Ok(())
     }
 
-    fn handle_vote(
+    async fn handle_vote(
         &mut self,
-        node: &NodeState<impl Network, impl Wallet>,
+        node: &mut NodeState<impl Network, impl Wallet>,
         sender: PeerId,
         vote: &Vote,
     ) {
@@ -316,7 +348,7 @@ impl ConsensusState {
                         self.validators.len()
                     );
 
-                    if self.prevotes.len() > (self.validators.len() * 2) / 3 {
+                    if self.prevotes.len() >= (self.validators.len() * 2) / 3 + 1 {
                         info!("Got 2/3+ prevotes. Sending precommit vote.");
 
                         let vote = Vote {
@@ -347,10 +379,46 @@ impl ConsensusState {
                         self.validators.len()
                     );
 
-                    if self.precommits.len() > (self.validators.len() * 2) / 3 {
-                        info!("Got 2/3+ precommits");
+                    if self.precommits.len() >= (self.validators.len() * 2) / 3 + 1 {
+                        info!("Got 2/3+ precommits. Finalizing block...");
 
-                        todo!("Finalize block here");
+                        // Get the proposed block to finalize
+                        let Ok(ChainResponse::GetProposedBlock { block }) = node
+                            .chain_interface_tx
+                            .send_message_with_response(ChainMessage::GetProposedBlock {
+                                previous_block: None,
+                                proposer: node.peer_id.to_bytes(),
+                            })
+                            .await
+                        else {
+                            tracing::error!("Failed to get proposed block for finalization");
+                            return;
+                        };
+
+                        // Finalize and store the block
+                        match node
+                            .chain_interface_tx
+                            .send_message_with_response(ChainMessage::FinalizeBlock {
+                                block: block.clone(),
+                            })
+                            .await
+                        {
+                            Ok(ChainResponse::FinalizeAndStoreBlock { error: None }) => {
+                                info!(
+                                    "🎉 Successfully finalized block at height {} with {} transactions",
+                                    block.header.height,
+                                    block.body.transactions.len()
+                                );
+
+                                self.start_new_round(node).ok();
+                            }
+                            Ok(ChainResponse::FinalizeAndStoreBlock { error: Some(e) }) => {
+                                tracing::error!("Failed to finalize block: {}", e);
+                            }
+                            _ => {
+                                tracing::error!("Unexpected response when finalizing block");
+                            }
+                        }
                     }
                 }
             }

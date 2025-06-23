@@ -70,6 +70,15 @@ impl ChainInterfaceImpl {
                 } => ChainResponse::GetProposedBlock {
                     block: self.get_proposed_block(previous_block, proposer)?,
                 },
+                ChainMessage::FinalizeBlock { block } => ChainResponse::FinalizeAndStoreBlock {
+                    error: self.finalize_and_store_block(block).await.err(),
+                },
+                ChainMessage::GetPendingTransactions => ChainResponse::GetPendingTransactions {
+                    transactions: self.get_pending_transactions(),
+                },
+                ChainMessage::GetChainState => ChainResponse::GetChainState {
+                    state: self.get_chain_state(),
+                },
             };
             response_tx
                 .send(response)

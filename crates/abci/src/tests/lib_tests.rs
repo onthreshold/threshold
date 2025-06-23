@@ -192,8 +192,19 @@ async fn test_execute_deposit_transaction() {
     );
 
     // Execute transaction
-    let result = chain_interface.add_transaction_to_block(transaction).await;
+    let result = chain_interface
+        .add_transaction_to_block(transaction.clone())
+        .await;
     assert!(result.is_ok());
+
+    // Create and finalize block to execute the transaction
+    let block = chain_interface
+        .get_proposed_block(None, vec![1, 2, 3, 4])
+        .unwrap();
+    chain_interface
+        .finalize_and_store_block(block)
+        .await
+        .unwrap();
 
     // Verify account was created with correct balance
     let account = chain_interface.get_account(address);
@@ -235,7 +246,16 @@ async fn test_execute_withdrawal_transaction() {
     );
 
     chain_interface
-        .add_transaction_to_block(deposit_transaction)
+        .add_transaction_to_block(deposit_transaction.clone())
+        .await
+        .unwrap();
+
+    // Finalize deposit block
+    let deposit_block = chain_interface
+        .get_proposed_block(None, vec![1, 2, 3, 4])
+        .unwrap();
+    chain_interface
+        .finalize_and_store_block(deposit_block)
         .await
         .unwrap();
 
@@ -255,9 +275,18 @@ async fn test_execute_withdrawal_transaction() {
 
     // Execute withdrawal
     let result = chain_interface
-        .add_transaction_to_block(withdrawal_transaction)
+        .add_transaction_to_block(withdrawal_transaction.clone())
         .await;
     assert!(result.is_ok());
+
+    // Finalize withdrawal block
+    let withdrawal_block = chain_interface
+        .get_proposed_block(None, vec![1, 2, 3, 4])
+        .unwrap();
+    chain_interface
+        .finalize_and_store_block(withdrawal_block)
+        .await
+        .unwrap();
 
     // Verify balance was decremented
     let account = chain_interface.get_account(address).unwrap();
@@ -285,11 +314,20 @@ async fn test_execute_transaction_insufficient_balance() {
         ],
     );
 
-    // Should fail due to insufficient balance
-    let result = chain_interface.add_transaction_to_block(transaction).await;
-    assert!(result.is_err());
+    // Add transaction to pending
+    let result = chain_interface
+        .add_transaction_to_block(transaction.clone())
+        .await;
+    assert!(result.is_ok());
+
+    // Try to finalize block - this should fail due to insufficient balance
+    let block = chain_interface
+        .get_proposed_block(None, vec![1, 2, 3, 4])
+        .unwrap();
+    let finalize_result = chain_interface.finalize_and_store_block(block).await;
+    assert!(finalize_result.is_err());
     assert!(
-        result
+        finalize_result
             .unwrap_err()
             .to_string()
             .contains("Insufficient balance")
@@ -329,7 +367,16 @@ async fn test_execute_transaction_state_persistence() {
     );
 
     chain_interface
-        .add_transaction_to_block(transaction)
+        .add_transaction_to_block(transaction.clone())
+        .await
+        .unwrap();
+
+    // Finalize block to execute and persist the transaction
+    let block = chain_interface
+        .get_proposed_block(None, vec![1, 2, 3, 4])
+        .unwrap();
+    chain_interface
+        .finalize_and_store_block(block)
         .await
         .unwrap();
 
@@ -374,10 +421,19 @@ async fn test_execute_multiple_transactions() {
         );
 
         chain_interface
-            .add_transaction_to_block(transaction)
+            .add_transaction_to_block(transaction.clone())
             .await
             .unwrap();
     }
+
+    // Finalize block to execute all transactions
+    let block = chain_interface
+        .get_proposed_block(None, vec![1, 2, 3, 4])
+        .unwrap();
+    chain_interface
+        .finalize_and_store_block(block)
+        .await
+        .unwrap();
 
     // Final balance should be 1000 + 2000 + 3000 = 6000
     let account = chain_interface.get_account(address).unwrap();
@@ -402,10 +458,19 @@ async fn test_transaction_error_propagation() {
         ],
     );
 
-    let result = chain_interface.add_transaction_to_block(transaction).await;
-    assert!(result.is_err());
+    let result = chain_interface
+        .add_transaction_to_block(transaction.clone())
+        .await;
+    assert!(result.is_ok());
+
+    // Try to finalize block - this should fail due to insufficient allowance
+    let block = chain_interface
+        .get_proposed_block(None, vec![1, 2, 3, 4])
+        .unwrap();
+    let finalize_result = chain_interface.finalize_and_store_block(block).await;
+    assert!(finalize_result.is_err());
     assert!(
-        result
+        finalize_result
             .unwrap_err()
             .to_string()
             .contains("Insufficient allowance")
@@ -459,7 +524,16 @@ async fn test_concurrent_operations() {
     );
 
     chain_interface
-        .add_transaction_to_block(transaction)
+        .add_transaction_to_block(transaction.clone())
+        .await
+        .unwrap();
+
+    // Finalize block to execute the transaction
+    let block = chain_interface
+        .get_proposed_block(None, vec![1, 2, 3, 4])
+        .unwrap();
+    chain_interface
+        .finalize_and_store_block(block)
         .await
         .unwrap();
 

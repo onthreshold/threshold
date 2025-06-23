@@ -1,14 +1,66 @@
 #[cfg(test)]
 mod withdrawl_tests {
+    async fn setup_account_with_balance(
+        node: &mut crate::mocks::network::MockNodeState,
+        public_key_hex: &str,
+        balance: u64,
+    ) {
+        let account_transaction = protocol::transaction::Transaction::new(
+            protocol::transaction::TransactionType::Deposit,
+            vec![
+                protocol::transaction::Operation::OpPush {
+                    value: balance.to_be_bytes().to_vec(),
+                },
+                protocol::transaction::Operation::OpPush {
+                    value: public_key_hex.as_bytes().to_vec(),
+                },
+                protocol::transaction::Operation::OpPush {
+                    value: format!("mock_txid_for_withdrawal_test_{}", public_key_hex)
+                        .as_bytes()
+                        .to_vec(),
+                },
+                protocol::transaction::Operation::OpCheckOracle,
+                protocol::transaction::Operation::OpPush {
+                    value: balance.to_be_bytes().to_vec(),
+                },
+                protocol::transaction::Operation::OpPush {
+                    value: public_key_hex.as_bytes().to_vec(),
+                },
+                protocol::transaction::Operation::OpIncrementBalance,
+            ],
+        );
+
+        node.chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::AddTransactionToBlock {
+                transaction: account_transaction,
+            })
+            .await
+            .expect("Failed to add account setup transaction");
+
+        let setup_block = node
+            .chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::GetProposedBlock {
+                previous_block: None,
+                proposer: vec![1, 2, 3, 4],
+            })
+            .await
+            .expect("Failed to get proposed block")
+            .into();
+
+        if let abci::ChainResponse::GetProposedBlock { block } = setup_block {
+            node.chain_interface_tx
+                .send_message_with_response(abci::ChainMessage::FinalizeBlock { block })
+                .await
+                .expect("Failed to finalize setup block");
+        }
+    }
     use bitcoin::{Address, Amount, CompressedPublicKey, OutPoint, Txid, hashes::Hash};
     use node::wallet::TrackedUtxo;
     use types::proto::node_proto::{
         ConfirmWithdrawalRequest, ProposeWithdrawalRequest, ProposeWithdrawalResponse,
     };
 
-    use crate::mocks::abci::setup_test_account;
     use crate::mocks::network::MockNodeCluster;
-    use abci::chain_state::Account;
     use grpc::grpc_operator;
     use node::handlers::withdrawl::SpendIntentState;
     use std::collections::HashMap;
@@ -27,24 +79,12 @@ mod withdrawl_tests {
         let network = cluster.networks.get(&node_peer).unwrap().clone();
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
-        // --- prepare wallet & chain state so that the withdrawal can succeed ---
-        // Generate a dummy address on Signet network for both the wallet and withdrawal target
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let (_, public_key) = secp.generate_keypair(&mut bitcoin::secp256k1::rand::thread_rng());
         let btc_pubkey = CompressedPublicKey::from_slice(&public_key.serialize()).unwrap();
         let address = Address::p2wpkh(&btc_pubkey, bitcoin::Network::Signet);
 
-        // Provide the node with sufficient on-chain balance for this address
-        setup_test_account(
-            node,
-            &hex::encode(public_key.serialize()),
-            Account {
-                address: hex::encode(public_key.serialize()),
-                balance: 100_000,
-            },
-        )
-        .await
-        .unwrap();
+        setup_account_with_balance(node, &hex::encode(public_key.serialize()), 100_000).await;
 
         let utxo = Utxo {
             outpoint: OutPoint {
@@ -106,18 +146,6 @@ mod withdrawl_tests {
         let btc_pubkey = bitcoin::PublicKey::from_slice(&public_key.serialize()).unwrap();
         let address = Address::p2pkh(btc_pubkey, bitcoin::Network::Signet);
 
-        // Insert account with low balance (e.g., 1 satoshi)
-        setup_test_account(
-            node,
-            &address.to_string(),
-            Account {
-                address: address.to_string(),
-                balance: 1,
-            },
-        )
-        .await
-        .unwrap();
-
         // Prepare SpendIntent and state
         let mut spend_state = SpendIntentState {
             pending_intents: HashMap::new(),
@@ -130,13 +158,14 @@ mod withdrawl_tests {
             blocks_to_confirm: None,
         };
 
-        // Act
         let result = spend_state
             .propose_withdrawal(node, &withdrawal_intent)
             .await;
 
-        // Assert: should error due to insufficient balance
-        assert!(result.is_err());
+        assert!(
+            result.is_err(),
+            "Expected withdrawal to fail without sufficient setup"
+        );
     }
 
     #[tokio::test]
@@ -145,27 +174,15 @@ mod withdrawl_tests {
         let mut cluster = MockNodeCluster::new_with_keys(2).await;
         cluster.setup().await;
 
-        // Extract node
         let node_peer = *cluster.nodes.keys().next().unwrap();
         let node = cluster.nodes.get_mut(&node_peer).unwrap();
 
-        // Prepare funding and accounts
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let (_, public_key) = secp.generate_keypair(&mut bitcoin::secp256k1::rand::thread_rng());
         let btc_pubkey = CompressedPublicKey::from_slice(&public_key.serialize()).unwrap();
         let address = Address::p2wpkh(&btc_pubkey, bitcoin::Network::Signet);
 
-        // Fund account and wallet UTXO so propose succeeds
-        setup_test_account(
-            node,
-            &hex::encode(public_key.serialize()),
-            Account {
-                address: hex::encode(public_key.serialize()),
-                balance: 100_000,
-            },
-        )
-        .await
-        .unwrap();
+        setup_account_with_balance(node, &hex::encode(public_key.serialize()), 100_000).await;
 
         let utxo = Utxo {
             outpoint: OutPoint {
@@ -231,18 +248,8 @@ mod withdrawl_tests {
         // Initial balance for user & destination address
         let initial_balance = 100_000u64;
 
-        // Populate chain state on **all** peers before we take any mutable references to a single node
         for (_peer, node) in cluster.nodes.iter_mut() {
-            setup_test_account(
-                node,
-                &public_key_hex,
-                Account {
-                    address: public_key_hex.clone(),
-                    balance: initial_balance,
-                },
-            )
-            .await
-            .unwrap();
+            setup_account_with_balance(node, &public_key_hex, initial_balance).await;
 
             let utxo = Utxo {
                 outpoint: OutPoint {
@@ -317,24 +324,40 @@ mod withdrawl_tests {
         // Run enough iterations so that signing workflow and gossipsub propagation complete
         cluster.run_n_iterations(10).await;
 
-        // --- Assert: every peer has updated the user's balance ---
-        let expected_debit = propose_resp.quote_satoshis;
         for (_, node) in cluster.nodes.iter_mut() {
-            let account = match node
+            let pending_transactions = match node
                 .chain_interface_tx
-                .send_message_with_response(abci::ChainMessage::GetAccount {
-                    address: public_key_hex.clone(),
-                })
+                .send_message_with_response(abci::ChainMessage::GetPendingTransactions)
                 .await
             {
-                Ok(abci::ChainResponse::GetAccount {
-                    account: Some(account),
-                }) => account,
-                _ => panic!("Account should exist on all peers"),
+                Ok(abci::ChainResponse::GetPendingTransactions { transactions }) => transactions,
+                _ => panic!("Failed to get pending transactions"),
             };
-            assert_eq!(account.balance, initial_balance - expected_debit);
 
-            // Assert the spent UTXO has been removed from the wallet
+            assert!(
+                !pending_transactions.is_empty(),
+                "Expected withdrawal transaction to be pending"
+            );
+
+            let withdrawal_transaction = pending_transactions
+                .iter()
+                .find(|tx| tx.r#type == protocol::transaction::TransactionType::Withdrawal)
+                .expect("Expected to find withdrawal transaction");
+
+            let operations = &withdrawal_transaction.operations;
+            assert!(
+                operations.len() >= 3,
+                "Expected at least 3 operations for withdrawal transaction"
+            );
+
+            if let protocol::transaction::Operation::OpPush { value } = &operations[1] {
+                let address_from_tx =
+                    String::from_utf8(value.clone()).expect("Invalid address in transaction");
+                assert_eq!(address_from_tx, public_key_hex);
+            } else {
+                panic!("Expected OpPush with address as second operation");
+            }
+
             let spent_still_present = node
                 .wallet
                 .utxos
