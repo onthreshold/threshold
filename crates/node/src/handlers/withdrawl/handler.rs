@@ -12,13 +12,13 @@ impl<N: Network, W: Wallet> Handler<N, W> for SpendIntentState {
     async fn handle(
         &mut self,
         node: &mut NodeState<N, W>,
-        message: Option<NetworkEvent>,
+        message: NetworkEvent,
     ) -> Result<(), NodeError> {
         match message {
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request: SelfRequest::ProposeWithdrawal { withdrawal_intent },
                 response_channel,
-            }) => {
+            } => {
                 let (total_amount, challenge) =
                     self.propose_withdrawal(node, &withdrawal_intent).await?;
                 if let Some(response_channel) = response_channel {
@@ -30,14 +30,14 @@ impl<N: Network, W: Wallet> Handler<N, W> for SpendIntentState {
                         .map_err(|e| NodeError::Error(e.to_string()))?;
                 }
             }
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request:
                     SelfRequest::ConfirmWithdrawal {
                         challenge,
                         signature,
                     },
                 response_channel,
-            }) => {
+            } => {
                 self.confirm_withdrawal(node, &challenge, &signature)?;
                 if let Some(response_channel) = response_channel {
                     response_channel
@@ -45,7 +45,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for SpendIntentState {
                         .map_err(|e| NodeError::Error(e.to_string()))?;
                 }
             }
-            Some(NetworkEvent::GossipsubMessage(Message { data, .. })) => {
+            NetworkEvent::GossipsubMessage(Message { data, .. }) => {
                 let broadcast = BroadcastMessage::decode(&data).map_err(|e| {
                     NodeError::Error(format!("Failed to decode broadcast message: {e}"))
                 })?;

@@ -19,13 +19,13 @@ impl<N: Network, W: Wallet> Handler<N, W> for BalanceState {
     async fn handle(
         &mut self,
         node: &mut NodeState<N, W>,
-        message: Option<NetworkEvent>,
+        message: NetworkEvent,
     ) -> Result<(), NodeError> {
         match message {
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request: SelfRequest::CheckBalance { address },
                 response_channel,
-            }) => {
+            } => {
                 let ChainResponse::GetAccount { account } = node
                     .chain_interface_tx
                     .send_message_with_response(ChainMessage::GetAccount {
@@ -48,10 +48,10 @@ impl<N: Network, W: Wallet> Handler<N, W> for BalanceState {
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
                 }
             }
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request: SelfRequest::GetChainInfo,
                 response_channel,
-            }) => {
+            } => {
                 let ChainResponse::GetChainState { state } = node
                     .chain_interface_tx
                     .send_message_with_response(ChainMessage::GetChainState)
@@ -74,10 +74,10 @@ impl<N: Network, W: Wallet> Handler<N, W> for BalanceState {
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
                 }
             }
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request: SelfRequest::GetLatestBlocks { count: _ },
                 response_channel,
-            }) => {
+            } => {
                 let ChainResponse::GetChainState { state } = node
                     .chain_interface_tx
                     .send_message_with_response(ChainMessage::GetChainState)

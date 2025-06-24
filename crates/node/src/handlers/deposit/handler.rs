@@ -19,17 +19,17 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
     async fn handle(
         &mut self,
         node: &mut NodeState<N, W>,
-        message: Option<NetworkEvent>,
+        message: NetworkEvent,
     ) -> Result<(), types::errors::NodeError> {
         match message {
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request:
                     SelfRequest::CreateDeposit {
                         user_pubkey,
                         amount_sat,
                     },
                 response_channel,
-            }) => {
+            } => {
                 println!("Node receveived request to create deposit");
                 let response = self.create_deposit(node, &user_pubkey, amount_sat).await;
                 if let Some(response_channel) = response_channel {
@@ -56,10 +56,10 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                     }
                 }
             }
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request: SelfRequest::GetPendingDepositIntents,
                 response_channel,
-            }) => {
+            } => {
                 let response = self.get_pending_deposit_intents(node).await;
                 if let Some(response_channel) = response_channel {
                     match response {
@@ -80,10 +80,10 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                     }
                 }
             }
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request: SelfRequest::ConfirmDeposit { confirmed_tx },
                 ..
-            }) => {
+            } => {
                 info!(
                     "🔔 Deposit handler received ConfirmDeposit event for tx: {}",
                     confirmed_tx.compute_txid()
@@ -97,7 +97,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                     );
                 }
             }
-            Some(NetworkEvent::GossipsubMessage(Message { data, .. })) => {
+            NetworkEvent::GossipsubMessage(Message { data, .. }) => {
                 let broadcast = BroadcastMessage::decode(&data).map_err(|e| {
                     NodeError::Error(format!("Failed to decode broadcast message: {e}"))
                 })?;
