@@ -501,5 +501,6 @@ const fn get_broadcast_message_type(
         types::broadcast::BroadcastMessage::DepositIntent(_) => "deposit_intent",
         types::broadcast::BroadcastMessage::PendingSpend(_) => "pending_spend",
         types::broadcast::BroadcastMessage::Dkg(_) => "dkg",
+        types::broadcast::BroadcastMessage::Transaction(_) => "transaction",
     }
 }
