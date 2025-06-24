@@ -25,7 +25,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
     async fn handle(
         &mut self,
         node: &mut NodeState<N, W>,
-        message: Option<NetworkEvent>,
+        message: NetworkEvent,
     ) -> Result<(), NodeError> {
         if self.is_leader && self.current_state == ConsensusPhase::WaitingForPropose {
             if let Ok(ChainResponse::GetProposedBlock { block }) = node
@@ -72,115 +72,113 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
             }
         }
 
-        if let Some(message) = message {
-            match message {
-                NetworkEvent::SelfRequest {
-                    request: SelfRequest::TriggerConsensusRound { force_round },
-                    response_channel,
-                } => {
-                    self.start_new_round(node)?;
-                    let round_number = self.current_round;
+        match message {
+            NetworkEvent::SelfRequest {
+                request: SelfRequest::TriggerConsensusRound { force_round },
+                response_channel,
+            } => {
+                self.start_new_round(node)?;
+                let round_number = self.current_round;
 
-                    if let Some(response_channel) = response_channel {
-                        response_channel
-                            .send(SelfResponse::TriggerConsensusRoundResponse {
-                                success: true,
-                                message: if force_round {
-                                    "Forced consensus round triggered".to_string()
-                                } else {
-                                    "Consensus round triggered".to_string()
-                                },
-                                round_number: u64::from(round_number),
-                            })
-                            .map_err(|e| {
-                                NodeError::Error(format!("Failed to send response: {e}"))
-                            })?;
-                    }
-                }
-                NetworkEvent::Subscribed { peer_id, topic } => {
-                    if topic == self.broadcast_topic.hash() {
-                        self.validators.insert(peer_id);
-
-                        info!(
-                            "🔗 Peer {} subscribed to broadcast topic. Validator set size: {}",
-                            node.network_handle.peer_name(&peer_id),
-                            self.validators.len()
-                        );
-
-                        if self.current_round == 0 {
-                            self.start_new_round(node)?;
-                        }
-                    }
-                }
-                NetworkEvent::GossipsubMessage(message) => {
-                    if let Some(peer) = message.source {
-                        let broadcast = BroadcastMessage::decode(&message.data).map_err(|e| {
-                            NodeError::Error(format!("Failed to decode broadcast message: {e}"))
+                if let Some(response_channel) = response_channel {
+                    response_channel
+                        .send(SelfResponse::TriggerConsensusRoundResponse {
+                            success: true,
+                            message: if force_round {
+                                "Forced consensus round triggered".to_string()
+                            } else {
+                                "Consensus round triggered".to_string()
+                            },
+                            round_number: u64::from(round_number),
+                        })
+                        .map_err(|e| {
+                            NodeError::Error(format!("Failed to send response: {e}"))
                         })?;
+                }
+            }
+            NetworkEvent::Subscribed { peer_id, topic } => {
+                if topic == self.broadcast_topic.hash() {
+                    self.validators.insert(peer_id);
 
-                        match broadcast {
-                            BroadcastMessage::Consensus(consensus_message) => {
-                                match consensus_message {
-                                    ConsensusMessage::LeaderAnnouncement(announcement) => {
-                                        self.handle_leader_announcement(node, &announcement)?;
-                                    }
-                                    ConsensusMessage::NewRound(round) => {
-                                        self.handle_new_round(node, peer, round)?;
-                                    }
-                                    ConsensusMessage::Vote(vote) => {
-                                        self.handle_vote(node, peer, &vote).await;
-                                    }
-                                }
-                            }
-                            BroadcastMessage::Block(raw_block) => {
-                                match Block::deserialize(&raw_block) {
-                                    Ok(block) => {
-                                        info!(
-                                            "📥 Received block proposal for round {} from {} with {} txs",
-                                            self.current_round,
-                                            peer,
-                                            block.body.transactions.len()
-                                        );
-                                        let Ok(ChainResponse::GetProposedBlock {
-                                            block: local_block,
-                                        }) = node
-                                            .chain_interface_tx
-                                            .send_message_with_response(
-                                                ChainMessage::GetProposedBlock {
-                                                    previous_block: None,
-                                                    proposer: self.proposer.unwrap().to_bytes(),
-                                                },
-                                            )
-                                            .await
-                                        else {
-                                            return Err(NodeError::Error(
-                                                "Failed to get proposed block".to_string(),
-                                            ));
-                                        };
+                    info!(
+                        "🔗 Peer {} subscribed to broadcast topic. Validator set size: {}",
+                        node.network_handle.peer_name(&peer_id),
+                        self.validators.len()
+                    );
 
-                                        if local_block == block {
-                                            info!("Block is valid. Sending prevote.");
-                                            self.send_vote(node, &block, VoteType::Prevote)?;
-                                        } else {
-                                            info!(
-                                                "Block is invalid. Not voting - transaction mismatch"
-                                            );
-                                            info!(
-                                                "Local txs: {:?}, Received txs: {:?}",
-                                                local_block.body.transactions,
-                                                block.body.transactions
-                                            );
-                                        }
-                                    }
-                                    Err(e) => warn!("Failed to deserialize block: {e}"),
-                                }
-                            }
-                            _ => {}
-                        }
+                    if self.current_round == 0 {
+                        self.start_new_round(node)?;
                     }
                 }
-                _ => {}
             }
+            NetworkEvent::GossipsubMessage(message) => {
+                if let Some(peer) = message.source {
+                    let broadcast = BroadcastMessage::decode(&message.data).map_err(|e| {
+                        NodeError::Error(format!("Failed to decode broadcast message: {e}"))
+                    })?;
+
+                    match broadcast {
+                        BroadcastMessage::Consensus(consensus_message) => {
+                            match consensus_message {
+                                ConsensusMessage::LeaderAnnouncement(announcement) => {
+                                    self.handle_leader_announcement(node, &announcement)?;
+                                }
+                                ConsensusMessage::NewRound(round) => {
+                                    self.handle_new_round(node, peer, round)?;
+                                }
+                                ConsensusMessage::Vote(vote) => {
+                                    self.handle_vote(node, peer, &vote).await;
+                                }
+                            }
+                        }
+                        BroadcastMessage::Block(raw_block) => {
+                            match Block::deserialize(&raw_block) {
+                                Ok(block) => {
+                                    info!(
+                                        "📥 Received block proposal for round {} from {} with {} txs",
+                                        self.current_round,
+                                        peer,
+                                        block.body.transactions.len()
+                                    );
+                                    let Ok(ChainResponse::GetProposedBlock {
+                                        block: local_block,
+                                    }) = node
+                                        .chain_interface_tx
+                                        .send_message_with_response(
+                                            ChainMessage::GetProposedBlock {
+                                                previous_block: None,
+                                                proposer: self.proposer.unwrap().to_bytes(),
+                                            },
+                                        )
+                                        .await
+                                    else {
+                                        return Err(NodeError::Error(
+                                            "Failed to get proposed block".to_string(),
+                                        ));
+                                    };
+
+                                    if local_block == block {
+                                        info!("Block is valid. Sending prevote.");
+                                        self.send_vote(node, &block, VoteType::Prevote)?;
+                                    } else {
+                                        info!(
+                                            "Block is invalid. Not voting - transaction mismatch"
+                                        );
+                                        info!(
+                                            "Local txs: {:?}, Received txs: {:?}",
+                                            local_block.body.transactions,
+                                            block.body.transactions
+                                        );
+                                    }
+                                }
+                                Err(e) => warn!("Failed to deserialize block: {e}"),
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
         }
         Ok(())
     }

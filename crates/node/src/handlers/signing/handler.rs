@@ -9,16 +9,16 @@ impl<N: Network, W: Wallet> Handler<N, W> for SigningState {
     async fn handle(
         &mut self,
         node: &mut NodeState<N, W>,
-        message: Option<NetworkEvent>,
+        message: NetworkEvent,
     ) -> Result<(), NodeError> {
         match message {
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request: SelfRequest::StartSigningSession { hex_message },
                 ..
-            }) => {
+            } => {
                 let _ = self.start_signing_session(node, &hex_message)?;
             }
-            Some(NetworkEvent::SelfRequest {
+            NetworkEvent::SelfRequest {
                 request:
                     SelfRequest::Spend {
                         amount_sat,
@@ -27,7 +27,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for SigningState {
                         user_pubkey,
                     },
                 response_channel,
-            }) => {
+            } => {
                 let response = self.start_spend_request(
                     node,
                     amount_sat,
@@ -44,28 +44,28 @@ impl<N: Network, W: Wallet> Handler<N, W> for SigningState {
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
                 }
             }
-            Some(NetworkEvent::MessageEvent((
+            NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::SignRequest { sign_id, message },
-            ))) => self.handle_sign_request(node, peer, sign_id, message)?,
-            Some(NetworkEvent::MessageEvent((
+            )) => self.handle_sign_request(node, peer, sign_id, message)?,
+            NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::SignPackage { sign_id, package },
-            ))) => self.handle_sign_package(node, peer, sign_id, &package)?,
-            Some(NetworkEvent::MessageEvent((
+            )) => self.handle_sign_package(node, peer, sign_id, &package)?,
+            NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::Commitments {
                     sign_id,
                     commitments,
                 },
-            ))) => self.handle_commitments_response(node, peer, sign_id, &commitments)?,
-            Some(NetworkEvent::MessageEvent((
+            )) => self.handle_commitments_response(node, peer, sign_id, &commitments)?,
+            NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::SignatureShare {
                     sign_id,
                     signature_share,
                 },
-            ))) => {
+            )) => {
                 self.handle_signature_share(node, peer, sign_id, &signature_share)
                     .await?;
             }

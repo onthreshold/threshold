@@ -9,7 +9,7 @@ impl<N: Network + 'static, W: Wallet + 'static> NodeState<N, W> {
     pub async fn try_poll(&mut self) -> Result<bool, NodeError> {
         let send_message = self.network_events_stream.try_recv().ok();
         if let Some(event) = send_message {
-            self.handle(Some(event)).await?;
+            self.handle_message(event).await?;
             Ok(true)
         } else {
             Ok(false)
@@ -17,8 +17,10 @@ impl<N: Network + 'static, W: Wallet + 'static> NodeState<N, W> {
     }
 
     pub async fn poll(&mut self) -> Result<(), NodeError> {
-        let send_message = self.network_events_stream.recv().await.ok();
-        self.handle(send_message).await
+        if let Ok(event) = self.network_events_stream.recv().await {
+            self.handle_message(event).await?;
+        }
+        Ok(())
     }
 
     pub async fn start(&mut self) {
@@ -30,7 +32,7 @@ impl<N: Network + 'static, W: Wallet + 'static> NodeState<N, W> {
         loop {
             tokio::select! {
                 _ = round_time.tick() => {
-                    if let Err(e) = self.handle(Some(NetworkEvent::SelfRequest { request: SelfRequest::Tick, response_channel: None })).await {
+                    if let Err(e) = self.handle_message(NetworkEvent::SelfRequest { request: SelfRequest::Tick, response_channel: None }).await {
                         error!("Error handling round tick: {}", e);
                     }
                 }
@@ -43,17 +45,17 @@ impl<N: Network + 'static, W: Wallet + 'static> NodeState<N, W> {
         }
     }
 
-    pub async fn handle(&mut self, send_message: Option<NetworkEvent>) -> Result<(), NodeError> {
+    pub async fn handle_message(&mut self, message: NetworkEvent) -> Result<(), NodeError> {
         let mut handlers = std::mem::take(&mut self.handlers);
 
         for handler in &mut handlers {
-            handler.handle(self, send_message.clone()).await?;
+            handler.handle(self, message.clone()).await?;
         }
 
         self.handlers = handlers;
-        if let Some(NetworkEvent::PeersConnected(list)) = send_message {
+        if let NetworkEvent::PeersConnected(list) = &message {
             for (peer_id, _multiaddr) in list {
-                self.peers.insert(peer_id);
+                self.peers.insert(*peer_id);
             }
         }
         Ok(())

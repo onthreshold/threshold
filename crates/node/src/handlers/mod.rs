@@ -17,7 +17,7 @@ pub trait Handler<N: Network, W: Wallet>: Send + Any {
     async fn handle(
         &mut self,
         node: &mut NodeState<N, W>,
-        message: Option<NetworkEvent>,
+        message: NetworkEvent,
     ) -> Result<(), NodeError>;
 }
 

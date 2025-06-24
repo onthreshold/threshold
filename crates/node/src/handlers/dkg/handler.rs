@@ -11,15 +11,15 @@ impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
     async fn handle(
         &mut self,
         node: &mut NodeState<N, W>,
-        message: Option<NetworkEvent>,
+        message: NetworkEvent,
     ) -> Result<(), types::errors::NodeError> {
         match message {
-            Some(NetworkEvent::Subscribed { peer_id, .. }) => {
+            NetworkEvent::Subscribed { peer_id, .. } => {
                 self.dkg_listeners.insert(peer_id);
                 self.round1_listeners.insert(peer_id);
                 self.handle_dkg_start(node)?;
             }
-            Some(NetworkEvent::GossipsubMessage(message)) => {
+            NetworkEvent::GossipsubMessage(message) => {
                 if let Ok(BroadcastMessage::Dkg(gossip_msg)) =
                     BroadcastMessage::decode(&message.data)
                 {
@@ -38,7 +38,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
                     }
                 }
             }
-            Some(NetworkEvent::MessageEvent((peer, DirectMessage::Round2Package(package)))) => {
+            NetworkEvent::MessageEvent((peer, DirectMessage::Round2Package(package))) => {
                 self.handle_round2_payload(node, peer, package).await?;
             }
             _ => {}
