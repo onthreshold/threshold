@@ -1,24 +1,25 @@
 [package]
 name = "grpc"
 description = "gRPC communication for the Threshold network"
-version = "0.1.0"
-edition = "2024"
-repository = "https://github.com/onthreshold/threshold/"
-license = "MIT"
-keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
-categories = ["cryptography", "blockchain"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
 
 [lib]
 name = "grpc"
 path = "src/lib.rs"
 
 [dependencies]
-futures = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-tonic = { workspace = true }
+futures.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+metrics.workspace = true
+
 types = { path = "../types" }
-tracing = { workspace = true }
-metrics = "0.24"
 
 [lints]
 workspace = true

@@ -517,6 +517,9 @@ pub async fn create_node_network(
         bitcoin::network::Network::Testnet,
     );
 
+    // Create a mock consensus interface for testing
+    let (consensus_interface_tx, _) = messenger::channel(100, Some(100));
+
     let nodes_state = NodeState::new_from_config(
         &network,
         node_config,
@@ -525,6 +528,7 @@ pub async fn create_node_network(
         Box::new(oracle),
         wallet,
         chain_interface_tx,
+        consensus_interface_tx,
     )
     .await?;
 

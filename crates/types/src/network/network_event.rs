@@ -6,6 +6,7 @@ use libp2p::{
 };
 use tokio::sync::mpsc;
 
+use crate::broadcast::BroadcastMessage;
 use crate::intents::{DepositIntent, WithdrawlIntent};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -30,6 +31,9 @@ pub enum NetworkEvent {
     MessageEvent((PeerId, DirectMessage)),
     PeersConnected(Vec<(PeerId, Multiaddr)>),
     PeersDisconnected(Vec<(PeerId, Multiaddr)>),
+    SendBroadcast {
+        message: BroadcastMessage,
+    },
     Unknown,
 }
 

@@ -1,24 +1,25 @@
 [package]
 name = "protocol"
 description = "Protocol for the Threshold network"
-version = "0.1.0"
-edition = "2024"
-repository = "https://github.com/onthreshold/threshold/"
-license = "MIT"
-keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
-categories = ["cryptography", "blockchain"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
 
 [dependencies]
-serde = { workspace = true }
-bincode = { workspace = true }
-sha2 = { workspace = true }
-bitcoin = { workspace = true }
-futures = { workspace = true }
-tokio = { workspace = true }
-async-trait = { workspace = true }
-esplora-client = { workspace = true }
+serde.workspace = true
+bincode.workspace = true
+sha2.workspace = true
+bitcoin.workspace = true
+futures.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+esplora-client.workspace = true
+hex.workspace = true
+
 types = { path = "../types" }
-hex = { workspace = true }
 oracle = { path = "../oracle" }
 
 [lints]

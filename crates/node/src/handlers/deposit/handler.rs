@@ -84,10 +84,6 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                 request: SelfRequest::ConfirmDeposit { confirmed_tx },
                 ..
             } => {
-                info!(
-                    "🔔 Deposit handler received ConfirmDeposit event for tx: {}",
-                    confirmed_tx.compute_txid()
-                );
                 if let Err(e) = self.update_user_balance(node, &confirmed_tx).await {
                     info!("❌ Failed to update user balance: {}", e);
                 } else {
@@ -109,7 +105,10 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                         bincode::config::standard(),
                     ) {
                         Ok((transaction, _)) => {
-                            info!("📨 Received broadcasted transaction: {:?}", transaction);
+                            info!(
+                                "📨 Received broadcasted transaction: {}",
+                                hex::encode(transaction.id())
+                            );
 
                             if let Err(e) = node
                                 .chain_interface_tx

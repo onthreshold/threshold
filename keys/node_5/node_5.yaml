@@ -1,14 +1,14 @@
 allowed_peers:
   - name: node_1
-    public_key: 12D3KooWJGkA7JCgXvCivQZaGESnThF4ugzm7Jf2H9tBqj4HwcDJ
+    public_key: 12D3KooWLcQzxnFPbw2RLeY4hWyV1ywhZ8fPRaLrRChGnno4awDN
   - name: node_2
-    public_key: 12D3KooWSj3SmzS1RUBx2tVg4kEQAqsGSAzwG3EEu9UuX8rLbDMb
+    public_key: 12D3KooWLzCeKDmYH98cpENF4CmNyNJ4PS9NWgvKQj5qyGTN8EVD
   - name: node_3
-    public_key: 12D3KooWA1StPpgLW1DUV7WisrMJE6Sj6VHCbfD1HEnrD9Hhjaf7
+    public_key: 12D3KooWKrJT5uxJoXPUXy6JFewk9Duffvpg1MtCXgw3yyT2PbT8
   - name: node_4
-    public_key: 12D3KooWPhe3ki2bPr1y7dTyELfMnEL8vNpJrACX1NwSNRUikqyC
-log_file_path: /home/vidyootsenthil/.config/thevault/node.log
-key_file_path: keys/node_5/node_5.json
+    public_key: 12D3KooWDoQciejAoCSzA3GjUekJdhsuY9E2RqnbHWhVoAmNFL7n
+log_file_path: /home/denssumesh/.config/thevault/node.log
+key_file_path: visuals/nodes/node_5/node_5.json
 database_directory: nodedb.db
 grpc_port: 50051
 libp2p_udp_port: 0
