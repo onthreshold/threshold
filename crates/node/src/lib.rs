@@ -21,6 +21,7 @@ pub use config::{ConfigStore, KeyStore, NodeConfig, NodeConfigBuilder};
 pub mod config;
 pub mod handlers;
 pub mod main_loop;
+pub mod timer_adapter;
 pub mod start_node;
 
 pub mod utils;
@@ -47,6 +48,8 @@ pub struct NodeState<N: Network, W: Wallet> {
     pub wallet: W,
     pub config: NodeConfig,
     pub network_handle: N,
+
+    pub network_events_sender: broadcast::Sender<NetworkEvent>,
     pub network_events_stream: broadcast::Receiver<NetworkEvent>,
 
     pub oracle: Box<dyn Oracle>,
@@ -101,6 +104,7 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
 
         let mut node_state = Self {
             network_handle: network_handle.clone(),
+            network_events_sender: network_events_sender.clone(),
             network_events_stream: network_events_sender.subscribe(),
             peer_id: network_handle.peer_id(),
             peers: HashSet::new(),

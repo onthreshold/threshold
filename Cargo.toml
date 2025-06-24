@@ -6,7 +6,7 @@ members = [
     "crates/node",
     "crates/protocol",
     "crates/types",
-    "crates/oracle", "crates/abci", "messenger", "crates/grpc",
+    "crates/oracle", "crates/abci", "messenger", "crates/grpc", "crates/consensus_timer",
 ]
 resolver = "2"
 

@@ -53,6 +53,7 @@ directories = "6.0.0"
 async-trait = { workspace = true }
 protocol = { path = "../protocol" }
 types = { path = "../types" }
+round_timer = { path = "../round_timer" }
 serde_yaml = "0.9.34"
 oracle = { path = "../oracle" }
 dotenvy = { workspace = true }

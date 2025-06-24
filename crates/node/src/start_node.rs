@@ -16,6 +16,7 @@ use tokio::{signal, sync::broadcast};
 use tonic::transport::Server;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use crate::timer_adapter::RoundTimerControl;
 
 type PrometheusHandler = Arc<PrometheusHandle>;
 
@@ -223,6 +224,8 @@ pub async fn start_node(
             .expect("gRPC server failed");
     });
 
+    let round_timer_handle = node_state.launch_round_timer(std::time::Duration::from_millis(100));
+
     let main_loop_handle = tokio::spawn(async move { node_state.start().await });
 
     let deposit_monitor_handle = tokio::spawn(async move {
@@ -272,6 +275,9 @@ pub async fn start_node(
         }
         _ = main_loop_handle => {
             tracing::info!("Main loop stopped");
+        }
+        _ = round_timer_handle => {
+            tracing::info!("Round timer stopped");
         }
         result = deposit_monitor_handle => {
             match result {
