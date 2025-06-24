@@ -43,14 +43,22 @@ macro_rules! dkg_start_metrics {
 
 #[macro_export]
 macro_rules! dkg_round1_package_metrics {
-    ($peer_from:expr) => {{
-        metrics::counter!("dkg_round1_packages_received", "peer_from" => $peer_from.to_string()).increment(1);
+    ($peer_from:expr, $peer_to:expr) => {{
+        metrics::counter!("dkg_round1_packages_received",
+            "source" => $peer_from.to_string(),
+            "target" => $peer_to.to_string()
+        )
+        .increment(1);
     }};
 }
 
 #[macro_export]
 macro_rules! dkg_round2_package_metrics {
-    ($peer_from:expr) => {{
-        metrics::counter!("dkg_round2_packages_received", "peer_from" => $peer_from.to_string()).increment(1);
+    ($peer_from:expr, $peer_to:expr) => {{
+        metrics::counter!("dkg_round2_packages_received",
+            "source" => $peer_from.to_string(),
+            "target" => $peer_to.to_string()
+        )
+        .increment(1);
     }};
 }
