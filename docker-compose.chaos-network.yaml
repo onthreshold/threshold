@@ -1,0 +1,47 @@
+services:
+  node1:
+    cap_add:
+      - NET_ADMIN
+    entrypoint: >
+      /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends iproute2 iptables && \
+      modprobe sch_netem 2>/dev/null || true && \
+      tc qdisc add dev eth0 root netem delay 200ms loss 10% 2>/dev/null || echo 'tc netem not available, continuing...' && \
+      exec /app/cli run --key-file-path /app/configs/node_1.json --config-file-path /app/configs/node_1.yaml --use-mock-oracle"
+
+  node2:
+    cap_add:
+      - NET_ADMIN
+    entrypoint: >
+      /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends iproute2 iptables && \
+      modprobe sch_netem 2>/dev/null || true && \
+      tc qdisc add dev eth0 root netem delay 200ms loss 10% 2>/dev/null || echo 'tc netem not available, continuing...' && \
+      exec /app/cli run --key-file-path /app/configs/node_2.json --config-file-path /app/configs/node_2.yaml --use-mock-oracle"
+
+  node3:
+    cap_add:
+      - NET_ADMIN
+    entrypoint: >
+      /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends iproute2 iptables && \
+      modprobe sch_netem 2>/dev/null || true && \
+      tc qdisc add dev eth0 root netem delay 200ms loss 10% 2>/dev/null || echo 'tc netem not available, continuing...' && \
+      iptables -A OUTPUT -d node4 -j DROP && \
+      exec /app/cli run --key-file-path /app/configs/node_3.json --config-file-path /app/configs/node_3.yaml --use-mock-oracle"
+
+  node4:
+    cap_add:
+      - NET_ADMIN
+    entrypoint: >
+      /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends iproute2 iptables && \
+      modprobe sch_netem 2>/dev/null || true && \
+      tc qdisc add dev eth0 root netem delay 200ms loss 10% 2>/dev/null || echo 'tc netem not available, continuing...' && \
+      iptables -A OUTPUT -d node3 -j DROP && \
+      exec /app/cli run --key-file-path /app/configs/node_4.json --config-file-path /app/configs/node_4.yaml --use-mock-oracle"
+
+  node5:
+    cap_add:
+      - NET_ADMIN
+    entrypoint: >
+      /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends iproute2 iptables && \
+      modprobe sch_netem 2>/dev/null || true && \
+      tc qdisc add dev eth0 root netem delay 200ms loss 10% 2>/dev/null || echo 'tc netem not available, continuing...' && \
+      exec /app/cli run --key-file-path /app/configs/node_5.json --config-file-path /app/configs/node_5.yaml --use-mock-oracle"
