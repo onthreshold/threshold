@@ -6,8 +6,47 @@ on:
     branches: [main]
 
 jobs:
+  build:
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Set up Rust toolchain
+        run: |
+          rustup update 1.87
+          rustup default 1.87
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+
+      - name: Build Docker image
+        run: |
+          docker build -t thevalut-node:test .
+
+      - name: Save Docker image
+        run: |
+          docker save thevalut-node:test | gzip > thevalut-node-test.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: thevalut-node-test-image
+          path: thevalut-node-test.tar.gz
+          retention-days: 1
+
   dkg_test-12:
     runs-on: blacksmith-16vcpu-ubuntu-2204
+    needs: build
     env:
       MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
       MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
@@ -29,6 +68,16 @@ jobs:
         run: |
           rustup update 1.87
           rustup default 1.87
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: thevalut-node-test-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          gunzip -c thevalut-node-test.tar.gz | docker load
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
@@ -65,6 +114,7 @@ jobs:
 
   dkg_test_5:
     runs-on: blacksmith-16vcpu-ubuntu-2204
+    needs: build
     env:
       MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
       MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
@@ -87,6 +137,16 @@ jobs:
           rustup update 1.87
           rustup default 1.87
 
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: thevalut-node-test-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          gunzip -c thevalut-node-test.tar.gz | docker load
+
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
 
@@ -95,7 +155,7 @@ jobs:
 
       - name: Start 5-node stack (docker-compose)
         run: |
-          docker compose -f docker-compose.yaml up -d --build
+          docker compose -f docker-compose.yaml up -d
 
       - name: Wait for gRPC endpoint
         run: |
@@ -114,6 +174,7 @@ jobs:
 
   end-to-end-deposit-withdrawl:
     runs-on: blacksmith-16vcpu-ubuntu-2204
+    needs: build
     env:
       MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
       MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
@@ -136,14 +197,25 @@ jobs:
           rustup update 1.87
           rustup default 1.87
 
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: thevalut-node-test-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          gunzip -c thevalut-node-test.tar.gz | docker load
+
+      - name: Clean cargo
+        run: cargo clean
+
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
 
-      - run: cargo clean
-
       - name: Start 5-node stack (docker-compose)
         run: |
-          docker compose -f docker-compose.yaml up -d --build
+          docker compose -f docker-compose.yaml up -d
 
       - name: Wait for gRPC endpoint
         run: |
@@ -167,6 +239,7 @@ jobs:
 
   dkg_test_chaos_network:
     runs-on: blacksmith-16vcpu-ubuntu-2204
+    needs: build
     env:
       MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
       MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
@@ -189,15 +262,25 @@ jobs:
           rustup update 1.87
           rustup default 1.87
 
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: thevalut-node-test-image
+          path: .
+
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+
+      - name: Load Docker image
+        run: |
+          gunzip -c thevalut-node-test.tar.gz | docker load
 
       - name: Create NodeCluster (3 nodes)
         run: ./scripts/clear_dkg_keys.sh
 
       - name: Start 5-node stack with network chaos
         run: |
-          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml up -d --build
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml up -d
 
       - name: Wait for gRPC endpoint
         run: |
@@ -221,6 +304,7 @@ jobs:
 
   dkg_test_chaos_nodes:
     runs-on: blacksmith-16vcpu-ubuntu-2204
+    needs: build
     env:
       MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
       MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
@@ -243,15 +327,25 @@ jobs:
           rustup update 1.87
           rustup default 1.87
 
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: thevalut-node-test-image
+          path: .
+
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+
+      - name: Load Docker image
+        run: |
+          gunzip -c thevalut-node-test.tar.gz | docker load
 
       - name: Create NodeCluster (3 nodes)
         run: ./scripts/clear_dkg_keys.sh
 
       - name: Start 5-node stack with node chaos
         run: |
-          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml up -d --build
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml up -d
 
       - name: Wait for gRPC endpoint
         run: |
@@ -275,6 +369,7 @@ jobs:
 
   end-to-end-deposit-withdrawl-chaos-network:
     runs-on: blacksmith-16vcpu-ubuntu-2204
+    needs: build
     env:
       MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
       MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
@@ -297,14 +392,25 @@ jobs:
           rustup update 1.87
           rustup default 1.87
 
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: thevalut-node-test-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          gunzip -c thevalut-node-test.tar.gz | docker load
+
+      - name: Clean cargo
+        run: cargo clean
+
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
 
-      - run: cargo clean
-
       - name: Start 5-node stack with network chaos
         run: |
-          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml up -d --build
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml up -d
 
       - name: Wait for gRPC endpoint
         run: |
@@ -328,6 +434,7 @@ jobs:
 
   end-to-end-deposit-withdrawl-chaos-nodes:
     runs-on: blacksmith-16vcpu-ubuntu-2204
+    needs: build
     env:
       MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
       MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
@@ -350,14 +457,25 @@ jobs:
           rustup update 1.87
           rustup default 1.87
 
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: thevalut-node-test-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          gunzip -c thevalut-node-test.tar.gz | docker load
+
+      - name: Clean cargo
+        run: cargo clean
+
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
 
-      - run: cargo clean
-
       - name: Start 5-node stack with node chaos
         run: |
-          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml up -d --build
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml up -d
 
       - name: Wait for gRPC endpoint
         run: |
