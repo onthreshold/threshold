@@ -60,12 +60,13 @@ impl ProtoEncode for ConsensusMessage {
                     VoteType::Precommit => p2p_proto::VoteType::Precommit as i32,
                 },
             }),
-            Self::BlockProposal { proposer, raw_block } => {
-                p2p_proto::consensus_message::Message::BlockProposal(p2p_proto::BlockProposal {
-                    proposer: proposer.clone(),
-                    raw_block: raw_block.clone(),
-                })
-            }
+            Self::BlockProposal {
+                proposer,
+                raw_block,
+            } => p2p_proto::consensus_message::Message::BlockProposal(p2p_proto::BlockProposal {
+                proposer: proposer.clone(),
+                raw_block: raw_block.clone(),
+            }),
         };
 
         let consensus_msg = p2p_proto::ConsensusMessage {
