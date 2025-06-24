@@ -44,14 +44,12 @@ impl<N: Network, W: Wallet> Handler<N, W> for SigningState {
                         .map_err(|e| NodeError::Error(format!("Failed to send response: {e}")))?;
                 }
             }
-            NetworkEvent::MessageEvent((
-                peer,
-                DirectMessage::SignRequest { sign_id, message },
-            )) => self.handle_sign_request(node, peer, sign_id, message)?,
-            NetworkEvent::MessageEvent((
-                peer,
-                DirectMessage::SignPackage { sign_id, package },
-            )) => self.handle_sign_package(node, peer, sign_id, &package)?,
+            NetworkEvent::MessageEvent((peer, DirectMessage::SignRequest { sign_id, message })) => {
+                self.handle_sign_request(node, peer, sign_id, message)?;
+            }
+            NetworkEvent::MessageEvent((peer, DirectMessage::SignPackage { sign_id, package })) => {
+                self.handle_sign_package(node, peer, sign_id, &package)?;
+            }
             NetworkEvent::MessageEvent((
                 peer,
                 DirectMessage::Commitments {
