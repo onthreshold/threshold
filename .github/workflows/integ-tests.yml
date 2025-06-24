@@ -18,9 +18,6 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: useblacksmith/cache@v5
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -75,9 +72,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v5
 
       - name: Cache Rust dependencies
         uses: useblacksmith/cache@v5
@@ -170,3 +164,217 @@ jobs:
         run: |
           docker compose -f docker-compose.yaml logs --no-color || true
           docker compose -f docker-compose.yaml down --volumes --remove-orphans || true
+
+  dkg_test_chaos_network:
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    env:
+      MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
+      MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
+      IS_TESTNET: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Set up Rust toolchain
+        run: |
+          rustup update 1.87
+          rustup default 1.87
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+
+      - name: Create NodeCluster (3 nodes)
+        run: ./scripts/clear_dkg_keys.sh
+
+      - name: Start 5-node stack with network chaos
+        run: |
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml up -d --build
+
+      - name: Wait for gRPC endpoint
+        run: |
+          echo "Waiting for node to expose port 50051..."
+          for i in {1..30}; do
+            if nc -z localhost 50051; then
+              echo "Port 50051 is open."
+              break
+            fi
+            echo "Port not ready yet – retry #$i"
+            sleep 5
+          done
+
+      - name: Run end-to-end integration tests with network chaos
+        run: cargo run --bin integration-tests check-dkg --port-range 50051-50055
+
+      - name: Shutdown stack & print logs
+        run: |
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml logs --no-color || true
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml down --volumes --remove-orphans || true
+
+  dkg_test_chaos_nodes:
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    env:
+      MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
+      MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
+      IS_TESTNET: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Set up Rust toolchain
+        run: |
+          rustup update 1.87
+          rustup default 1.87
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+
+      - name: Create NodeCluster (3 nodes)
+        run: ./scripts/clear_dkg_keys.sh
+
+      - name: Start 5-node stack with node chaos
+        run: |
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml up -d --build
+
+      - name: Wait for gRPC endpoint
+        run: |
+          echo "Waiting for node to expose port 50051..."
+          for i in {1..30}; do
+            if nc -z localhost 50051; then
+              echo "Port 50051 is open."
+              break
+            fi
+            echo "Port not ready yet – retry #$i"
+            sleep 5
+          done
+
+      - name: Run end-to-end integration tests with node chaos
+        run: cargo run --bin integration-tests check-dkg --port-range 50051-50055
+
+      - name: Shutdown stack & print logs
+        run: |
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml logs --no-color || true
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml down --volumes --remove-orphans || true
+
+  end-to-end-deposit-withdrawl-chaos-network:
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    env:
+      MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
+      MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
+      IS_TESTNET: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Set up Rust toolchain
+        run: |
+          rustup update 1.87
+          rustup default 1.87
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+
+      - run: cargo clean
+
+      - name: Start 5-node stack with network chaos
+        run: |
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml up -d --build
+
+      - name: Wait for gRPC endpoint
+        run: |
+          echo "Waiting for node to expose port 50051..."
+          for i in {1..30}; do
+            if nc -z localhost 50051; then
+              echo "Port 50051 is open."
+              break
+            fi
+            echo "Port not ready yet – retry #$i"
+            sleep 5
+          done
+
+      - name: Run end-to-end integration tests with network chaos
+        run: cargo run --bin integration-tests test
+
+      - name: Shutdown stack & print logs
+        run: |
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml logs --no-color || true
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml down --volumes --remove-orphans || true
+
+  end-to-end-deposit-withdrawl-chaos-nodes:
+    runs-on: blacksmith-16vcpu-ubuntu-2204
+    env:
+      MNEMONIC: ${{ secrets.TEST_MNEMONIC }}
+      MNEMONIC_TO: ${{ secrets.TEST_MNEMONIC_TO }}
+      IS_TESTNET: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Set up Rust toolchain
+        run: |
+          rustup update 1.87
+          rustup default 1.87
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
+
+      - run: cargo clean
+
+      - name: Start 5-node stack with node chaos
+        run: |
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml up -d --build
+
+      - name: Wait for gRPC endpoint
+        run: |
+          echo "Waiting for node to expose port 50051..."
+          for i in {1..30}; do
+            if nc -z localhost 50051; then
+              echo "Port 50051 is open."
+              break
+            fi
+            echo "Port not ready yet – retry #$i"
+            sleep 5
+          done
+
+      - name: Run end-to-end integration tests with node chaos
+        run: cargo run --bin integration-tests test
+
+      - name: Shutdown stack & print logs
+        run: |
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml logs --no-color || true
+          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml down --volumes --remove-orphans || true
