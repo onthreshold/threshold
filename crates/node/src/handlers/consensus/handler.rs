@@ -15,6 +15,7 @@ use types::errors::NodeError;
 use types::network::network_protocol::Network;
 use types::{
     consensus::VoteType,
+    current_round_metrics,
     network::network_event::{NetworkEvent, SelfRequest, SelfResponse},
     proto::ProtoDecode,
 };
@@ -212,6 +213,8 @@ impl ConsensusState {
         }
 
         self.current_round = round - 1;
+        current_round_metrics!(self.current_round, node.network_handle.peer_name(&node.peer_id));
+
         self.start_new_round(node)
     }
 
@@ -220,6 +223,8 @@ impl ConsensusState {
         node: &NodeState<N, W>,
     ) -> Result<(), NodeError> {
         self.current_round += 1;
+
+        current_round_metrics!(self.current_round, node.network_handle.peer_name(&node.peer_id));
 
         if let Some(new_leader) = self.select_leader(self.current_round) {
             self.proposer = Some(new_leader);
@@ -265,6 +270,8 @@ impl ConsensusState {
 
         if announcement.round >= self.current_round {
             self.current_round = announcement.round;
+            current_round_metrics!(self.current_round, node.network_handle.peer_name(&node.peer_id));
+
             self.proposer = Some(leader);
             self.is_leader = leader == node.peer_id;
             self.current_state = ConsensusPhase::WaitingForPropose;
