@@ -33,7 +33,8 @@ impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
                                 }
                                 Some(DkgInner::Round1Package(_)) => {
                                     dkg_round1_package_metrics!(
-                                        node.network_handle.peer_name(&source_peer)
+                                        node.network_handle.peer_name(&source_peer),
+                                        node.network_handle.peer_name(&node.peer_id)
                                     );
                                     self.handle_round1_payload(node, source_peer, inner_dkg)?;
                                 }
@@ -44,7 +45,10 @@ impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
                 }
             }
             NetworkEvent::MessageEvent((peer, DirectMessage::Round2Package(package))) => {
-                dkg_round2_package_metrics!(node.network_handle.peer_name(&peer));
+                dkg_round2_package_metrics!(
+                    node.network_handle.peer_name(&peer),
+                    node.network_handle.peer_name(&node.peer_id)
+                );
                 self.handle_round2_payload(node, peer, package).await?;
             }
             _ => {}
