@@ -32,13 +32,14 @@ use tokio::{
 
 use crate::PeerData;
 use types::{
+    broadcast_received_metrics, broadcast_sent_metrics,
     errors::{NetworkError, NodeError},
     network::network_protocol::{NetworkHandle, NetworkMessage, NetworkResponseFuture},
     proto::p2p_proto,
 };
 use types::{
     network::network_event::{DirectMessage, NetworkEvent, SelfRequest, SelfResponse},
-    proto::ProtoEncode,
+    proto::{ProtoDecode, ProtoEncode},
 };
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -85,6 +86,12 @@ impl Network for NetworkHandle {
         topic: gossipsub::IdentTopic,
         message: impl ProtoEncode,
     ) -> Result<(), NetworkError> {
+        if let Ok(broadcast_msg) = types::broadcast::BroadcastMessage::decode(
+            &message.encode().map_err(NetworkError::SendError)?,
+        ) {
+            broadcast_sent_metrics!(get_broadcast_message_type(&broadcast_msg));
+        }
+
         let network_message = NetworkMessage::SendBroadcast {
             topic,
             message: message.encode().map_err(NetworkError::SendError)?,
@@ -264,6 +271,9 @@ impl SwarmManager {
                             message,
                             ..
                         })) => {
+                            if let Ok(broadcast_msg) = types::broadcast::BroadcastMessage::decode(&message.data) {
+                                broadcast_received_metrics!(get_broadcast_message_type(&broadcast_msg));
+                            }
                             self.network_events.send(NetworkEvent::GossipsubMessage(message.clone())).unwrap();
                         },
                         SwarmEvent::Behaviour(MyBehaviourEvent::RequestResponse(Event::Message {
@@ -479,5 +489,17 @@ impl libp2p::request_response::Codec for ProtobufCodec {
     {
         // We don't use responses for direct messages
         Ok(())
+    }
+}
+
+const fn get_broadcast_message_type(
+    broadcast_msg: &types::broadcast::BroadcastMessage,
+) -> &'static str {
+    match broadcast_msg {
+        types::broadcast::BroadcastMessage::Consensus(_) => "consensus",
+        types::broadcast::BroadcastMessage::Block(_) => "block",
+        types::broadcast::BroadcastMessage::DepositIntent(_) => "deposit_intent",
+        types::broadcast::BroadcastMessage::PendingSpend(_) => "pending_spend",
+        types::broadcast::BroadcastMessage::Dkg(_) => "dkg",
     }
 }

@@ -1,8 +1,6 @@
 use tonic::{Request, Response, Status};
 use types::network::network_protocol::NetworkHandle;
 
-use crate::{grpc_operator, route_metrics};
-
 use types::proto::node_proto::{
     CheckBalanceRequest, CheckBalanceResponse, ConfirmWithdrawalRequest, ConfirmWithdrawalResponse,
     CreateDepositIntentRequest, CreateDepositIntentResponse, GetChainInfoRequest,
@@ -12,6 +10,10 @@ use types::proto::node_proto::{
     StartSigningResponse, TriggerConsensusRoundRequest, TriggerConsensusRoundResponse,
     node_control_server::{NodeControl, NodeControlServer},
 };
+
+use types::route_metrics;
+
+use crate::grpc_operator;
 
 pub struct NodeControlService {
     network: NetworkHandle,

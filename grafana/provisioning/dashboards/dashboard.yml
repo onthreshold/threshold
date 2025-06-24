@@ -8,4 +8,13 @@ providers:
     editable: true
     updateIntervalSeconds: 30
     options:
-      path: /etc/grafana/provisioning/dashboards/
+      path: /etc/grafana/provisioning/dashboards/grpc_dashboards/
+  - name: "Broadcast Dashboards"
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards/broadcast_dashboards/
