@@ -29,7 +29,7 @@ struct Cli {
 enum Commands {
     /// Run all integration tests
     Test {
-        #[arg(short, long, default_value_t = 1000)]
+        #[arg(short, long, default_value_t = 5000)]
         amount: u64,
         #[arg(short, long, default_value_t = false)]
         use_testnet: bool,

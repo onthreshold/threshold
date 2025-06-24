@@ -104,13 +104,18 @@ impl<N: Network, W: Wallet> Handler<N, W> for ConsensusState {
                                     })
                                     .await;
                             }
-                            ConsensusNetMessage::BlockProposal { proposer, raw_block } => {
+                            ConsensusNetMessage::BlockProposal {
+                                proposer,
+                                raw_block,
+                            } => {
                                 let _ = node
                                     .consensus_interface_tx
-                                    .send_message_with_response(ConsensusMessage::HandleBlockProposal {
-                                        sender: proposer,
-                                        raw_block,
-                                    })
+                                    .send_message_with_response(
+                                        ConsensusMessage::HandleBlockProposal {
+                                            sender: proposer,
+                                            raw_block,
+                                        },
+                                    )
                                     .await;
                             }
                         },
