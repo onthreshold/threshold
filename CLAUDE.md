@@ -74,14 +74,20 @@ docker-compose down
 docker build -t vault-node .
 
 # Multi-node DKG testing workflow
-# 1. Start n nodes using setup script
+# 1. Start n nodes using setup script (max 13 nodes for DKG to work)
 ./setup_nodes.sh <n>
 
 # 2. Run DKG integration test (note: port range is 50057 to 50057+n-1)
 cargo run --bin integration-tests check-dkg --port-range 50057-50063  # for 7 nodes
+cargo run --bin integration-tests check-dkg --port-range 50057-50069  # for 13 nodes (max working)
 
 # 3. Clean up containers
 docker ps -q | xargs docker stop
+
+# DKG Scalability Limits:
+# ✅ Works: 7-13 nodes
+# ❌ Shaky: 14+ nodes (DKG process doesn't complete)
+# Note: The limit appears to be around 13 nodes but should be 256
 ```
 
 ### Integration Testing

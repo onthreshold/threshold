@@ -175,7 +175,7 @@ impl SwarmManager {
     ) -> Result<(Self, NetworkHandle), NodeError> {
         let (send_commands, receiving_commands) = unbounded_channel::<NetworkMessage>();
 
-        let (network_events_emitter, _) = broadcast::channel::<NetworkEvent>(200);
+        let (network_events_emitter, _) = broadcast::channel::<NetworkEvent>(10000);
 
         let broadcast_topic = gossipsub::IdentTopic::new("broadcast");
         swarm
@@ -323,7 +323,7 @@ pub fn build_swarm(
             let mesh_high_env: usize = std::env::var("GOSSIPSUB_MESH_HIGH")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or_else(|| std::cmp::max(12, peer_data.len().saturating_sub(1)));
+                .unwrap_or_else(|| std::cmp::min(12, peer_data.len().saturating_sub(1)));
 
             let mesh_n_high = mesh_high_env.clamp(4, 512);
 
@@ -332,7 +332,7 @@ pub fn build_swarm(
 
             let gossipsub_config = gossipsub::ConfigBuilder::default()
                 .heartbeat_interval(Duration::from_secs(1))
-                .validation_mode(gossipsub::ValidationMode::Permissive)
+                .validation_mode(gossipsub::ValidationMode::Strict)
                 .message_id_fn(message_id_fn)
                 .mesh_n_low(mesh_n_low)
                 .mesh_n_high(mesh_n_high)

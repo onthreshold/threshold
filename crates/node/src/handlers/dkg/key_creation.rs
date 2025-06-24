@@ -54,11 +54,6 @@ impl DkgState {
             return Ok(());
         }
 
-        self.dkg_started = true;
-
-        // Run the DKG initialization code
-        let participant_identifier = peer_id_to_identifier(&node.peer_id);
-
         tracing::info!(
             "Starting DKG NOW. DKG Listeners: {}/{}, Round1 Listeners: {}/{}",
             self.dkg_listeners.len() + 1,
@@ -66,6 +61,23 @@ impl DkgState {
             self.round1_listeners.len() + 1,
             max_signers,
         );
+
+        self.start_dkg(node)?;
+
+        Ok(())
+    }
+
+    pub fn start_dkg<N: Network, W: Wallet>(
+        &mut self,
+        node: &mut NodeState<N, W>,
+    ) -> Result<(), NodeError> {
+        if self.dkg_started {
+            return Err(NodeError::Error("DKG already started".to_string()));
+        }
+        self.dkg_started = true;
+
+        // Run the DKG initialization code
+        let participant_identifier = peer_id_to_identifier(&node.peer_id);
 
         let (round1_secret_package, round1_package) = frost::keys::dkg::part1(
             participant_identifier,
@@ -193,6 +205,29 @@ impl DkgState {
             max_signers - 1
         );
 
+        if self.round1_peer_packages.len() < max_signers - 1 {
+            let waiting_for: Vec<String> = self
+                .dkg_listeners
+                .iter()
+                .filter(|peer_id| {
+                    let identifier = peer_id_to_identifier(peer_id);
+                    !self.round1_peer_packages.contains_key(&identifier)
+                })
+                .map(|peer_id| node.network_handle.peer_name(peer_id))
+                .collect();
+            tracing::info!("Still waiting for round1 packages from: {:?}", waiting_for);
+        }
+
+        if !self.dkg_started
+            && !self.round1_peer_packages.is_empty()
+            && node.private_key_package.is_none()
+            && node.pubkey_package.is_none()
+        {
+            // edge case, where a node doesn't notice all the peers joined the network
+            // override the listerners check and start DKG
+            self.start_dkg(node)?;
+        }
+
         self.try_enter_round2(node)?;
 
         Ok(())
@@ -308,14 +343,28 @@ impl DkgState {
                 - 1
         );
 
+        let max_signers = node
+            .config
+            .max_signers
+            .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
+            as usize;
+
+        let waiting_for: Vec<String> = self
+            .dkg_listeners
+            .iter()
+            .filter(|peer_id| {
+                let identifier = peer_id_to_identifier(peer_id);
+                !self.round2_peer_packages.contains_key(&identifier)
+            })
+            .map(|peer_id| node.network_handle.peer_name(peer_id))
+            .collect();
+
+        if self.round2_peer_packages.len() + 1 != max_signers {
+            tracing::info!("Still waiting for round1 packages from: {:?}", waiting_for);
+        }
+
         if let Some(r2_secret_package) = self.r2_secret_package.as_ref() {
-            if self.round2_peer_packages.len() + 1
-                == node
-                    .config
-                    .max_signers
-                    .ok_or_else(|| NodeError::Error("Max signers not set".to_string()))?
-                    as usize
-            {
+            if self.round2_peer_packages.len() + 1 == max_signers {
                 tracing::info!("Received all round2 packages, entering part3");
                 std::thread::sleep(dkg_step_delay());
 
