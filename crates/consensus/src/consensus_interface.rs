@@ -26,6 +26,7 @@ pub struct ConsensusInterfaceImpl {
 }
 
 impl ConsensusInterfaceImpl {
+    #[must_use]
     pub fn new() -> (Self, messenger::Sender<ConsensusMessage, ConsensusResponse>) {
         let (tx, rx) = messenger::channel(100, Some(100));
         (
@@ -55,11 +56,11 @@ impl ConsensusInterfaceImpl {
         self.chain_interface_tx = Some(tx);
     }
 
-    pub fn set_peer_id(&mut self, peer_id: PeerId) {
+    pub const fn set_peer_id(&mut self, peer_id: PeerId) {
         self.peer_id = Some(peer_id);
     }
 
-    pub fn set_max_validators(&mut self, max_validators: usize) {
+    pub const fn set_max_validators(&mut self, max_validators: usize) {
         self.max_validators = Some(max_validators);
     }
 
@@ -165,14 +166,20 @@ impl ConsensusInterfaceImpl {
             self.state.current_round
         );
 
-        // Get the proposed block from chain interface
-        let proposer_bytes = self.peer_id.map(|p| p.to_bytes()).unwrap_or_default();
+        // Get the proposed block from chain ilibp2p::PeerId::to_bytes
+        let proposer_bytes = self
+            .peer_id
+            .map(libp2p::PeerId::to_bytes)
+            .unwrap_or_default();
         let block = self.get_proposed_block(proposer_bytes).await?;
 
         // Serialize and broadcast the block proposal
         let raw_block = block.serialize()?;
         let proposal_message = ConsensusNetMessage::BlockProposal {
-            proposer: self.peer_id.map(|p| p.to_bytes()).unwrap_or_default(),
+            proposer: self
+                .peer_id
+                .map(libp2p::PeerId::to_bytes)
+                .unwrap_or_default(),
             raw_block,
         };
 
@@ -207,13 +214,13 @@ impl ConsensusInterfaceImpl {
                 let proposer_bytes = self
                     .state
                     .proposer
-                    .map(|p| p.to_bytes())
+                    .map(libp2p::PeerId::to_bytes)
                     .unwrap_or_default();
                 let local_block = self.get_proposed_block(proposer_bytes).await?;
 
                 if local_block == block {
                     info!("Block is valid. Sending prevote.");
-                    self.send_vote(&block, VoteType::Prevote)?;
+                    self.send_vote(&block, &VoteType::Prevote)?;
                 } else {
                     info!("Block is invalid. Not voting - transaction mismatch");
                     info!(
@@ -227,7 +234,7 @@ impl ConsensusInterfaceImpl {
         Ok(())
     }
 
-    fn send_vote(&self, block: &Block, vote_type: VoteType) -> Result<(), NodeError> {
+    fn send_vote(&self, block: &Block, vote_type: &VoteType) -> Result<(), NodeError> {
         let block_bytes = block.serialize()?;
         let mut hasher = Sha256::new();
         hasher.update(&block_bytes);
@@ -237,7 +244,10 @@ impl ConsensusInterfaceImpl {
             round: self.state.current_round,
             height: self.state.current_height,
             block_hash: block_hash.clone(),
-            voter: self.peer_id.map(|p| p.to_bytes()).unwrap_or_default(),
+            voter: self
+                .peer_id
+                .map(libp2p::PeerId::to_bytes)
+                .unwrap_or_default(),
             vote_type: vote_type.clone(),
         };
 
@@ -278,7 +288,10 @@ impl ConsensusInterfaceImpl {
                     round: self.state.current_round,
                     height: self.state.current_height,
                     block_hash: vote.block_hash.clone(),
-                    voter: self.peer_id.map(|p| p.to_bytes()).unwrap_or_default(),
+                    voter: self
+                        .peer_id
+                        .map(libp2p::PeerId::to_bytes)
+                        .unwrap_or_default(),
                     vote_type: VoteType::Precommit,
                 };
 
@@ -314,7 +327,10 @@ impl ConsensusInterfaceImpl {
 
                     self.state.block_finalized = true;
 
-                    let proposer_bytes = self.peer_id.map(|p| p.to_bytes()).unwrap_or_default();
+                    let proposer_bytes = self
+                        .peer_id
+                        .map(libp2p::PeerId::to_bytes)
+                        .unwrap_or_default();
                     match self.get_proposed_block(proposer_bytes).await {
                         Ok(block) => match self.finalize_block(block.clone()).await {
                             Ok(()) => {
