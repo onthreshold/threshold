@@ -1,39 +1,41 @@
 [package]
 name = "tests"
 description = "Integration tests for the Threshold network"
-version = "0.1.0"
-edition = "2024"
-repository = "https://github.com/onthreshold/threshold/"
-license = "MIT"
-keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
-categories = ["cryptography", "blockchain"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
 
 [[bin]]
 name = "integration-tests"
 path = "src/bin/integration-tests/main.rs"
 
 [dependencies]
+bitcoin.workspace = true
+libp2p.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+futures.workspace = true
+esplora-client.workspace = true
+sha2.workspace = true
+bincode.workspace = true
+log.workspace = true
+rand.workspace = true
+hex.workspace = true
+frost-secp256k1.workspace = true
+dotenvy.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+tracing-subscriber.workspace = true
+bip39.workspace = true
+clap.workspace = true
+
 abci = { path = "../crates/abci" }
-bitcoin = { workspace = true }
 protocol = { path = "../crates/protocol" }
 node = { path = "../crates/node" }
 types = { path = "../crates/types" }
 grpc = { path = "../crates/grpc" }
-libp2p = { workspace = true }
-async-trait = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-futures = { workspace = true }
-esplora-client = { workspace = true }
 oracle = { path = "../crates/oracle" }
-sha2 = { workspace = true }
-bincode = { workspace = true }
-log = "0.4.27"
-rand = { workspace = true }
-hex = { workspace = true }
-frost-secp256k1 = { workspace = true }
-dotenvy = "0.15.7"
-serde_json = { workspace = true }
-uuid = "1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
-bip39 = { workspace = true }
-clap = { version = "4.5.4", features = ["derive"] }
+messenger = { path = "../messenger" }

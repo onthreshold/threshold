@@ -1,12 +1,12 @@
 [package]
 name = "node"
 description = "Node management and communication for the Threshold network"
-version = "0.1.0"
-edition = "2024"
-repository = "https://github.com/onthreshold/threshold/"
-license = "MIT"
-keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
-categories = ["cryptography", "blockchain"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
 
 [lib]
 name = "node"
@@ -27,48 +27,50 @@ libp2p = { workspace = true, features = [
     "quic",
     "cbor",
 ] }
-futures = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-tracing = { workspace = true }
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
-tracing-appender = "0.2"
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-frost-secp256k1 = { workspace = true }
-rand = { workspace = true }
-hex = { workspace = true }
-bitcoin = { workspace = true }
-tonic = { workspace = true }
-prost = { workspace = true }
-aes-gcm = "0.10"
-argon2 = "0.5"
-base64 = "0.22"
-rpassword = "7.3"
-uuid = { version = "1.17.0", features = ["v4"] }
-rocksdb = { workspace = true }
-sha2 = { workspace = true }
-bincode = { workspace = true }
-esplora-client = { workspace = true }
-directories = "6.0.0"
-async-trait = { workspace = true }
+futures.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+frost-secp256k1.workspace = true
+rand.workspace = true
+hex.workspace = true
+bitcoin.workspace = true
+tonic.workspace = true
+prost.workspace = true
+aes-gcm.workspace = true
+argon2.workspace = true
+base64.workspace = true
+rpassword.workspace = true
+uuid.workspace = true
+rocksdb.workspace = true
+sha2.workspace = true
+bincode.workspace = true
+esplora-client.workspace = true
+directories.workspace = true
+async-trait.workspace = true
+serde_yaml.workspace = true
+dotenvy.workspace = true
+bip39.workspace = true
+num-traits.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
+actix-web.workspace = true
+
 protocol = { path = "../protocol" }
 types = { path = "../types" }
-serde_yaml = "0.9.34"
 oracle = { path = "../oracle" }
-dotenvy = { workspace = true }
-bip39 = { workspace = true }
-num-traits = "0.2.19"
 abci = { path = "../abci" }
 messenger = { path = "../../messenger" }
 grpc = { path = "../grpc" }
-metrics = "0.24"
-metrics-exporter-prometheus = { version = "0.17", features = ["http-listener"] }
-actix-web = "4"
+consensus = { path = "../consensus" }
 
 [dev-dependencies]
-tempfile = "3.8"
-assert_cmd = "2.0"
-predicates = "3.0"
+tempfile.workspace = true
+assert_cmd.workspace = true
+predicates.workspace = true
 
 
 

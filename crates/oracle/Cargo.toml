@@ -1,22 +1,23 @@
 [package]
 name = "oracle"
 description = "Oracle communication service for the Threshold network"
-version = "0.1.0"
-edition = "2024"
-repository = "https://github.com/onthreshold/threshold/"
-license = "MIT"
-keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
-categories = ["cryptography", "blockchain"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
 
 [dependencies]
-bitcoin = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-esplora-client = { workspace = true }
-async-trait = "0.1.88"
-tracing = "0.1"
+bitcoin.workspace = true
+tokio.workspace = true
+esplora-client.workspace = true
+async-trait.workspace = true
+tracing.workspace = true
+hex.workspace = true
+dyn-clone.workspace = true
+
 types = { path = "../types" }
-hex = { workspace = true }
-dyn-clone = "1.0.19"
 
 [lints]
 workspace = true

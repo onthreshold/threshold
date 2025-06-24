@@ -64,6 +64,7 @@ message ConsensusMessage {
     LeaderAnnouncement leader_announcement = 1;
     NewRound new_round = 2;
     Vote vote = 3;
+    BlockProposal block_proposal = 4;
   }
 }
 
@@ -87,6 +88,11 @@ message Vote {
 enum VoteType {
   PREVOTE = 0;
   PRECOMMIT = 1;
+}
+
+message BlockProposal {
+  bytes proposer = 1;
+  bytes raw_block = 2;
 }
 
 // ========== Intent Messages ==========

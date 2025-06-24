@@ -1,5 +1,7 @@
 use abci::{ChainInterfaceImpl, db::rocksdb::RocksDb, executor::TransactionExecutorImpl};
+use consensus::{ConsensusInterface, ConsensusInterfaceImpl, ConsensusMessage};
 use oracle::{esplora::EsploraOracle, mock::MockOracle, oracle::Oracle};
+use types::network::network_protocol::Network;
 use types::{errors::NodeError, intents::DepositIntent};
 
 use crate::{
@@ -7,7 +9,7 @@ use crate::{
     wallet::TaprootWallet,
 };
 use actix_web::{App, HttpResponse, HttpServer, web};
-use bitcoin::Network;
+use bitcoin::Network as BitcoinNetwork;
 use grpc::grpc_handler::NodeControlService;
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use std::path::{Path, PathBuf};
@@ -148,9 +150,9 @@ pub async fn start_node(
     } else {
         Box::new(EsploraOracle::new(
             if is_testnet {
-                Network::Testnet
+                BitcoinNetwork::Testnet
             } else {
-                Network::Bitcoin
+                BitcoinNetwork::Bitcoin
             },
             Some(100),
             Some(swarm.network_events.clone()),
@@ -173,6 +175,39 @@ pub async fn start_node(
         chain_interface.start().await;
     });
 
+    let (mut consensus_interface, consensus_message_tx) = ConsensusInterfaceImpl::new();
+
+    // Set up consensus interface with necessary components
+    consensus_interface.set_chain_interface(chain_message_tx.clone());
+    consensus_interface.set_peer_id(network_handle.peer_id());
+    consensus_interface.set_network_events_tx(swarm.network_events.clone());
+
+    // Set max validators (self + allowed peers)
+    let max_validators = allowed_peers.len() + 1;
+    consensus_interface.set_max_validators(max_validators);
+
+    // Add validators from config
+    for peer in &allowed_peers {
+        if let Ok(peer_id) = peer.public_key.parse::<libp2p::PeerId>() {
+            let _ = consensus_interface
+                .handle_message(ConsensusMessage::AddValidator {
+                    peer_id: peer_id.to_bytes(),
+                })
+                .await;
+        }
+    }
+
+    // Add self as validator
+    let _ = consensus_interface
+        .handle_message(ConsensusMessage::AddValidator {
+            peer_id: network_handle.peer_id().to_bytes(),
+        })
+        .await;
+
+    let consensus_interface_handle = tokio::spawn(async move {
+        consensus_interface.start().await;
+    });
+
     let mut node_state = NodeState::new_from_config(
         &network_handle,
         config,
@@ -189,14 +224,15 @@ pub async fn start_node(
                     .unwrap_or(false);
 
                 if is_testnet {
-                    bitcoin::Network::Testnet
+                    BitcoinNetwork::Testnet
                 } else {
-                    bitcoin::Network::Bitcoin
+                    BitcoinNetwork::Bitcoin
                 }
             },
             db_arc.clone(),
         ),
         chain_message_tx,
+        consensus_message_tx,
     )
     .await
     .expect("Failed to create node");
@@ -289,6 +325,12 @@ pub async fn start_node(
             match result {
                 Ok(()) => tracing::info!("Metrics server stopped"),
                 Err(e) => tracing::error!("Metrics server error: {}", e),
+            }
+        }
+        result = consensus_interface_handle => {
+            match result {
+                Ok(()) => tracing::info!("Consensus interface stopped"),
+                Err(e) => tracing::error!("Consensus interface error: {}", e),
             }
         }
     }

@@ -152,18 +152,12 @@ impl DepositIntentState {
                 Address::from_script(&output.script_pubkey, BitcoinNetwork::Testnet)
             {
                 let addr_str = address.to_string();
-                info!(
-                    "🔍 Checking output address: {} | Known addresses: {:?}",
-                    addr_str,
-                    self.deposit_addresses.iter().collect::<Vec<_>>()
-                );
+
                 if !self.deposit_addresses.contains(&addr_str) {
                     info!("❌ Address {} not in deposit_addresses, skipping", addr_str);
                     continue;
                 }
-                info!("✅ Address {} found in deposit_addresses", addr_str);
 
-                info!("🔍 Looking up deposit intent for address: {}", addr_str);
                 let chain_response = node
                     .chain_interface_tx
                     .send_message_with_response(ChainMessage::GetDepositIntentByAddress {
@@ -175,7 +169,6 @@ impl DepositIntentState {
                     intent: Some(intent),
                 } = chain_response
                 {
-                    info!("✅ Found deposit intent for address: {}", addr_str);
                     info!(
                         "Updating user balance for address: {} amount: {}",
                         intent.user_pubkey,
@@ -188,7 +181,7 @@ impl DepositIntentState {
                         output.value.to_sat(),
                     )?;
 
-                    info!("🔍 Created transaction: {:?}", transaction);
+                    info!("🔍 Created transaction: {}", hex::encode(transaction.id()));
 
                     let add_tx_response = node
                         .chain_interface_tx

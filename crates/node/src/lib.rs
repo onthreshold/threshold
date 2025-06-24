@@ -6,6 +6,7 @@ use crate::{
     wallet::Wallet,
 };
 use abci::{ChainMessage, ChainResponse};
+use consensus::{ConsensusMessage, ConsensusResponse};
 use frost_secp256k1::{self as frost, Identifier};
 use libp2p::PeerId;
 use oracle::oracle::Oracle;
@@ -51,6 +52,7 @@ pub struct NodeState<N: Network, W: Wallet> {
 
     pub oracle: Box<dyn Oracle>,
     pub chain_interface_tx: messenger::Sender<ChainMessage, ChainResponse>,
+    pub consensus_interface_tx: messenger::Sender<ConsensusMessage, ConsensusResponse>,
 }
 
 impl<N: Network, W: Wallet> NodeState<N, W> {
@@ -64,19 +66,12 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
         oracle: Box<dyn Oracle>,
         wallet: W,
         mut chain_interface_tx: messenger::Sender<ChainMessage, ChainResponse>,
+        consensus_interface_tx: messenger::Sender<ConsensusMessage, ConsensusResponse>,
     ) -> Result<Self, NodeError> {
         let keys = config.load_dkg_keys()?;
         let dkg_state = DkgState::new();
         let signing_state = SigningState::new();
-        let mut consensus_state = ConsensusState::new();
-
-        for peer in &config.allowed_peers {
-            if let Ok(peer_id) = peer.public_key.parse::<PeerId>() {
-                consensus_state.validators.insert(peer_id);
-            }
-        }
-
-        consensus_state.validators.insert(network_handle.peer_id());
+        let consensus_state = ConsensusState::new();
 
         let mut deposit_intent_state = DepositIntentState::new(deposit_intent_tx);
         let withdrawl_intent_state = SpendIntentState::new();
@@ -119,6 +114,7 @@ impl<N: Network, W: Wallet> NodeState<N, W> {
             private_key_package: None,
             oracle,
             chain_interface_tx,
+            consensus_interface_tx,
         };
 
         if let Some((private_key, pubkey)) = keys {

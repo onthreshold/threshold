@@ -7,6 +7,10 @@ pub enum ConsensusMessage {
     LeaderAnnouncement(LeaderAnnouncement),
     NewRound(u32),
     Vote(Vote),
+    BlockProposal {
+        proposer: Vec<u8>,
+        raw_block: Vec<u8>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -15,7 +19,7 @@ pub struct LeaderAnnouncement {
     pub round: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Vote {
     pub round: u32,
     pub height: u64,
@@ -24,7 +28,7 @@ pub struct Vote {
     pub vote_type: VoteType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum VoteType {
     Prevote,
     Precommit,
@@ -56,6 +60,12 @@ impl ProtoEncode for ConsensusMessage {
                     VoteType::Precommit => p2p_proto::VoteType::Precommit as i32,
                 },
             }),
+            Self::BlockProposal { proposer, raw_block } => {
+                p2p_proto::consensus_message::Message::BlockProposal(p2p_proto::BlockProposal {
+                    proposer: proposer.clone(),
+                    raw_block: raw_block.clone(),
+                })
+            }
         };
 
         let consensus_msg = p2p_proto::ConsensusMessage {
@@ -99,6 +109,12 @@ impl ProtoDecode for ConsensusMessage {
                     voter: vote.voter,
                     vote_type,
                 }))
+            }
+            p2p_proto::consensus_message::Message::BlockProposal(proposal) => {
+                Ok(Self::BlockProposal {
+                    proposer: proposal.proposer,
+                    raw_block: proposal.raw_block,
+                })
             }
         }
     }

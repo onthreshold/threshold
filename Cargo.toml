@@ -6,7 +6,11 @@ members = [
     "crates/node",
     "crates/protocol",
     "crates/types",
-    "crates/oracle", "crates/abci", "messenger", "crates/grpc",
+    "crates/oracle",
+    "crates/abci",
+    "messenger",
+    "crates/grpc",
+    "crates/consensus",
 ]
 resolver = "2"
 
@@ -64,6 +68,30 @@ prost-types = "0.13.5"
 tempfile = "3.20.0"
 uuid = { version = "1.7.0", features = ["v4", "serde"] }
 tracing = "0.1"
+
+# Additional common dependencies
+derive_more = { version = "2.0.1", features = ["full"] }
+tonic-build = "0.13"
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.17", features = ["http-listener"] }
+actix-web = "4"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+tracing-appender = "0.2"
+aes-gcm = "0.10"
+argon2 = "0.5"
+rpassword = "7.3"
+directories = "6.0.0"
+serde_yaml = "0.9.34"
+num-traits = "0.2.19"
+clap = { version = "4.4", features = ["derive"] }
+bs58 = "0.5"
+dyn-clone = "1.0.19"
+log = "0.4.27"
+assert_cmd = "2.0"
+predicates = "3.0"
+assert_matches = "1.5"
+
+# Local crates
 grpc = { path = "crates/grpc" }
 
 [workspace.lints.rust]

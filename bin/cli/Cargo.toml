@@ -1,35 +1,36 @@
 [package]
 name = "cli"
 description = "Command-line interface for the Threshold network"
-version = "0.1.0"
-edition = "2024"
-repository = "https://github.com/onthreshold/threshold/"
-license = "MIT"
-keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
-categories = ["cryptography", "blockchain"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
 
 [dependencies]
-tokio = { workspace = true, features = ["full", "macros", "rt-multi-thread"] }
+tokio.workspace = true
+libp2p.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+bs58.workspace = true
+directories.workspace = true
+argon2.workspace = true
+aes-gcm.workspace = true
+base64.workspace = true
+rpassword.workspace = true
+dotenvy.workspace = true
+derive_more.workspace = true
+tonic.workspace = true
+
 node = { path = "../../crates/node" }
 types = { path = "../../crates/types" }
-libp2p = { workspace = true }
-rand = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-clap = { version = "4.4", features = ["derive"] }
-bs58 = "0.5"
-directories = "6.0.0"
-argon2 = "0.5"
-aes-gcm = "0.10"
-base64 = "0.22.1"
-rpassword = "7.2"
-dotenvy = "0.15.7"
-derive_more = { version = "2.0.1", features = ["full"] }
-tonic = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.8"
-assert_matches = "1.5"
+tempfile.workspace = true
+assert_matches.workspace = true
 
 [lints]
 workspace = true

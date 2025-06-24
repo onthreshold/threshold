@@ -1,28 +1,29 @@
 [package]
 name = "utxo-spend"
 description = "Utxo spend service for the Threshold network"
-version = "0.1.0"
-edition = "2024"
-repository = "https://github.com/onthreshold/threshold/"
-license = "MIT"
-keywords = ["bitcoin", "cryptocurrency", "wallet", "cli"]
-categories = ["cryptography", "blockchain"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
 
 [dependencies]
-bitcoin = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-bip39 = { workspace = true }
-tonic = { workspace = true }
-esplora-client = { version = "0.12.0", features = ["async"] }
-hex = { workspace = true }
-dotenvy = { workspace = true }
+bitcoin.workspace = true
+tokio.workspace = true
+bip39.workspace = true
+tonic.workspace = true
+esplora-client.workspace = true
+hex.workspace = true
+dotenvy.workspace = true
+
 node = { path = "../../crates/node" }
 protocol = { path = "../../crates/protocol" }
 oracle = { path = "../../crates/oracle" }
 
 [dev-dependencies]
-tempfile = "3.8"
-assert_matches = "1.5"
+tempfile.workspace = true
+assert_matches.workspace = true
 
 [lints]
 workspace = true

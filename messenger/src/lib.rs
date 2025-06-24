@@ -48,3 +48,18 @@ where
         Ok(response)
     }
 }
+
+impl<M, R> Clone for Sender<M, R>
+where
+    M: Clone,
+    R: Clone,
+{
+    fn clone(&self) -> Self {
+        let (reverse_tx, reverse_rx) = broadcast::channel(100);
+        Self {
+            tx: self.tx.clone(),
+            reverse_tx,
+            reverse_rx,
+        }
+    }
+}

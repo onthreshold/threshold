@@ -1,0 +1,32 @@
+[package]
+name = "consensus"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+futures.workspace = true
+serde_json.workspace = true
+libp2p.workspace = true
+hex.workspace = true
+rand.workspace = true
+bincode.workspace = true
+sha2.workspace = true
+async-trait.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+metrics.workspace = true
+
+types = { path = "../types" }
+protocol = { path = "../protocol" }
+messenger = { path = "../../messenger" }
+abci = { path = "../abci" }
+
+[lints]
+workspace = true

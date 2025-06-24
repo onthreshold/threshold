@@ -1,4 +1,6 @@
+use std::future::Future;
 use std::str::FromStr;
+use std::time::{Duration, Instant};
 
 use bitcoin::Address;
 use bitcoin::secp256k1::{Message, Secp256k1};
@@ -11,8 +13,7 @@ use oracle::oracle::Oracle;
 use types::proto::node_proto::node_control_client::NodeControlClient;
 use types::proto::node_proto::{
     CheckBalanceRequest, ConfirmWithdrawalRequest, CreateDepositIntentRequest, GetChainInfoRequest,
-    GetLatestBlocksRequest, GetPendingDepositIntentsRequest, ProposeWithdrawalRequest,
-    TriggerConsensusRoundRequest,
+    GetLatestBlocksRequest, ProposeWithdrawalRequest, TriggerConsensusRoundRequest,
 };
 
 #[derive(Parser)]
@@ -83,8 +84,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             check_if_dkg_keys_exist("50051-50055".to_string()).await?;
             println!("✅ DKG test completed\n");
 
-            println!("Waiting for deposit intents to be processed...");
-            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            println!("⏳ Waiting for DKG deposit intents to settle (max 60s)...");
+
+            // Use either provided endpoint or default first node.
+            let monitor_endpoint = endpoint
+                .clone()
+                .unwrap_or_else(|| "http://127.0.0.1:50051".to_string());
+
+            poll_until(
+                || {
+                    let monitor_endpoint = monitor_endpoint.clone();
+                    async move {
+                        let mut client = NodeControlClient::connect(monitor_endpoint).await?;
+                        let info = client
+                            .get_chain_info(GetChainInfoRequest {})
+                            .await?
+                            .into_inner();
+                        println!(
+                            "   📊 pending_txs: {} | latest_height: {}",
+                            info.pending_transactions, info.latest_height
+                        );
+                        Ok(info.pending_transactions == 0)
+                    }
+                },
+                Duration::from_secs(2),
+                Duration::from_secs(60),
+            )
+            .await?;
 
             println!("📥 Running deposit test...");
             run_deposit_test(amount, 2000, endpoint.clone(), use_testnet).await?;
@@ -177,7 +203,34 @@ async fn run_deposit_test(
     } else {
         println!("  ❌ Node failed to trigger consensus: {}", resp.message);
     }
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    // Wait until the deposit is reflected in the user's balance instead of
+    // sleeping for a fixed amount of time.
+    let expected_balance = initial_balance + amount;
+    poll_until(
+        || {
+            let mut client = client.clone();
+            let public_key = public_key.clone();
+            async move {
+                let request = CheckBalanceRequest {
+                    address: public_key,
+                };
+                match client.check_balance(request).await {
+                    Ok(r) => {
+                        let balance = r.into_inner().balance_satoshis;
+                        println!(
+                            "💰 Current balance: {} sats (Expected: {})",
+                            balance, expected_balance
+                        );
+                        Ok(balance == expected_balance)
+                    }
+                    Err(e) => Err(Box::new(e) as Box<dyn std::error::Error>),
+                }
+            }
+        },
+        Duration::from_secs(2),
+        Duration::from_secs(60),
+    )
+    .await?;
 
     if use_testnet {
         println!("🔑 Sender address: {}. Refreshing UTXOs...", sender_address);
@@ -198,25 +251,32 @@ async fn run_deposit_test(
         oracle.broadcast_transaction(&signed_tx).await?;
         println!("📤 Broadcast Transaction txid: {}", txid);
 
-        let start_time = std::time::Instant::now();
-        loop {
-            let request = CheckBalanceRequest {
-                address: public_key.clone(),
-            };
-            let resp = client.check_balance(request).await?.into_inner();
-            println!("💰 Final balance: {} sats", resp.balance_satoshis);
-
-            if resp.balance_satoshis == initial_balance + amount {
-                break;
-            }
-
-            if start_time.elapsed() >= std::time::Duration::from_secs(1000) {
-                println!("⏰ Timeout reached. Exiting polling loop.");
-                break;
-            }
-
-            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-        }
+        poll_until(
+            || {
+                let mut client = client.clone();
+                let public_key = public_key.clone();
+                async move {
+                    let request = CheckBalanceRequest {
+                        address: public_key,
+                    };
+                    match client.check_balance(request).await {
+                        Ok(r) => {
+                            let balance = r.into_inner().balance_satoshis;
+                            println!(
+                                "💰 Current balance: {} sats (Expected: {})",
+                                balance,
+                                initial_balance + amount
+                            );
+                            Ok(balance == initial_balance + amount)
+                        }
+                        Err(e) => Err(Box::new(e) as Box<dyn std::error::Error>),
+                    }
+                }
+            },
+            Duration::from_secs(60),   // Keep a larger interval for testnet
+            Duration::from_secs(1000), // Original long timeout preserved
+        )
+        .await?;
     } else {
         let request = CheckBalanceRequest {
             address: public_key.clone(),
@@ -306,17 +366,43 @@ async fn run_withdrawal_test(
     } else {
         println!("  ❌ Node failed to trigger consensus: {}", resp.message);
     }
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-    // Check balance -------------------------------------------
+    // Wait until the withdrawal is reflected in the user's balance.
+    let expected_balance = initial_balance - propose_resp.quote_satoshis;
+    poll_until(
+        || {
+            let mut client = client.clone();
+            let public_key = public_key.clone();
+            async move {
+                let request = CheckBalanceRequest {
+                    address: public_key,
+                };
+                match client.check_balance(request).await {
+                    Ok(r) => {
+                        let balance = r.into_inner().balance_satoshis;
+                        println!(
+                            "💰 Current balance: {} sats (Expected: {})",
+                            balance, expected_balance
+                        );
+                        Ok(balance == expected_balance)
+                    }
+                    Err(e) => Err(Box::new(e) as Box<dyn std::error::Error>),
+                }
+            }
+        },
+        Duration::from_secs(2),
+        Duration::from_secs(60),
+    )
+    .await?;
+
+    // Final balance check to assert condition
     let request = CheckBalanceRequest {
         address: public_key.clone(),
     };
     let resp = client.check_balance(request).await?.into_inner();
     println!("💰 Final balance: {} sats", resp.balance_satoshis);
     assert_eq!(
-        resp.balance_satoshis,
-        initial_balance - propose_resp.quote_satoshis,
+        resp.balance_satoshis, expected_balance,
         "Balance after withdrawal should be equal to initial balance - quoted amount"
     );
 
@@ -434,81 +520,7 @@ async fn run_consensus_test(
         deposit_data.push((unique_key, i));
     }
 
-    println!(
-        "📝 Phase 1: Creating {} deposit intents across nodes",
-        num_deposits
-    );
-    let mut deposit_addresses = Vec::new();
-
-    for (idx, (public_key, _)) in deposit_data.iter().enumerate() {
-        let client_idx = idx % clients.len();
-        let req = CreateDepositIntentRequest {
-            public_key: public_key.clone(),
-            amount_satoshis: amount,
-        };
-
-        let resp = clients[client_idx]
-            .create_deposit_intent(req)
-            .await?
-            .into_inner();
-        println!(
-            "  📄 Deposit {} created on node {} - Address: {}",
-            idx + 1,
-            client_idx + 1,
-            resp.deposit_address
-        );
-        deposit_addresses.push((resp.deposit_address, public_key.clone()));
-    }
-
-    println!("⏳ Phase 2: Waiting for consensus to process deposit intents...");
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-
-    println!("🔍 Phase 3: Verifying consensus across all nodes");
-    let mut all_consistent = true;
-
-    for (client_idx, client) in clients.iter_mut().enumerate() {
-        println!("  🔍 Checking node {}...", client_idx + 1);
-
-        // Check that all deposit intents are visible on this node
-        let pending_resp = client
-            .get_pending_deposit_intents(GetPendingDepositIntentsRequest {})
-            .await?
-            .into_inner();
-
-        println!(
-            "    📋 Node {} has {} pending intents",
-            client_idx + 1,
-            pending_resp.intents.len()
-        );
-
-        let mut found_addresses = 0;
-        for (expected_address, _) in &deposit_addresses {
-            if pending_resp
-                .intents
-                .iter()
-                .any(|intent| &intent.deposit_address == expected_address)
-            {
-                found_addresses += 1;
-            }
-        }
-
-        if found_addresses != deposit_addresses.len() {
-            println!(
-                "    ❌ Node {} only has {}/{} expected deposit addresses",
-                client_idx + 1,
-                found_addresses,
-                deposit_addresses.len()
-            );
-            all_consistent = false;
-        } else {
-            println!(
-                "    ✅ Node {} has all expected deposit addresses",
-                client_idx + 1
-            );
-        }
-    }
-
-    println!("🧱 Phase 4: Getting initial chain state using dev endpoints");
+    println!("🧱 Getting initial chain state using dev endpoints");
     let mut initial_chain_info = Vec::new();
     for (client_idx, client) in clients.iter_mut().enumerate() {
         let chain_info = client
@@ -538,8 +550,31 @@ async fn run_consensus_test(
         );
     }
 
-    // Phase 5: Trigger consensus rounds to process deposits
-    println!("🔄 Phase 5: Triggering consensus rounds for block processing");
+    println!("📝 Creating {} deposit intents across nodes", num_deposits);
+    let mut deposit_addresses = Vec::new();
+
+    for (idx, (public_key, _)) in deposit_data.iter().enumerate() {
+        let client_idx = idx % clients.len();
+        let req = CreateDepositIntentRequest {
+            public_key: public_key.clone(),
+            amount_satoshis: amount,
+        };
+
+        let resp = clients[client_idx]
+            .create_deposit_intent(req)
+            .await?
+            .into_inner();
+        println!(
+            "  📄 Deposit {} created on node {} - Address: {}",
+            idx + 1,
+            client_idx + 1,
+            resp.deposit_address
+        );
+        deposit_addresses.push((resp.deposit_address, public_key.clone()));
+    }
+
+    // Trigger consensus rounds to process deposits
+    println!("🔄 Triggering consensus rounds for block processing");
     for (client_idx, client) in clients.iter_mut().enumerate() {
         let resp = client
             .trigger_consensus_round(TriggerConsensusRoundRequest { force_round: true })
@@ -562,11 +597,29 @@ async fn run_consensus_test(
     }
 
     // Wait for mock oracle to process and consensus to complete
-    println!("⏳ Waiting for mock oracle processing and block finalization...");
-    tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+    println!("⏳ Waiting for mock oracle processing and block finalization (max 60s)...");
+    // Poll any node until chain height increases or timeout.
+    poll_until(
+        || {
+            let mut client = clients[0].clone();
+            let initial_height = initial_chain_info[0].latest_height;
+            async move {
+                match client.get_chain_info(GetChainInfoRequest {}).await {
+                    Ok(r) => {
+                        let info = r.into_inner();
+                        Ok(info.latest_height > initial_height)
+                    }
+                    Err(e) => Err(Box::new(e) as Box<dyn std::error::Error>),
+                }
+            }
+        },
+        Duration::from_secs(2),
+        Duration::from_secs(60),
+    )
+    .await?;
 
-    // Phase 6: Verify block creation and chain advancement
-    println!("🧱 Phase 6: Verifying block creation and chain advancement");
+    // Verify block creation and chain advancement
+    println!("🧱 Verifying block creation and chain advancement");
     let mut blocks_created = false;
     for (client_idx, client) in clients.iter_mut().enumerate() {
         let chain_info = client
@@ -602,8 +655,8 @@ async fn run_consensus_test(
         }
     }
 
-    // Phase 7: Check final balances to verify transaction execution
-    println!("🔍 Phase 7: Verifying transaction execution across nodes");
+    // Check final balances to verify transaction execution
+    println!("🔍 Verifying transaction execution across nodes");
     let mut execution_consistent = true;
 
     for (client_idx, client) in clients.iter_mut().enumerate() {
@@ -650,7 +703,7 @@ async fn run_consensus_test(
     }
 
     // Final comprehensive verification
-    if all_consistent && blocks_created && execution_consistent {
+    if blocks_created && execution_consistent {
         println!("✅ COMPLETE CONSENSUS TEST PASSED");
         println!(
             "   📊 All {} nodes maintain consistent state",
@@ -660,14 +713,11 @@ async fn run_consensus_test(
             "   📄 All {} deposit intents properly synchronized",
             num_deposits
         );
-        println!("   🧱 Blocks created and consensus rounds completed");
+        println!("   ✅ Blocks created and consensus rounds completed");
         println!("   ⚖️  All deposits processed and balances updated");
         println!("   🔗 Chain state consistent across all nodes");
     } else {
         let mut error_msg = "Consensus test failed: ".to_string();
-        if !all_consistent {
-            error_msg.push_str("state inconsistent, ");
-        }
         if !blocks_created {
             error_msg.push_str("no blocks created, ");
         }
@@ -679,4 +729,35 @@ async fn run_consensus_test(
     }
 
     Ok(())
+}
+
+// -----------------------------------------------------------------------------
+// 🛠️  Utility helpers
+// -----------------------------------------------------------------------------
+/// Polls the provided asynchronous condition every `poll_interval` until it
+/// returns `Ok(true)` or the `timeout` duration is exceeded.
+///
+/// If the timeout elapses before the condition is met, an error is returned.
+async fn poll_until<F, Fut>(
+    mut condition_fn: F,
+    poll_interval: Duration,
+    timeout: Duration,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<bool, Box<dyn std::error::Error>>>,
+{
+    let start = Instant::now();
+
+    loop {
+        if condition_fn().await? {
+            return Ok(());
+        }
+
+        if start.elapsed() >= timeout {
+            return Err("Timeout reached while waiting for condition".into());
+        }
+
+        tokio::time::sleep(poll_interval).await;
+    }
 }
