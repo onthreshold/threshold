@@ -164,7 +164,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests
-        run: cargo run --bin integration-tests deposit-test 5000 && cargo run --bin integration-tests withdrawl-test 2500
+        run: cargo run --bin integration-tests deposit-test 5000 && cargo run --bin integration-tests withdrawal-test 2500
 
       - name: Shutdown stack & print logs
         run: |
