@@ -5,6 +5,7 @@ use types::network::network_event::{DirectMessage, NetworkEvent};
 use types::network::network_protocol::Network;
 use types::proto::ProtoDecode;
 use types::proto::p2p_proto::{self, gossipsub_message::Message};
+use types::{dkg_round1_package_metrics, dkg_round2_package_metrics, dkg_start_metrics};
 
 #[async_trait::async_trait]
 impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
@@ -27,9 +28,13 @@ impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
                         if let Some(Message::Dkg(inner_dkg)) = gossip_msg.message {
                             match inner_dkg.message {
                                 Some(DkgInner::StartDkg(_)) => {
+                                    dkg_start_metrics!(node.network_handle.peer_name(&source_peer));
                                     self.handle_dkg_start(node)?;
                                 }
                                 Some(DkgInner::Round1Package(_)) => {
+                                    dkg_round1_package_metrics!(
+                                        node.network_handle.peer_name(&source_peer)
+                                    );
                                     self.handle_round1_payload(node, source_peer, inner_dkg)?;
                                 }
                                 _ => {}
@@ -39,6 +44,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for DkgState {
                 }
             }
             NetworkEvent::MessageEvent((peer, DirectMessage::Round2Package(package))) => {
+                dkg_round2_package_metrics!(node.network_handle.peer_name(&peer));
                 self.handle_round2_payload(node, peer, package).await?;
             }
             _ => {}

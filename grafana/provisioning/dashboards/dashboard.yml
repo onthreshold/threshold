@@ -6,7 +6,7 @@ providers:
     type: file
     disableDeletion: false
     editable: true
-    updateIntervalSeconds: 30
+    updateIntervalSeconds: 5
     options:
       path: /etc/grafana/provisioning/dashboards/grpc_dashboards/
   - name: "Broadcast Dashboards"
@@ -15,6 +15,15 @@ providers:
     type: file
     disableDeletion: false
     editable: true
-    updateIntervalSeconds: 30
+    updateIntervalSeconds: 5
     options:
       path: /etc/grafana/provisioning/dashboards/broadcast_dashboards/
+  - name: "DKG Dashboards"
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 5
+    options:
+      path: /etc/grafana/provisioning/dashboards/dkg_dashboards/
