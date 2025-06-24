@@ -102,21 +102,21 @@ mod deposit_tests {
 
         let response = rx.recv().await.unwrap();
 
-        for (_, node) in cluster.nodes.iter_mut() {
-            let intent_opt = match node
-                .chain_interface_tx
-                .send_message_with_response(abci::ChainMessage::GetDepositIntentByAddress {
-                    address: response.deposit_address.clone(),
-                })
-                .await
-            {
-                Ok(abci::ChainResponse::GetDepositIntentByAddress { intent }) => intent,
-                _ => None,
-            };
-            assert!(intent_opt.is_some(), "deposit intent not stored");
-            let intent = intent_opt.unwrap();
-            assert_eq!(intent.deposit_address, response.deposit_address);
-        }
+        // Only check the creating node since we no longer broadcast deposit intents
+        let creating_node = cluster.nodes.get_mut(&node_peer).unwrap();
+        let intent_opt = match creating_node
+            .chain_interface_tx
+            .send_message_with_response(abci::ChainMessage::GetDepositIntentByAddress {
+                address: response.deposit_address.clone(),
+            })
+            .await
+        {
+            Ok(abci::ChainResponse::GetDepositIntentByAddress { intent }) => intent,
+            _ => None,
+        };
+        assert!(intent_opt.is_some(), "deposit intent not stored");
+        let intent = intent_opt.unwrap();
+        assert_eq!(intent.deposit_address, response.deposit_address);
     }
 
     #[tokio::test]

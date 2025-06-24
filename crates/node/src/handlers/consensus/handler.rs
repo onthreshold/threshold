@@ -467,6 +467,10 @@ impl ConsensusState {
                                 block.header.height,
                                 block.body.transactions.len()
                             );
+
+                            // Update consensus height after successful finalization
+                            self.current_height = block.header.height;
+                            info!("✅ Updated consensus height to {}", self.current_height);
                         }
                         Ok(ChainResponse::FinalizeAndStoreBlock { error: Some(e) }) => {
                             tracing::error!("Failed to finalize block: {}", e);
