@@ -207,7 +207,7 @@ async fn test_trigger_consensus_round() {
             round_number,
         } => {
             assert!(success);
-            assert_eq!(round_number, (initial_round + 1) as u64);
+            assert_eq!(round_number, u64::from(initial_round + 1));
         }
         _ => panic!("Unexpected response type"),
     }
@@ -341,7 +341,7 @@ async fn test_network_events_setup() {
 
     assert!(interface.network_events_tx.is_none());
 
-    interface.set_network_events_tx(network_tx.clone());
+    interface.set_network_events_tx(network_tx);
 
     assert!(interface.network_events_tx.is_some());
 }
