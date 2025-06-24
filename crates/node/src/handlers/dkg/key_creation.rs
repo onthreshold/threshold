@@ -216,6 +216,10 @@ impl DkgState {
                 .map(|peer_id| node.network_handle.peer_name(peer_id))
                 .collect();
             tracing::info!("Still waiting for round1 packages from: {:?}", waiting_for);
+
+            for missing_peer in &waiting_for {
+                tracing::debug!("Missing round1 package from peer: {}", missing_peer);
+            }
         }
 
         if !self.dkg_started
@@ -360,7 +364,7 @@ impl DkgState {
             .collect();
 
         if self.round2_peer_packages.len() + 1 != max_signers {
-            tracing::info!("Still waiting for round1 packages from: {:?}", waiting_for);
+            tracing::info!("Still waiting for round2 packages from: {:?}", waiting_for);
         }
 
         if let Some(r2_secret_package) = self.r2_secret_package.as_ref() {

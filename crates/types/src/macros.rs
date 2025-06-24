@@ -33,3 +33,24 @@ macro_rules! current_round_metrics {
         metrics::gauge!("current_round", "node_id" => $node_id.to_string()).set(f64::from($round));
     }};
 }
+
+#[macro_export]
+macro_rules! dkg_start_metrics {
+    ($peer_from:expr) => {{
+        metrics::counter!("dkg_start_dkg_initiated", "peer_from" => $peer_from.to_string()).increment(1);
+    }};
+}
+
+#[macro_export]
+macro_rules! dkg_round1_package_metrics {
+    ($peer_from:expr) => {{
+        metrics::counter!("dkg_round1_packages_received", "peer_from" => $peer_from.to_string()).increment(1);
+    }};
+}
+
+#[macro_export]
+macro_rules! dkg_round2_package_metrics {
+    ($peer_from:expr) => {{
+        metrics::counter!("dkg_round2_packages_received", "peer_from" => $peer_from.to_string()).increment(1);
+    }};
+}
