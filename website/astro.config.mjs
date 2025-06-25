@@ -7,6 +7,7 @@ import react from "@astrojs/react";
 import icon from "astro-icon";
 import sitemap from "@astrojs/sitemap";
 import { SiteUrl } from "./src/theme.config";
+import devtoolsJson from "vite-plugin-devtools-json";
 
 // https://astro.build/config
 export default defineConfig({
@@ -26,7 +27,7 @@ export default defineConfig({
         "@": "/src",
       },
     },
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss(), devtoolsJson()],
   },
   integrations: [
     mdx(),

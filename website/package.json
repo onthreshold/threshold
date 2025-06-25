@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@iconify-json/bi": "^1.2.4",
-    "@iconify-json/simple-icons": "^1.2.38"
+    "@iconify-json/simple-icons": "^1.2.38",
+    "vite-plugin-devtools-json": "^0.2.0"
   }
 }

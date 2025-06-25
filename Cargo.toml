@@ -17,7 +17,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-description = "building the best infrastructure for decentralized multisigs"
+description = "Open source alternative to Coinbase Custody. We provide institutions with software solutions to securely store digital assets at scale using threshold signature cryptography."
 license = "MIT"
 keywords = ["bitcoin", "cryptocurrency", "wallet", "multisig"]
 categories = ["cryptography", "blockchain"]
@@ -75,7 +75,11 @@ tonic-build = "0.13"
 metrics = "0.24"
 metrics-exporter-prometheus = { version = "0.17", features = ["http-listener"] }
 actix-web = "4"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "json",
+    "fmt",
+] }
 tracing-appender = "0.2"
 aes-gcm = "0.10"
 argon2 = "0.5"
