@@ -75,6 +75,7 @@ impl SigningState {
                 PendingSpend {
                     tx,
                     user_pubkey,
+                    address_to: address.to_string(),
                     recipient_script,
                     fee: estimated_fee_sat,
                 },

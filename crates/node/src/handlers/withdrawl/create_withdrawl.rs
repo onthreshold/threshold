@@ -132,11 +132,13 @@ impl SpendIntentState {
         tx: &BitcoinTransaction,
         fee: u64,
         user_pubkey: String,
+        address_to: String,
     ) -> Result<(), NodeError> {
         node.oracle.broadcast_transaction(tx).await?;
 
         let transaction = Transaction::create_withdrawal_transaction(
             &user_pubkey,
+            &address_to,
             tx.output[0].value.to_sat() + fee,
         )?;
 
@@ -155,6 +157,7 @@ impl SpendIntentState {
         let spend_intent = PendingSpend {
             tx: tx.clone(),
             user_pubkey: user_pubkey.clone(),
+            address_to,
             recipient_script,
             fee,
         };
@@ -184,7 +187,11 @@ impl SpendIntentState {
 
         let debit = pay_out.value.to_sat() + pending.fee;
 
-        let transaction = Transaction::create_withdrawal_transaction(&pending.user_pubkey, debit)?;
+        let transaction = Transaction::create_withdrawal_transaction(
+            &pending.user_pubkey,
+            &pending.address_to,
+            debit,
+        )?;
 
         let ChainResponse::AddTransactionToBlock { error: None } = node
             .chain_interface_tx

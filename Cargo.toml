@@ -55,7 +55,7 @@ esplora-client = { version = "0.12.0", default-features = false, features = [
     "async-https",
     "tokio",
 ] }
-bincode = { version = "2.0.1", features = ["serde"] }
+bincode = { version = "2.0.1", features = ["serde", "derive"] }
 sha2 = "0.10.9"
 rocksdb = "0.23.0"
 async-trait = "0.1.88"

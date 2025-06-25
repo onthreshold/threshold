@@ -58,6 +58,7 @@ num-traits.workspace = true
 metrics.workspace = true
 metrics-exporter-prometheus.workspace = true
 actix-web.workspace = true
+itertools = "0.14"
 
 protocol = { path = "../protocol" }
 types = { path = "../types" }

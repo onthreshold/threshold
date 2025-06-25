@@ -94,6 +94,7 @@ mod deposit_test {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         let mut executor = TransactionExecutorImpl::new(Box::new(mock_oracle));
@@ -197,6 +198,7 @@ mod deposit_test {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         let mut executor = TransactionExecutorImpl::new(Box::new(mock_oracle));
@@ -237,6 +239,7 @@ mod deposit_test {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         let mut executor = TransactionExecutorImpl::new(Box::new(mock_oracle));
@@ -274,6 +277,7 @@ mod deposit_test {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         let mut executor = TransactionExecutorImpl::new(Box::new(mock_oracle));
@@ -312,6 +316,7 @@ mod deposit_test {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         let mut executor = TransactionExecutorImpl::new(Box::new(mock_oracle));
@@ -342,6 +347,7 @@ mod deposit_test {
                 },
                 Operation::OpCheckOracle,
             ],
+            None,
         );
 
         let mut executor = TransactionExecutorImpl::new(Box::new(mock_oracle));
@@ -368,6 +374,7 @@ mod deposit_test {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         let mut executor = TransactionExecutorImpl::new(Box::new(mock_oracle));
@@ -415,6 +422,7 @@ mod deposit_test {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         let mut executor = TransactionExecutorImpl::new(Box::new(mock_oracle));
@@ -469,6 +477,7 @@ mod deposit_test {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         let mut executor = TransactionExecutorImpl::new(Box::new(mock_oracle));

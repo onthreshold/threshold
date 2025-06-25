@@ -413,7 +413,7 @@ async fn test_execute_transaction_push_operations() {
     let mut executor = create_test_executor();
     let initial_state = ChainState::new();
 
-    let transaction = Transaction::new(
+    let transaction = Transaction::new8(
         TransactionType::Deposit,
         vec![
             Operation::OpPush {

@@ -1,5 +1,6 @@
 // PendingSpend struct shared across node handlers
 use bitcoin::{Address, PublicKey, Transaction, secp256k1::Scalar};
+use protocol::block::Block;
 use types::errors::NodeError;
 
 pub mod taproot;
@@ -17,6 +18,12 @@ pub trait Wallet: Send + Sync {
         recipient: &Address,
         dry_run: bool,
     ) -> Result<(Transaction, [u8; 32]), NodeError>;
+
+    fn get_transaction_for_block(
+        &self,
+        block: Block,
+        estimated_fee_sat: u64,
+    ) -> Result<Transaction, NodeError>;
 
     fn sign(
         &mut self,
