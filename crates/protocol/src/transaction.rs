@@ -31,8 +31,8 @@ impl<C> Decode<C> for Transaction {
         let version = u32::decode(d)?;
         let r#type = TransactionType::decode(d)?;
         let operations = Vec::<Operation>::decode(d)?;
-        let metadata = Option::<String>::decode(d)?;
-        let metadata = metadata.map(|s| serde_json::from_str(&s).unwrap());
+        let metadata = String::decode(d)?;
+        let metadata = serde_json::from_str(&metadata).unwrap();
         Ok(Self {
             version,
             r#type,

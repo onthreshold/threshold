@@ -142,7 +142,7 @@ pub async fn start_node(
         .parse()
         .unwrap();
 
-    let mut oracle: Box<dyn Oracle> = if use_mock_oracle.unwrap_or(false) {
+    let oracle: Box<dyn Oracle> = if use_mock_oracle.unwrap_or(false) {
         Box::new(MockOracle::new(
             swarm.network_events.clone(),
             Some(deposit_intent_tx.clone()),
@@ -208,6 +208,11 @@ pub async fn start_node(
         consensus_interface.start().await;
     });
 
+    let mut oracle_clone = oracle.clone();
+    let deposit_monitor_handle = tokio::spawn(async move {
+        oracle_clone.poll_new_transactions(vec![]).await;
+    });
+
     let mut node_state = NodeState::new_from_config(
         &network_handle,
         config,
@@ -260,10 +265,6 @@ pub async fn start_node(
     });
 
     let main_loop_handle = tokio::spawn(async move { node_state.start().await });
-
-    let deposit_monitor_handle = tokio::spawn(async move {
-        oracle.poll_new_transactions(vec![]).await;
-    });
 
     // Create shutdown signal handler for Docker compatibility
     let shutdown_signal = async {
