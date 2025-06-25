@@ -138,7 +138,7 @@ impl DepositIntentState {
         }
     }
 
-    pub async fn update_user_balance<N: Network, W: Wallet>(
+    pub async fn insert_pending_deposit_transaction<N: Network, W: Wallet>(
         &mut self,
         node: &mut NodeState<N, W>,
         tx: &BitcoinTransaction,

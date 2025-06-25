@@ -302,7 +302,7 @@ mod deposit_tests {
         };
 
         state
-            .update_user_balance(node, &tx)
+            .insert_pending_deposit_transaction(node, &tx)
             .await
             .expect("balance update failed");
 
@@ -408,7 +408,7 @@ mod deposit_tests {
         };
 
         state
-            .update_user_balance(node, &tx)
+            .insert_pending_deposit_transaction(node, &tx)
             .await
             .expect("balance update failed");
 
