@@ -10,6 +10,7 @@ use node::key_manager::generate_keys_from_mnemonic;
 use node::wallet::{TaprootWallet, Wallet};
 use oracle::esplora::EsploraOracle;
 use oracle::oracle::Oracle;
+use tonic::transport::Channel;
 use types::proto::node_proto::node_control_client::NodeControlClient;
 use types::proto::node_proto::{
     CheckBalanceRequest, ConfirmWithdrawalRequest, CreateDepositIntentRequest, GetChainInfoRequest,
@@ -658,6 +659,9 @@ async fn run_consensus_test(
         }
     }
 
+    println!("🔗 Verifying chain state consistency across nodes");
+    verify_chain_state_consistency(&mut clients).await?;
+
     // Check final balances to verify transaction execution
     println!("🔍 Verifying transaction execution across nodes");
     let mut execution_consistent = true;
@@ -763,4 +767,49 @@ where
 
         tokio::time::sleep(poll_interval).await;
     }
+}
+
+async fn verify_chain_state_consistency(
+    clients: &mut [NodeControlClient<Channel>],
+) -> Result<(), Box<dyn std::error::Error>> {
+    use types::proto::node_proto::GetChainInfoRequest;
+
+    let mut reference_height: Option<u64> = None;
+    let mut reference_hash: Option<String> = None;
+
+    for (idx, client) in clients.iter_mut().enumerate() {
+        let info = client
+            .get_chain_info(GetChainInfoRequest {})
+            .await?
+            .into_inner();
+
+        println!(
+            "    🌐 Node {}: height={} | hash={}",
+            idx + 1,
+            info.latest_height,
+            info.latest_block_hash
+        );
+
+        if let Some(h) = reference_height {
+            if let Some(hash) = &reference_hash {
+                if h != info.latest_height || hash != &info.latest_block_hash {
+                    return Err(format!(
+                        "Chain state mismatch on node {} (height/hash differ)",
+                        idx + 1
+                    )
+                    .into());
+                }
+            }
+        } else {
+            reference_height = Some(info.latest_height);
+            reference_hash = Some(info.latest_block_hash);
+        }
+    }
+
+    println!(
+        "    ✅ Chain state is consistent across all {} nodes",
+        clients.len()
+    );
+
+    Ok(())
 }

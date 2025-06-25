@@ -31,7 +31,7 @@ uuid.workspace = true
 tracing-subscriber.workspace = true
 bip39.workspace = true
 clap.workspace = true
-
+tonic.workspace = true
 abci = { path = "../crates/abci" }
 protocol = { path = "../crates/protocol" }
 node = { path = "../crates/node" }
