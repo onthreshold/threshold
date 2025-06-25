@@ -1,4 +1,5 @@
-use bincode::{Decode, Encode};
+use bincode::de::{BorrowDecode, BorrowDecoder};
+use bincode::{Decode, Encode, de::Decoder, enc::Encoder};
 use bitcoin::hashes::Hash;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -6,11 +7,47 @@ use types::errors::NodeError;
 
 pub type TransactionId = [u8; 32];
 
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Transaction {
     pub version: u32,
     pub r#type: TransactionType,
     pub operations: Vec<Operation>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+impl Encode for Transaction {
+    fn encode<E: Encoder>(&self, e: &mut E) -> Result<(), bincode::error::EncodeError> {
+        self.version.encode(e)?;
+        self.r#type.encode(e)?;
+        self.operations.encode(e)?;
+        let metadata_string = serde_json::to_string(&self.metadata).unwrap();
+        metadata_string.encode(e)?;
+        Ok(())
+    }
+}
+
+impl<C> Decode<C> for Transaction {
+    fn decode<D: Decoder>(d: &mut D) -> Result<Self, bincode::error::DecodeError> {
+        let version = u32::decode(d)?;
+        let r#type = TransactionType::decode(d)?;
+        let operations = Vec::<Operation>::decode(d)?;
+        let metadata = Option::<String>::decode(d)?;
+        let metadata = metadata.map(|s| serde_json::from_str(&s).unwrap());
+        Ok(Self {
+            version,
+            r#type,
+            operations,
+            metadata,
+        })
+    }
+}
+
+impl<'de, C> BorrowDecode<'de, C> for Transaction {
+    fn borrow_decode<D: BorrowDecoder<'de>>(
+        d: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        Self::decode(d)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode, PartialEq, Eq)]
@@ -57,11 +94,16 @@ pub enum Operation {
 
 impl Transaction {
     #[must_use]
-    pub const fn new(r#type: TransactionType, operations: Vec<Operation>) -> Self {
+    pub const fn new(
+        r#type: TransactionType,
+        operations: Vec<Operation>,
+        metadata: Option<serde_json::Value>,
+    ) -> Self {
         Self {
             version: 1,
             r#type,
             operations,
+            metadata,
         }
     }
 
@@ -77,6 +119,11 @@ impl Transaction {
         for op in &self.operations {
             let op_bytes = bincode::encode_to_vec(op, bincode::config::standard()).unwrap();
             hasher.update(&op_bytes);
+        }
+
+        if let Some(metadata) = &self.metadata {
+            let metadata_string = serde_json::to_string(metadata).unwrap();
+            hasher.update(metadata_string.as_bytes());
         }
 
         let result = hasher.finalize();
@@ -111,20 +158,32 @@ impl Transaction {
                 },
                 Operation::OpIncrementBalance,
             ],
+            Some(serde_json::json!({
+                "tx": tx,
+                "user_pubkey": user_pubkey,
+                "amount_sat": amount_sat,
+            })),
         ))
     }
 
-    pub fn get_deposit_transaction_address(&self) -> Result<String, NodeError> {
-        let Operation::OpPush { value } = &self.operations[2] else {
-            return Err(NodeError::Error("Not a deposit transaction".to_string()));
-        };
-        let txid = bitcoin::Txid::from_slice(value)
-            .map_err(|_| NodeError::Error("Invalid transaction ID length".to_string()))?;
-        Ok(txid.to_string())
+    pub fn get_deposit_transaction_address(&self) -> Result<bitcoin::Transaction, NodeError> {
+        let tx = self
+            .metadata
+            .as_ref()
+            .ok_or_else(|| NodeError::Error("No metadata".to_string()))?;
+        let tx = serde_json::from_value(
+            tx.get("tx")
+                .ok_or_else(|| NodeError::Error("No tx".to_string()))?
+                .clone(),
+        )
+        .map_err(|_| NodeError::Error("Invalid tx".to_string()))?;
+
+        Ok(tx)
     }
 
     pub fn create_withdrawal_transaction(
         user_pubkey: &str,
+        address_to: &str,
         amount_sat: u64,
     ) -> Result<Self, NodeError> {
         Ok(Self::new(
@@ -138,6 +197,11 @@ impl Transaction {
                 },
                 Operation::OpDecrementBalance,
             ],
+            Some(serde_json::json!({
+                "user_pubkey": user_pubkey,
+                "amount_sat": amount_sat,
+                "address_to": address_to,
+            })),
         ))
     }
 }

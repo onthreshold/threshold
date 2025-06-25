@@ -28,6 +28,7 @@ mod withdrawl_tests {
                 },
                 protocol::transaction::Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         node.chain_interface_tx

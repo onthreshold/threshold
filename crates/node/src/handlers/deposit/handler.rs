@@ -125,8 +125,7 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                                 info!("✅ Added broadcasted transaction to pending pool");
                             }
 
-                            let address = transaction.get_deposit_transaction_address()?;
-                            let tx = node.oracle.get_transaction_by_address(&address).await?;
+                            let tx = transaction.get_deposit_transaction_address()?;
                             node.wallet.ingest_external_tx(&tx)?;
                         }
                         Err(e) => {

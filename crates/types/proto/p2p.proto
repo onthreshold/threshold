@@ -108,8 +108,9 @@ message DepositIntent {
 message PendingSpend {
   bytes transaction = 1;
   string user_pubkey = 2;
-  bytes recipient_script = 3;
-  uint64 fee = 4;
+  string address_to = 3;
+  bytes recipient_script = 4;
+  uint64 fee = 5;
 }
 
 // ========== Bitcoin Transaction Wrapper ==========

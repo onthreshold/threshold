@@ -58,6 +58,7 @@ pub struct WithdrawlIntent {
 pub struct PendingSpend {
     pub tx: Transaction,
     pub user_pubkey: String,
+    pub address_to: String,
     pub recipient_script: ScriptBuf,
     pub fee: u64,
 }
@@ -70,6 +71,7 @@ impl Encode for PendingSpend {
         let raw_tx = bitcoin::consensus::encode::serialize(&self.tx);
         bincode::Encode::encode(&raw_tx, encoder)?;
         bincode::Encode::encode(&self.user_pubkey, encoder)?;
+        bincode::Encode::encode(&self.address_to, encoder)?;
         bincode::Encode::encode(&self.recipient_script.as_bytes(), encoder)?;
         bincode::Encode::encode(&self.fee, encoder)?;
         Ok(())
@@ -84,11 +86,13 @@ impl<Context> Decode<Context> for PendingSpend {
         let raw_tx: Transaction = bitcoin::consensus::encode::deserialize(&raw_tx_bytes)
             .map_err(|_| bincode::error::DecodeError::Other("Failed to deserialize transaction"))?;
         let user_pubkey = bincode::Decode::decode(decoder)?;
+        let address_to = bincode::Decode::decode(decoder)?;
         let recipient_script = ScriptBuf::from_bytes(bincode::Decode::decode(decoder)?);
         let fee = bincode::Decode::decode(decoder)?;
         Ok(Self {
             tx: raw_tx,
             user_pubkey,
+            address_to,
             recipient_script,
             fee,
         })
@@ -103,6 +107,7 @@ impl ProtoEncode for PendingSpend {
         let proto_intent = p2p_proto::PendingSpend {
             transaction: transaction_bytes,
             user_pubkey: self.user_pubkey.clone(),
+            address_to: self.address_to.clone(),
             recipient_script: script_bytes,
             fee: self.fee,
         };
@@ -127,6 +132,7 @@ impl ProtoDecode for PendingSpend {
         Ok(Self {
             tx,
             user_pubkey: proto_intent.user_pubkey,
+            address_to: proto_intent.address_to,
             recipient_script,
             fee: proto_intent.fee,
         })

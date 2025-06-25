@@ -10,12 +10,21 @@ use bitcoin::{
     Amount, Network, ScriptBuf, Sequence, Transaction, TxIn, TxOut, absolute::LockTime,
     transaction::Version, witness::Witness,
 };
+use itertools::Itertools;
 use oracle::oracle::Oracle;
+use protocol::block::Block;
+use protocol::transaction::TransactionType;
+use std::str::FromStr;
 use std::sync::Arc;
 use types::errors::NodeError;
 use types::utxo::Utxo;
 
 use super::Wallet;
+
+const IN_SZ_VBYTES: f64 = 68.0; // assume P2WPKH/P2TR key-spend
+const OUT_SZ_VBYTES: f64 = 31.0; // P2WPKH/P2TR output
+const TX_OVH_VBYTES: f64 = 10.5; // version + locktime + marker/flag
+const DUST: u64 = 546;
 
 #[derive(Debug, Clone)]
 pub struct TrackedUtxo {
@@ -324,5 +333,141 @@ impl Wallet for TaprootWallet {
 
     fn get_utxos(&self) -> Vec<TrackedUtxo> {
         self.utxos.clone()
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
+    fn get_transaction_for_block(
+        &self,
+        block: Block,
+        feerate_sat_per_vb: u64,
+    ) -> Result<bitcoin::Transaction, NodeError> {
+        let mut payouts: Vec<(bitcoin::Address, u64)> = Vec::new();
+
+        for tx in &block.body.transactions {
+            if tx.r#type != TransactionType::Withdrawal {
+                continue;
+            }
+
+            let meta = tx
+                .metadata
+                .as_ref()
+                .ok_or_else(|| NodeError::Error("Withdrawal tx missing metadata".into()))?;
+
+            let addr_str = meta
+                .get("address_to")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| NodeError::Error("Withdrawal tx missing address_to".into()))?;
+
+            let amt_sat = meta
+                .get("amount_sat")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| NodeError::Error("Withdrawal tx missing amount_sat".into()))?;
+
+            let addr = bitcoin::Address::from_str(addr_str)
+                .map_err(|e| NodeError::Error(e.to_string()))
+                .map(bitcoin::Address::assume_checked)?;
+            payouts.push((addr, amt_sat));
+        }
+
+        if payouts.is_empty() {
+            return Err(NodeError::Error(
+                "Block contains no withdrawals to process".into(),
+            ));
+        }
+
+        let fee_rate = feerate_sat_per_vb as f64;
+        let total_payout: u64 = payouts.iter().map(|(_, v)| *v).sum();
+        let utxos = &self.utxos; // shorthand
+
+        if utxos.is_empty() {
+            return Err(NodeError::Error("Wallet has no spendable UTXOs".into()));
+        }
+
+        let mut candidates = utxos.clone();
+        candidates.sort_by(|a, b| b.utxo.value.cmp(&a.utxo.value));
+
+        let mut chosen: Option<Vec<TrackedUtxo>> = None;
+        let mut chosen_change = 0_u64;
+
+        'outer: for k in 1..=candidates.len() {
+            for idx_set in (0..candidates.len()).combinations(k) {
+                let inputs: Vec<&TrackedUtxo> = idx_set.iter().map(|&i| &candidates[i]).collect();
+                let in_sum: u64 = inputs.iter().map(|t| t.utxo.value.to_sat()).sum();
+
+                let mut n_out = payouts.len() + 1;
+                let mut weight = (n_out as f64).mul_add(
+                    OUT_SZ_VBYTES,
+                    (k as f64).mul_add(IN_SZ_VBYTES, TX_OVH_VBYTES),
+                );
+                let mut fee = (weight * fee_rate).ceil() as u64;
+
+                if in_sum < total_payout + fee {
+                    continue; // under-funded
+                }
+
+                let mut change = in_sum - total_payout - fee;
+                if change > 0 && change < DUST {
+                    n_out -= 1;
+                    weight = (n_out as f64).mul_add(
+                        OUT_SZ_VBYTES,
+                        (k as f64).mul_add(IN_SZ_VBYTES, TX_OVH_VBYTES),
+                    );
+                    fee = (weight * fee_rate).ceil() as u64;
+                    change = in_sum - total_payout - fee;
+                }
+
+                if change == 0 || change >= DUST {
+                    chosen = Some(inputs.into_iter().cloned().collect());
+                    chosen_change = change;
+                    break 'outer;
+                }
+            }
+        }
+
+        let selected = chosen.ok_or_else(|| {
+            NodeError::Error("Insufficient funds to satisfy withdrawals + fee".into())
+        })?;
+
+        let tx_inputs: Vec<TxIn> = selected
+            .iter()
+            .map(|t| TxIn {
+                previous_output: t.utxo.outpoint,
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::ZERO,
+                witness: Witness::new(),
+            })
+            .collect();
+
+        let mut tx_outputs: Vec<TxOut> = payouts
+            .iter()
+            .map(|(addr, amt)| TxOut {
+                value: Amount::from_sat(*amt),
+                script_pubkey: addr.script_pubkey(),
+            })
+            .collect();
+
+        if chosen_change > 0 {
+            let change_addr = self
+                .addresses
+                .first()
+                .ok_or_else(|| NodeError::Error("Wallet has no change address".into()))?;
+            tx_outputs.push(TxOut {
+                value: Amount::from_sat(chosen_change),
+                script_pubkey: change_addr.script_pubkey(),
+            });
+        }
+
+        let tx = bitcoin::Transaction {
+            version: Version::TWO,
+            lock_time: LockTime::ZERO,
+            input: tx_inputs,
+            output: tx_outputs,
+        };
+
+        Ok(tx)
     }
 }

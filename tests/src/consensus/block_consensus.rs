@@ -203,6 +203,7 @@ mod block_consensus_tests {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         )
     }
 

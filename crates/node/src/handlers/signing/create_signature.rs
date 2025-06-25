@@ -402,6 +402,7 @@ impl SigningState {
                             &tx,
                             pending.fee,
                             pending.user_pubkey,
+                            pending.address_to,
                         )
                         .await?;
                         debug!("📤 Broadcasted transaction");
