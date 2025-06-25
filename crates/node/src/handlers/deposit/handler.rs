@@ -84,7 +84,10 @@ impl<N: Network, W: Wallet> Handler<N, W> for DepositIntentState {
                 request: SelfRequest::ConfirmDeposit { confirmed_tx },
                 ..
             } => {
-                if let Err(e) = self.update_user_balance(node, &confirmed_tx).await {
+                if let Err(e) = self
+                    .insert_pending_deposit_transaction(node, &confirmed_tx)
+                    .await
+                {
                     info!("❌ Failed to update user balance: {}", e);
                 } else {
                     info!(
