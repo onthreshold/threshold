@@ -413,7 +413,7 @@ async fn test_execute_transaction_push_operations() {
     let mut executor = create_test_executor();
     let initial_state = ChainState::new();
 
-    let transaction = Transaction::new8(
+    let transaction = Transaction::new(
         TransactionType::Deposit,
         vec![
             Operation::OpPush {
@@ -423,6 +423,7 @@ async fn test_execute_transaction_push_operations() {
                 value: vec![4, 5, 6],
             },
         ],
+        None,
     );
 
     let result = executor
@@ -467,6 +468,7 @@ async fn test_execute_transaction_deposit_flow() {
             },
             Operation::OpIncrementBalance,
         ],
+        None,
     );
 
     let result = executor
@@ -503,6 +505,7 @@ async fn test_execute_transaction_withdrawal_flow() {
             },
             Operation::OpDecrementBalance,
         ],
+        None,
     );
 
     let result = executor
@@ -532,6 +535,7 @@ async fn test_execute_transaction_error_propagation() {
             },
             Operation::OpIncrementBalance,
         ],
+        None,
     );
 
     let result = executor
