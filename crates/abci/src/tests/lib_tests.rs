@@ -198,6 +198,7 @@ async fn test_execute_deposit_transaction() {
             },
             Operation::OpIncrementBalance,
         ],
+        None,
     );
 
     // Execute transaction
@@ -252,6 +253,7 @@ async fn test_execute_withdrawal_transaction() {
             },
             Operation::OpIncrementBalance,
         ],
+        None,
     );
 
     chain_interface
@@ -280,6 +282,7 @@ async fn test_execute_withdrawal_transaction() {
             },
             Operation::OpDecrementBalance,
         ],
+        None,
     );
 
     // Execute withdrawal
@@ -321,6 +324,7 @@ async fn test_execute_transaction_insufficient_balance() {
             },
             Operation::OpDecrementBalance,
         ],
+        None,
     );
 
     // Add transaction to pending
@@ -373,6 +377,7 @@ async fn test_execute_transaction_state_persistence() {
             },
             Operation::OpIncrementBalance,
         ],
+        None,
     );
 
     chain_interface
@@ -427,6 +432,7 @@ async fn test_execute_multiple_transactions() {
                 },
                 Operation::OpIncrementBalance,
             ],
+            None,
         );
 
         chain_interface
@@ -465,6 +471,7 @@ async fn test_transaction_error_propagation() {
             },
             Operation::OpIncrementBalance, // This should fail due to no allowance
         ],
+        None,
     );
 
     let result = chain_interface
@@ -530,6 +537,7 @@ async fn test_concurrent_operations() {
             },
             Operation::OpIncrementBalance,
         ],
+        None,
     );
 
     chain_interface
