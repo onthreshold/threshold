@@ -165,11 +165,10 @@ DOCKER_COMPOSE_FILE_PATH="$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_FILE
 echo "Successfully generated '$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_FILE'."
 
 # ------------------- Build Docker Image Once ----------------------------
-echo -e "\nBuilding Docker image..."
-
-cd "$BASE_DIR/test_${NUM_NODES}_nodes"
-
 if [ -z "$2" ]; then
+  echo -e "\nBuilding Docker image..."
+  cd "$BASE_DIR/test_${NUM_NODES}_nodes"
+
   docker build -t threshold-node -f ../../Dockerfile ../..
 fi
 
@@ -177,8 +176,5 @@ fi
 echo -e "\nStarting Docker Compose for $NUM_NODES nodes..."
 
 docker compose -f "$DOCKER_COMPOSE_FILE" up -d
-
-# Wait 10 seconds for dkg to complete
-sleep 20s
 
 echo "All nodes started."

@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: vault-node
+    image: trieve/threshold
     environment:
       - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
@@ -21,7 +21,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: vault-node
+    image: trieve/threshold
     environment:
       - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
@@ -39,7 +39,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: vault-node
+    image: trieve/threshold
     environment:
       - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
@@ -57,7 +57,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: vault-node
+    image: trieve/threshold
     environment:
       - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
@@ -75,7 +75,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: vault-node
+    image: trieve/threshold
     environment:
       - KEY_PASSWORD=supersecret
       - IS_TESTNET=true
