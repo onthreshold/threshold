@@ -142,7 +142,7 @@ impl Oracle for MockOracle {
 
     async fn poll_new_transactions(&mut self, _addresses: Vec<Address>) {
         info!("Polling new transactions");
-        let Some(dep_tx_sender) = self.deposit_intent_rx.take() else {
+        let Some(ref dep_tx_sender) = self.deposit_intent_rx else {
             return;
         };
 
