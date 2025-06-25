@@ -33,6 +33,7 @@ pub struct NodeConfig {
     pub monitor_start_block: u32,
     pub min_signers: Option<u16>,
     pub max_signers: Option<u16>,
+    pub save_keys: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,6 +55,7 @@ pub struct ConfigStore {
     pub monitor_start_block: u32,
     pub min_signers: Option<u16>,
     pub max_signers: Option<u16>,
+    pub save_keys: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -147,6 +149,7 @@ impl NodeConfig {
             monitor_start_block: 0,
             min_signers: None,
             max_signers: None,
+            save_keys: true,
         })
     }
 
@@ -189,6 +192,7 @@ impl NodeConfig {
             monitor_start_block: self.monitor_start_block,
             min_signers: self.min_signers,
             max_signers: self.max_signers,
+            save_keys: self.save_keys,
         };
 
         let config_str: String = serde_yaml::to_string(&config_store).unwrap();
@@ -271,6 +275,7 @@ impl NodeConfig {
             monitor_start_block: config_store.monitor_start_block,
             min_signers: config_store.min_signers,
             max_signers: config_store.max_signers,
+            save_keys: config_store.save_keys,
         };
 
         Ok(node_config)
@@ -312,7 +317,9 @@ impl NodeConfig {
         };
 
         self.dkg_keys = Some(dkg_keys);
-        self.save_to_keys_file()?;
+        if self.save_keys {
+            self.save_to_keys_file()?;
+        }
 
         Ok(())
     }
@@ -370,6 +377,7 @@ pub struct NodeConfigBuilder {
     monitor_start_block: Option<u32>,
     min_signers: Option<u16>,
     max_signers: Option<u16>,
+    save_keys: Option<bool>,
 }
 
 impl Default for NodeConfigBuilder {
@@ -398,6 +406,7 @@ impl NodeConfigBuilder {
             monitor_start_block: None,
             min_signers: None,
             max_signers: None,
+            save_keys: None,
         }
     }
     #[must_use]
@@ -490,6 +499,12 @@ impl NodeConfigBuilder {
         self
     }
 
+    #[must_use]
+    pub const fn save_keys(mut self, save_keys: bool) -> Self {
+        self.save_keys = Some(save_keys);
+        self
+    }
+
     pub fn build(self) -> Result<NodeConfig, NodeError> {
         let key_file_path = self.key_file_path.ok_or_else(|| {
             NodeError::Error("key_file_path must be provided when building NodeConfig".into())
@@ -510,6 +525,10 @@ impl NodeConfigBuilder {
             &password,
         )
         .map_err(|e| NodeError::Error(format!("Failed to create NodeConfig: {e}")))?;
+
+        if let Some(save_keys) = self.save_keys {
+            cfg.save_keys = save_keys;
+        }
 
         if let Some(data) = self.key_data {
             cfg.key_data = data;

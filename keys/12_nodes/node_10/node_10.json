@@ -1,0 +1,12 @@
+{
+  "key_data": {
+    "public_key_b58": "12D3KooWDFZLHP5rKqiSZ1cU5cevivcoSUk2LWhiaSxCKXXxU9Gq",
+    "encrypted_private_key_b64": "JY+LLVym/p/4oKdTbH31eH63Nlv67F6mZoxOvSOxm2H72V/7P8m4nb8qGliI7ufLx2zVIMrGLDMAjot2Vg1BmcVbSC88GtxdsbZnRAySlQ2FQM63",
+    "encryption_params": {
+      "kdf": "argon2id",
+      "salt_b64": "lQ+ascVb/CXxPy9esPSIbw",
+      "iv_b64": "3ZMpZ+fl2bP3hUDs"
+    }
+  },
+  "dkg_keys": null
+}

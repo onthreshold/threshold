@@ -17,3 +17,4 @@ confirmation_depth: 6
 monitor_start_block: 0
 min_signers: 3
 max_signers: 5
+save_keys: true
