@@ -1,14 +1,14 @@
 allowed_peers:
+  - name: node_1
+    public_key: 12D3KooWLcQzxnFPbw2RLeY4hWyV1ywhZ8fPRaLrRChGnno4awDN
   - name: node_2
     public_key: 12D3KooWLzCeKDmYH98cpENF4CmNyNJ4PS9NWgvKQj5qyGTN8EVD
   - name: node_3
     public_key: 12D3KooWKrJT5uxJoXPUXy6JFewk9Duffvpg1MtCXgw3yyT2PbT8
-  - name: node_4
-    public_key: 12D3KooWDoQciejAoCSzA3GjUekJdhsuY9E2RqnbHWhVoAmNFL7n
   - name: node_5
     public_key: 12D3KooWDSGNfTSyKxQy8mKJRjWNsEsiX83hC5SGmWjS7vBtDgrp
 log_file_path: /home/denssumesh/.config/thevault/node.log
-key_file_path: visuals/nodes/node_1/node_1.json
+key_file_path: visuals/nodes/node_4/node_4.json
 database_directory: nodedb.db
 grpc_port: 50051
 libp2p_udp_port: 0
@@ -17,3 +17,4 @@ confirmation_depth: 6
 monitor_start_block: 0
 min_signers: 3
 max_signers: 5
+save_keys: true

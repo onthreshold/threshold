@@ -12,8 +12,8 @@ services:
     ports:
       - "50051:50051"
     volumes:
-      - ./keys/node_1/node_1.json:/app/configs/node_1.json
-      - ./keys/node_1/node_1.yaml:/app/configs/node_1.yaml
+      - ./keys/5_nodes/node_1/node_1.json:/app/configs/node_1.json
+      - ./keys/5_nodes/node_1/node_1.yaml:/app/configs/node_1.yaml
       - ./nodedb_1.db:/app/nodedb.db
     networks:
       - vaultnet
@@ -30,8 +30,8 @@ services:
     ports:
       - "50052:50051"
     volumes:
-      - ./keys/node_2/node_2.json:/app/configs/node_2.json
-      - ./keys/node_2/node_2.yaml:/app/configs/node_2.yaml
+      - ./keys/5_nodes/node_2/node_2.json:/app/configs/node_2.json
+      - ./keys/5_nodes/node_2/node_2.yaml:/app/configs/node_2.yaml
       - ./nodedb_2.db:/app/nodedb.db
     networks:
       - vaultnet
@@ -48,8 +48,8 @@ services:
     ports:
       - "50053:50051"
     volumes:
-      - ./keys/node_3/node_3.json:/app/configs/node_3.json
-      - ./keys/node_3/node_3.yaml:/app/configs/node_3.yaml
+      - ./keys/5_nodes/node_3/node_3.json:/app/configs/node_3.json
+      - ./keys/5_nodes/node_3/node_3.yaml:/app/configs/node_3.yaml
       - ./nodedb_3.db:/app/nodedb.db
     networks:
       - vaultnet
@@ -66,8 +66,8 @@ services:
     ports:
       - "50054:50051"
     volumes:
-      - ./keys/node_4/node_4.json:/app/configs/node_4.json
-      - ./keys/node_4/node_4.yaml:/app/configs/node_4.yaml
+      - ./keys/5_nodes/node_4/node_4.json:/app/configs/node_4.json
+      - ./keys/5_nodes/node_4/node_4.yaml:/app/configs/node_4.yaml
       - ./nodedb_4.db:/app/nodedb.db
     networks:
       - vaultnet
@@ -84,8 +84,8 @@ services:
     ports:
       - "50055:50051"
     volumes:
-      - ./keys/node_5/node_5.json:/app/configs/node_5.json
-      - ./keys/node_5/node_5.yaml:/app/configs/node_5.yaml
+      - ./keys/5_nodes/node_5/node_5.json:/app/configs/node_5.json
+      - ./keys/5_nodes/node_5/node_5.yaml:/app/configs/node_5.yaml
       - ./nodedb_5.db:/app/nodedb.db
     networks:
       - vaultnet

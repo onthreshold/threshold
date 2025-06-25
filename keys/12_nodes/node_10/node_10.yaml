@@ -1,0 +1,34 @@
+allowed_peers:
+- name: node_1
+  public_key: 12D3KooWHRWTnjspkUPeBCRP4E7uWPLWjKPZm6zMDAjZh9wWXTkh
+- name: node_2
+  public_key: 12D3KooWLPixYU1tPHrmrep8KGobwQnjMqZSUoSqgwfD4oStVJWF
+- name: node_3
+  public_key: 12D3KooWH9tLpTSFNaCikNmetPrYJNXLhJsPViV6uGZCPMf8dRM8
+- name: node_4
+  public_key: 12D3KooWBRkFeJTgpX8UiPPkTE9q6s7B9dCC4GT2CmTVcrPC6qjh
+- name: node_5
+  public_key: 12D3KooWMLXs8HRr8ySikPv5KF725fzAdKuZhEBQTbMF2x16LKhx
+- name: node_6
+  public_key: 12D3KooWAceML2c2KurUpA3tg6i1dyeiyKucZPKWeSoYdkpiPhw4
+- name: node_7
+  public_key: 12D3KooWGnHgQES37t4hxmcXaSRwBjWwtu2MbyyRbDg248EVKE5D
+- name: node_8
+  public_key: 12D3KooWMVV25dH7GrNEfE3BfYKBcGn8iqujNzZcasAfDZUKzsNb
+- name: node_9
+  public_key: 12D3KooWSdYhmTKQdUkXKLETeaqecuoxfGryqxKwaeZaKc1rQvEg
+- name: node_11
+  public_key: 12D3KooWMbAuiQ5wgVS5WTxeLUg5BRiYFeqpBR8LacYxYmAVChjT
+- name: node_12
+  public_key: 12D3KooWKDXwFZ3eSQRxhv7cWv9TLhxA8PGuvNhZ4mTmZuwzoabk
+log_file_path: /home/cdxker/.config/thevault/node.log
+key_file_path: /home/cdxker/work/Trieve/threshold/test_artifacts/test_12_nodes/node_10/node_10.json
+database_directory: nodedb.db
+grpc_port: 50051
+libp2p_udp_port: 0
+libp2p_tcp_port: 0
+confirmation_depth: 6
+monitor_start_block: 0
+min_signers: 8
+max_signers: 12
+save_keys: false

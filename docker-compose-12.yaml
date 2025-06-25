@@ -1,0 +1,208 @@
+services:
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_1.json --config-file-path /app/configs/node_1.yaml --use-mock-oracle"
+    ports:
+      - "50057:50051"
+    volumes:
+      - ./keys/12_nodes/node_1/node_1.json:/app/configs/node_1.json
+      - ./keys/12_nodes/node_1/node_1.yaml:/app/configs/node_1.yaml
+    networks:
+      - threshold
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_2.json --config-file-path /app/configs/node_2.yaml --use-mock-oracle"
+    ports:
+      - "50058:50051"
+    volumes:
+      - ./keys/12_nodes/node_2/node_2.json:/app/configs/node_2.json
+      - ./keys/12_nodes/node_2/node_2.yaml:/app/configs/node_2.yaml
+    networks:
+      - threshold
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_3.json --config-file-path /app/configs/node_3.yaml --use-mock-oracle"
+    ports:
+      - "50059:50051"
+    volumes:
+      - ./keys/12_nodes/node_3/node_3.json:/app/configs/node_3.json
+      - ./keys/12_nodes/node_3/node_3.yaml:/app/configs/node_3.yaml
+    networks:
+      - threshold
+  node4:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_4.json --config-file-path /app/configs/node_4.yaml --use-mock-oracle"
+    ports:
+      - "50060:50051"
+    volumes:
+      - ./keys/12_nodes/node_4/node_4.json:/app/configs/node_4.json
+      - ./keys/12_nodes/node_4/node_4.yaml:/app/configs/node_4.yaml
+    networks:
+      - threshold
+  node5:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_5.json --config-file-path /app/configs/node_5.yaml --use-mock-oracle"
+    ports:
+      - "50061:50051"
+    volumes:
+      - ./keys/12_nodes/node_5/node_5.json:/app/configs/node_5.json
+      - ./keys/12_nodes/node_5/node_5.yaml:/app/configs/node_5.yaml
+    networks:
+      - threshold
+  node6:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_6.json --config-file-path /app/configs/node_6.yaml --use-mock-oracle"
+    ports:
+      - "50062:50051"
+    volumes:
+      - ./keys/12_nodes/node_6/node_6.json:/app/configs/node_6.json
+      - ./keys/12_nodes/node_6/node_6.yaml:/app/configs/node_6.yaml
+    networks:
+      - threshold
+  node7:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_7.json --config-file-path /app/configs/node_7.yaml --use-mock-oracle"
+    ports:
+      - "50063:50051"
+    volumes:
+      - ./keys/12_nodes/node_7/node_7.json:/app/configs/node_7.json
+      - ./keys/12_nodes/node_7/node_7.yaml:/app/configs/node_7.yaml
+    networks:
+      - threshold
+  node8:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_8.json --config-file-path /app/configs/node_8.yaml --use-mock-oracle"
+    ports:
+      - "50064:50051"
+    volumes:
+      - ./keys/12_nodes/node_8/node_8.json:/app/configs/node_8.json
+      - ./keys/12_nodes/node_8/node_8.yaml:/app/configs/node_8.yaml
+    networks:
+      - threshold
+  node9:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_9.json --config-file-path /app/configs/node_9.yaml --use-mock-oracle"
+    ports:
+      - "50065:50051"
+    volumes:
+      - ./keys/12_nodes/node_9/node_9.json:/app/configs/node_9.json
+      - ./keys/12_nodes/node_9/node_9.yaml:/app/configs/node_9.yaml
+    networks:
+      - threshold
+  node10:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_10.json --config-file-path /app/configs/node_10.yaml --use-mock-oracle"
+    ports:
+      - "50066:50051"
+    volumes:
+      - ./keys/12_nodes/node_10/node_10.json:/app/configs/node_10.json
+      - ./keys/12_nodes/node_10/node_10.yaml:/app/configs/node_10.yaml
+    networks:
+      - threshold
+  node11:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_11.json --config-file-path /app/configs/node_11.yaml --use-mock-oracle"
+    ports:
+      - "50067:50051"
+    volumes:
+      - ./keys/12_nodes/node_11/node_11.json:/app/configs/node_11.json
+      - ./keys/12_nodes/node_11/node_11.yaml:/app/configs/node_11.yaml
+    networks:
+      - threshold
+  node12:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trieve/threshold
+    environment:
+      - KEY_PASSWORD=supersecret
+      - IS_TESTNET=true
+      - RUST_LOG=info
+    entrypoint: "/app/cli run --key-file-path /app/configs/node_12.json --config-file-path /app/configs/node_12.yaml --use-mock-oracle"
+    ports:
+      - "50068:50051"
+    volumes:
+      - ./keys/12_nodes/node_12/node_12.json:/app/configs/node_12.json
+      - ./keys/12_nodes/node_12/node_12.yaml:/app/configs/node_12.yaml
+    networks:
+      - threshold
+networks:
+  threshold:
+    driver: bridge
