@@ -101,7 +101,11 @@ jobs:
 
       - name: Start 12-node stack (docker-compose)
         run: |
-          bash setup_nodes.sh 12
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bash setup_nodes.sh 12 "trieve/threshold:pr-${{ github.event.pull_request.number }}"
+          else
+            bash setup_nodes.sh 12 "trieve/threshold:latest"
+          fi
 
       - name: Wait for gRPC endpoints
         run: |
@@ -173,14 +177,18 @@ jobs:
 
       - name: Start 5-node stack (docker-compose)
         run: |
-          docker compose -f docker-compose.yaml up -d
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bash setup_nodes.sh 5 "trieve/threshold:pr-${{ github.event.pull_request.number }}"
+          else
+            bash setup_nodes.sh 5 "trieve/threshold:latest"
+          fi
 
       - name: Wait for gRPC endpoint
         run: |
-          echo "Waiting for node to expose port 50051..."
+          echo "Waiting for node to expose port 50057-50061..."
           for i in {1..30}; do
-            if nc -z localhost 50051; then
-              echo "Port 50051 is open."
+            if nc -z localhost {50057..50061}; then
+              echo "Port 50057-50061 is open."
               break
             fi
             echo "Port not ready yet – retry #$i"
@@ -188,7 +196,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests
-        run: cargo run --bin integration-tests check-dkg --port-range 50051-50055
+        run: cargo run --bin integration-tests check-dkg --port-range 50057-50061
 
   end-to-end-deposit-withdrawl:
     runs-on: blacksmith-16vcpu-ubuntu-2204
@@ -237,14 +245,18 @@ jobs:
 
       - name: Start 5-node stack (docker-compose)
         run: |
-          docker compose -f docker-compose.yaml up -d
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bash setup_nodes.sh 5 "trieve/threshold:pr-${{ github.event.pull_request.number }}"
+          else
+            bash setup_nodes.sh 5 "trieve/threshold:latest"
+          fi
 
       - name: Wait for gRPC endpoint
         run: |
-          echo "Waiting for node to expose port 50051..."
+          echo "Waiting for node to expose port 50057-50061..."
           for i in {1..30}; do
-            if nc -z localhost 50051; then
-              echo "Port 50051 is open."
+            if nc -z localhost {50057..50061}; then
+              echo "Port 50057-50061 is open."
               break
             fi
             echo "Port not ready yet – retry #$i"
@@ -252,7 +264,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests
-        run: cargo run --bin integration-tests test
+        run: cargo run --bin integration-tests test --port-range 50057-50061
 
       - name: Shutdown stack & print logs
         run: |
@@ -309,14 +321,18 @@ jobs:
 
       - name: Start 5-node stack with network chaos
         run: |
-          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml up -d
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bash setup_nodes.sh 5 "trieve/threshold:pr-${{ github.event.pull_request.number }}"
+          else
+            bash setup_nodes.sh 5 "trieve/threshold:latest"
+          fi
 
       - name: Wait for gRPC endpoint
         run: |
-          echo "Waiting for node to expose port 50051..."
+          echo "Waiting for node to expose port 50057-50061..."
           for i in {1..30}; do
-            if nc -z localhost 50051; then
-              echo "Port 50051 is open."
+            if nc -z localhost {50057..50061}; then
+              echo "Port 50057-50061 is open."
               break
             fi
             echo "Port not ready yet – retry #$i"
@@ -324,7 +340,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests with network chaos
-        run: cargo run --bin integration-tests check-dkg --port-range 50051-50055
+        run: cargo run --bin integration-tests check-dkg --port-range 50057-50061
 
       - name: Shutdown stack & print logs
         run: |
@@ -378,14 +394,18 @@ jobs:
 
       - name: Start 5-node stack with node chaos
         run: |
-          docker compose -f docker-compose.yaml -f docker-compose.chaos-nodes.yaml up -d
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bash setup_nodes.sh 5 "trieve/threshold:pr-${{ github.event.pull_request.number }}"
+          else
+            bash setup_nodes.sh 5 "trieve/threshold:latest"
+          fi
 
       - name: Wait for gRPC endpoint
         run: |
-          echo "Waiting for node to expose port 50051..."
+          echo "Waiting for node to expose port 50057-50061..."
           for i in {1..30}; do
-            if nc -z localhost 50051; then
-              echo "Port 50051 is open."
+            if nc -z localhost {50057..50061}; then
+              echo "Port 50057-50061 is open."
               break
             fi
             echo "Port not ready yet – retry #$i"
@@ -393,7 +413,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests with node chaos
-        run: cargo run --bin integration-tests check-dkg --port-range 50051-50055
+        run: cargo run --bin integration-tests check-dkg --port-range 50057-50061
 
       - name: Shutdown stack & print logs
         run: |
@@ -450,14 +470,18 @@ jobs:
 
       - name: Start 5-node stack with network chaos
         run: |
-          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml up -d
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            bash setup_nodes.sh 5 "trieve/threshold:pr-${{ github.event.pull_request.number }}"
+          else
+            bash setup_nodes.sh 5 "trieve/threshold:latest"
+          fi
 
       - name: Wait for gRPC endpoint
         run: |
-          echo "Waiting for node to expose port 50051..."
+          echo "Waiting for node to expose port 50057-50061..."
           for i in {1..30}; do
-            if nc -z localhost 50051; then
-              echo "Port 50051 is open."
+            if nc -z localhost {50057..50061}; then
+              echo "Port 50057-50061 is open."
               break
             fi
             echo "Port not ready yet – retry #$i"
@@ -465,7 +489,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests with network chaos
-        run: cargo run --bin integration-tests test
+        run: cargo run --bin integration-tests test --port-range 50057-50061
 
       - name: Shutdown stack & print logs
         run: |
@@ -523,10 +547,10 @@ jobs:
 
       - name: Wait for gRPC endpoint
         run: |
-          echo "Waiting for node to expose port 50051..."
+          echo "Waiting for node to expose port 50057-50061..."
           for i in {1..30}; do
-            if nc -z localhost 50051; then
-              echo "Port 50051 is open."
+            if nc -z localhost {50057..50061}; then
+              echo "Port 50057-50061 is open."
               break
             fi
             echo "Port not ready yet – retry #$i"
@@ -534,7 +558,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests with node chaos
-        run: cargo run --bin integration-tests test
+        run: cargo run --bin integration-tests test --port-range 50057-50061
 
       - name: Shutdown stack & print logs
         run: |

@@ -16,6 +16,7 @@ set -euo pipefail
 
 # --------------------------- Configuration -----------------------------------
 NUM_NODES=${1:-5}
+IMAGE_TAG=${2:-trieve/threshold:latest}
 BASE_DIR="test_artifacts/"
 
 CLI_CMD=(cargo run --quiet --bin cli)
@@ -137,7 +138,7 @@ for i in $(seq 1 "$NUM_NODES"); do
 
   cat >> "$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_FILE" <<EOL
   node${i}:
-    image: threshold-node
+    image: $IMAGE_TAG
     environment:
       - KEY_PASSWORD=${KEY_PASSWORD}
       - IS_TESTNET=true
@@ -167,7 +168,10 @@ echo "Successfully generated '$BASE_DIR/test_${NUM_NODES}_nodes/$DOCKER_COMPOSE_
 echo -e "\nBuilding Docker image..."
 
 cd "$BASE_DIR/test_${NUM_NODES}_nodes"
-docker build -t threshold-node -f ../../Dockerfile ../..
+
+if [ -z "$2" ]; then
+  docker build -t threshold-node -f ../../Dockerfile ../..
+fi
 
 # ------------------- Start Docker Compose ----------------------------
 echo -e "\nStarting Docker Compose for $NUM_NODES nodes..."

@@ -35,6 +35,8 @@ enum Commands {
         use_testnet: bool,
         #[arg(short, long)]
         endpoint: Option<String>,
+        #[arg(long, default_value = "50051-50055")]
+        port_range: Option<String>,
     },
     /// Run the deposit integration flow
     DepositTest {
@@ -77,11 +79,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             amount,
             endpoint,
             use_testnet,
+            port_range,
         } => {
             println!("🧪 Running all integration tests...\n");
 
             println!("🔄 Running dkg test...");
-            check_if_dkg_keys_exist("50051-50055".to_string()).await?;
+            check_if_dkg_keys_exist(port_range.unwrap_or("50051-50055".to_string())).await?;
             println!("✅ DKG test completed\n");
 
             println!("⏳ Waiting for DKG deposit intents to settle (max 60s)...");
