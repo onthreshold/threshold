@@ -113,4 +113,10 @@ impl Db for MockDb {
         let utxos = self.utxos.read().unwrap();
         Ok(utxos.values().cloned().collect())
     }
+
+    fn remove_deposit_intent(&self, intent: DepositIntent) -> Result<(), NodeError> {
+        let mut deposit_intents = self.deposit_intents.write().unwrap();
+        deposit_intents.remove(&intent.deposit_tracking_id);
+        Ok(())
+    }
 }
