@@ -264,7 +264,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests
-        run: cargo run --bin integration-tests test --port-range 50057-50061
+        run: cargo run --bin integration-tests test --port-range 50051-50055
 
       - name: Shutdown stack & print logs
         run: |
@@ -465,22 +465,17 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libclang-dev clang
 
-      - name: Create NodeCluster (3 nodes)
-        run: ./scripts/clear_dkg_keys.sh
-
       - name: Start 5-node stack with network chaos
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            bash setup_nodes.sh 5 "trieve/threshold:pr-${{ github.event.pull_request.number }}"
-          else
-            bash setup_nodes.sh 5 "trieve/threshold:latest"
-          fi
+          # Modify docker-compose.yaml to the correct tag
+          sed -i "s/trieve\/threshold:latest/trieve\/threshold:pr-${{ github.event.pull_request.number }}/g" docker-compose.yaml
+          docker compose -f docker-compose.yaml up -d
 
       - name: Wait for gRPC endpoint
         run: |
-          echo "Waiting for node to expose port 50057-50061..."
+          echo "Waiting for node to expose port 50051-50055..."
           for i in {1..30}; do
-            if nc -z localhost {50057..50061}; then
+            if nc -z localhost {50051..50055}; then
               echo "Port 50057-50061 is open."
               break
             fi
@@ -489,12 +484,12 @@ jobs:
           done
 
       - name: Run end-to-end integration tests with network chaos
-        run: cargo run --bin integration-tests test --port-range 50057-50061
+        run: cargo run --bin integration-tests test --port-range 50051-50055
 
       - name: Shutdown stack & print logs
         run: |
-          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml logs --no-color || true
-          docker compose -f docker-compose.yaml -f docker-compose.chaos-network.yaml down --volumes --remove-orphans || true
+          docker compose -f docker-compose.yaml logs --no-color || true
+          docker compose -f docker-compose.yaml down --volumes --remove-orphans || true
 
   end-to-end-deposit-withdrawl-chaos-nodes:
     runs-on: blacksmith-16vcpu-ubuntu-2204
@@ -558,7 +553,7 @@ jobs:
           done
 
       - name: Run end-to-end integration tests with node chaos
-        run: cargo run --bin integration-tests test --port-range 50057-50061
+        run: cargo run --bin integration-tests test --port-range 50051-50055
 
       - name: Shutdown stack & print logs
         run: |
