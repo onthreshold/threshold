@@ -222,4 +222,16 @@ impl Db for RocksDb {
 
         Ok(utxos)
     }
+
+    fn remove_deposit_intent(&self, intent: DepositIntent) -> Result<(), NodeError> {
+        self.db.delete_cf(
+            self.db.cf_handle("deposit_intents").unwrap(),
+            &intent.deposit_tracking_id,
+        )?;
+        self.db.delete_cf(
+            self.db.cf_handle("deposit_intents").unwrap(),
+            format!("addr:{}", intent.deposit_address),
+        )?;
+        Ok(())
+    }
 }

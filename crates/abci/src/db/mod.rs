@@ -15,6 +15,7 @@ pub trait Db: Send + Sync {
     fn insert_deposit_intent(&self, intent: DepositIntent) -> Result<(), NodeError>;
     fn get_deposit_intent(&self, tracking_id: &str) -> Result<Option<DepositIntent>, NodeError>;
     fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError>;
+    fn remove_deposit_intent(&self, intent: DepositIntent) -> Result<(), NodeError>;
     fn get_deposit_intent_by_address(
         &self,
         address: &str,

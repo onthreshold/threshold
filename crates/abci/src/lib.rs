@@ -18,6 +18,7 @@ pub trait ChainInterface: Send + Sync {
     fn insert_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError>;
     fn get_all_deposit_intents(&self) -> Result<Vec<DepositIntent>, NodeError>;
     fn get_deposit_intent_by_address(&self, address: &str) -> Option<DepositIntent>;
+    fn remove_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError>;
 
     fn create_genesis_block(
         &mut self,
@@ -68,20 +69,51 @@ pub enum ChainMessage {
     },
     GetPendingTransactions,
     GetChainState,
+    GetChainInfo,
+    RemoveDepositIntent {
+        intent: DepositIntent,
+    },
 }
 
 #[derive(Clone)]
 pub enum ChainResponse {
-    InsertDepositIntent { error: Option<NodeError> },
-    GetAccount { account: Option<Account> },
-    GetAllDepositIntents { intents: Vec<DepositIntent> },
-    GetDepositIntentByAddress { intent: Option<DepositIntent> },
-    CreateGenesisBlock { error: Option<NodeError> },
-    AddTransactionToBlock { error: Option<NodeError> },
-    GetProposedBlock { block: Block },
-    FinalizeAndStoreBlock { error: Option<NodeError> },
-    GetPendingTransactions { transactions: Vec<Transaction> },
-    GetChainState { state: chain_state::ChainState },
+    InsertDepositIntent {
+        error: Option<NodeError>,
+    },
+    GetAccount {
+        account: Option<Account>,
+    },
+    GetAllDepositIntents {
+        intents: Vec<DepositIntent>,
+    },
+    GetDepositIntentByAddress {
+        intent: Option<DepositIntent>,
+    },
+    CreateGenesisBlock {
+        error: Option<NodeError>,
+    },
+    AddTransactionToBlock {
+        error: Option<NodeError>,
+    },
+    GetProposedBlock {
+        block: Block,
+    },
+    FinalizeAndStoreBlock {
+        error: Option<NodeError>,
+    },
+    GetPendingTransactions {
+        transactions: Vec<Transaction>,
+    },
+    GetChainState {
+        state: chain_state::ChainState,
+    },
+    GetChainInfo {
+        height: u64,
+        pending_transactions: usize,
+    },
+    RemoveDepositIntent {
+        error: Option<NodeError>,
+    },
 }
 
 pub struct ChainInterfaceImpl {
@@ -130,6 +162,12 @@ impl ChainInterface for ChainInterfaceImpl {
         self.chain_state
             .get_deposit_intent_by_address(address)
             .cloned()
+    }
+
+    fn remove_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError> {
+        self.chain_state.remove_deposit_intent(&intent);
+        self.db.remove_deposit_intent(intent)?;
+        Ok(())
     }
 
     fn create_genesis_block(

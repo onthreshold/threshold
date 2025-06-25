@@ -204,6 +204,11 @@ pub async fn start_node(
         })
         .await;
 
+    // Initialize consensus state from current chain state
+    if let Err(e) = consensus_interface.initialize_from_chain_state().await {
+        tracing::error!("Failed to initialize consensus from chain state: {}", e);
+    }
+
     let consensus_interface_handle = tokio::spawn(async move {
         consensus_interface.start().await;
     });

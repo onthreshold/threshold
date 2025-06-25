@@ -255,6 +255,12 @@ impl ChainInterface for MockChainInterface {
     fn get_chain_state(&self) -> ChainState {
         self.chain_state.clone()
     }
+
+    fn remove_deposit_intent(&mut self, intent: DepositIntent) -> Result<(), NodeError> {
+        self.chain_state.remove_deposit_intent(&intent);
+        self.db.remove_deposit_intent(intent)?;
+        Ok(())
+    }
 }
 
 impl TestChainInterface for MockChainInterface {

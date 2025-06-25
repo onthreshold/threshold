@@ -340,7 +340,7 @@ pub fn build_swarm(
                 .mesh_outbound_min(mesh_n_low)
                 .gossip_lazy(std::cmp::max(3, mesh_n_low))
                 .max_transmit_size(64 * 1024)
-                .flood_publish(false)
+                .flood_publish(true)
                 .build()
                 .map_err(io::Error::other)?;
 

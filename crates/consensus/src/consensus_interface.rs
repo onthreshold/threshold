@@ -64,6 +64,42 @@ impl ConsensusInterfaceImpl {
         self.max_validators = Some(max_validators);
     }
 
+    pub async fn initialize_from_chain_state(&mut self) -> Result<(), NodeError> {
+        if let Some(chain_tx) = &mut self.chain_interface_tx {
+            match chain_tx
+                .send_message_with_response(abci::ChainMessage::GetChainInfo)
+                .await
+            {
+                Ok(abci::ChainResponse::GetChainInfo {
+                    height,
+                    pending_transactions: _,
+                }) => {
+                    self.state.current_height = height;
+
+                    // Set round to 0 for the current height (fresh start for this height)
+                    self.state.current_round = 0;
+
+                    info!(
+                        "✅ Initialized consensus from chain state: height={}, round={}",
+                        self.state.current_height, self.state.current_round
+                    );
+
+                    Ok(())
+                }
+                Ok(_) => Err(NodeError::Error(
+                    "Unexpected response from chain interface for GetChainInfo".to_string(),
+                )),
+                Err(e) => {
+                    warn!("Failed to get chain info, using default values: {}", e);
+                    Ok(()) // Don't fail initialization, just use defaults
+                }
+            }
+        } else {
+            warn!("Chain interface not available during initialization, using default values");
+            Ok(())
+        }
+    }
+
     fn send_broadcast(&self, message: BroadcastMessage) -> Result<(), NodeError> {
         if let Some(sender) = &self.network_events_tx {
             sender

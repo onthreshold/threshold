@@ -102,6 +102,11 @@ impl ChainState {
         self.deposit_intents.clone()
     }
 
+    pub fn remove_deposit_intent(&mut self, intent: &DepositIntent) {
+        self.deposit_intents
+            .retain(|i| i.deposit_address != intent.deposit_address);
+    }
+
     #[must_use]
     pub fn get_deposit_intent_by_address(&self, address: &str) -> Option<&DepositIntent> {
         self.deposit_intents
@@ -115,6 +120,11 @@ impl ChainState {
     }
 
     pub fn add_transaction_to_block(&mut self, transaction: Transaction) {
+        // Check if the transaction is already in the block
+        if self.proposed_transactions.contains(&transaction) {
+            return;
+        }
+
         self.proposed_transactions.push(transaction);
     }
 

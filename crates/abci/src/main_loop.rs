@@ -39,6 +39,11 @@ impl ChainInterfaceImpl {
                         error: self.insert_deposit_intent(intent).err(),
                     }
                 }
+                ChainMessage::RemoveDepositIntent { intent } => {
+                    ChainResponse::RemoveDepositIntent {
+                        error: self.remove_deposit_intent(intent).err(),
+                    }
+                }
                 ChainMessage::GetAccount { address } => ChainResponse::GetAccount {
                     account: self.get_account(&address),
                 },
@@ -78,6 +83,10 @@ impl ChainInterfaceImpl {
                 },
                 ChainMessage::GetChainState => ChainResponse::GetChainState {
                     state: self.get_chain_state(),
+                },
+                ChainMessage::GetChainInfo => ChainResponse::GetChainInfo {
+                    height: self.get_chain_state().get_block_height(),
+                    pending_transactions: self.get_pending_transactions().len(),
                 },
             };
             response_tx

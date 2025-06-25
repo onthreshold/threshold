@@ -199,6 +199,34 @@ impl DepositIntentState {
 
                     info!("✅ Transaction successfully added to block");
 
+                    // Remove the transaction from the deposit addresses
+                    self.deposit_addresses.remove(&addr_str);
+                    self.processed_txids.insert(tx.compute_txid());
+                    let remove_intent_response = node
+                        .chain_interface_tx
+                        .send_message_with_response(ChainMessage::RemoveDepositIntent {
+                            intent: intent.clone(),
+                        })
+                        .await?;
+
+                    match remove_intent_response {
+                        ChainResponse::RemoveDepositIntent { error: None } => {
+                            info!("✅ Deposit intent removed");
+                        }
+                        ChainResponse::RemoveDepositIntent { error: Some(e) } => {
+                            error!("Failed to remove deposit intent: {}", e);
+                            return Err(NodeError::Error(
+                                "Failed to remove deposit intent".to_string(),
+                            ));
+                        }
+                        _ => {
+                            error!("Failed to remove deposit intent");
+                            return Err(NodeError::Error(
+                                "Failed to remove deposit intent".to_string(),
+                            ));
+                        }
+                    }
+
                     // Broadcast the transaction to all other nodes
                     match bincode::encode_to_vec(&transaction, bincode::config::standard()) {
                         Ok(transaction_data) => {
