@@ -51,7 +51,7 @@ invariant(i18n, "No homepage content found");
             required
           />
           <p class="text-sm text-btcgray-600">
-            &rarr; <span id="subscriber-count-value">4</span>
+            &rarr; <span id="subscriber-count-value">23</span>
             {i18n.waitlist.numberSuffix}
           </p>
           <button
@@ -70,7 +70,7 @@ invariant(i18n, "No homepage content found");
             <Icon name="simple-icons:github" class="w-4 h-4 mr-2" />
             <span>star us</span>
             <span class="mx-1">|</span>
-            <span id="github-star-count">4</span>
+            <span id="github-star-count">17</span>
           </a>
           <div class="flex w-full items-center mt-4 text-sm text-btcgray-600">
             <Icon name="simple-icons:ycombinator" class="w-4 h-4 mr-2" />
@@ -132,7 +132,7 @@ invariant(i18n, "No homepage content found");
       }
       const name = email.substring(0, email.indexOf("@"));
       const apiKey = import.meta.env.PUBLIC_LISTMONK_API_KEY;
-      const apiUsername = "skeptrune-api-key";
+      const apiUsername = import.meta.env.PUBLIC_LISTMONK_API_USER;
 
       if (!apiKey) {
         console.error(

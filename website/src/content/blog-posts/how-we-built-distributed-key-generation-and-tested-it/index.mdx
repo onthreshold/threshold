@@ -1,0 +1,93 @@
+---
+opengraph:
+  title: How We Built Distributed Key Generation And Tested It
+  description: >-
+    Technical guide explaining how we built DKG into Threshold and tested it.
+    Our first implementation works, but has some entropy bugs that we're working
+    on and we are proud of not only the implementation, but the robust testing
+    framework which makes identifying and debugging these issues possible.
+  type: article
+  image: >-
+    /src/assets/images/open-graph/how-we-built-distributed-key-generation-and-tested-it/opengraph/image.jpg
+  publishedTime: 2025-06-26
+  modifiedTime: 2025-06-26
+  author: Nick Khami
+  primaryCategory: tutorial
+title: How We Built Distributed Key Generation And Tested It
+createdAt: 2025-06-25T15:51:00.000Z
+lastUpdatedAt: 2025-06-25T15:51:00.000Z
+isDraft: false
+categories:
+  - dkg
+---
+
+## What is DKG?
+
+Distributed Key Generation (DKG) is a cryptographic protocol that allows a group of participants to jointly generate a public/private key pair in such a way that no single participant has access to the private key. However, each participant holds a share of the private key, and a threshold number of arbitrary participants defined at the start of the generation process can later come together to sign messages without needing to reconstruct the private key.
+
+This is useful for many applications, such as threshold signatures, where you want to ensure that a byzantine fault tolerant system can still function even if some participants are compromised or fail.
+
+I will go into the details of how the process works for FROST (Flexible Round-Optimised Schnorr Threshold signatures), which is the protocol we implemented in Threshold, to the extent that you should understand it from an engineering perspective. If you're more interested in the theory and mathematics behind it, I recommend reading the [FROST paper](https://eprint.iacr.org/2020/852.pdf) by Chelsea Komlo and Ian Goldberg from the University of Waterloo and Zcash Foundation.
+
+## Pre-requisite Configuration Steps
+
+Everyone in the DKG process needs to know who all of the other paricipants are supposed to be and agree on the threshold number of participants that will be required to sign messages. Further, each participant needs to share some pieces of information with each other out of band, before the actual DKG process begins. This is done to ensure that the DKG process can be run in a distributed manner without leaking any information during the process which would allow an adversary to reconstruct the private key.
+
+Prior to startup, we require that each participant share a file with the others over Telegram or some other arbitrary channel which does not have to be secure. This file needs to contain the following information:
+
+- **threshold number of participants**: The number of participants that need to come together to sign messages. This is denoted as `t` in the configuration.
+- **total number of participants**: The total number of participants in the DKG process.This is denoted as `n` in the configuration.
+- **public key**: Each participant needs to generate a public key that will be used to identify them in the DKG process. This is typically a BIP32 public key or a similar format that can be shared publicly.
+- **IP address**: Each participant needs to know the IP address of all other participants so that they can communicate with each other during the DKG process.
+
+## Configuration File Generation
+
+1. Install the Threshold CLI tool and run the following command to generate a configuration file. `t` is the threshold number of participants, and `n` is the total number of participants.
+
+```bash
+cargo install threshold-cli
+thresh config generate -t 3 -n 5 -o alice-config.yml
+```
+
+2. The generated `config.yml` file will look something like this:
+
+```yaml
+t: 3
+n: 5
+public_key_b58: "12D3KooWLcQzxnFPbw2RLeY4hWyV1ywhZ8fPRaLrRChGnno4awDN",
+ip_address: 160.221.153.63
+```
+
+3. Each participant needs to share their `config.yml` file with all other participants. I like to use the `magic-wormhole` CLI tool to send files from one computer to another, but you can use any method you prefer. The important thing is that each participant has every other participant's `config.yml` file before starting the DKG process.
+
+4. Import each configuration file into the Threshold CLI tool by running the following command, replacing `alice-config.yml` with the name of each configuration file you received from a given participant:
+
+```bash
+thresh config import -f ./alice-config.yml
+```
+
+5. After importing all configuration files, you can verify that everything is set up correctly by running the following command:
+
+```bash
+thresh config verify
+```
+
+If everything is set up correctly, you should see a message indicating that the configuration is valid and all participants are known. If there are any issues, the CLI tool will provide feedback on what needs to be fixed. For example, if you have less than `n` configurations imported, you will see an error message indicating how many configurations are missing.
+
+6. Confirm with all participants that they were each able to see a successful verification message. If any participant sees an error message, make sure they have resolved the issue before proceeding to the next step. The `thresh config list` command can be used to see all imported configurations and verify that they match the expected values.
+
+```bash
+thresh config list
+```
+
+## Running the DKG Process
+
+Once all participants have shared their configuration files and verified that they are set up correctly, you can start the DKG process. Each participant will run the following command to initiate the DKG process:
+
+```bash
+thresh dkg start
+```
+
+This command will start the DKG process and each participant will begin communicating with each other to generate the public/private key pair. Once you have ran this command, no further input is required from the user. The DKG process will run until it is complete, which can take anywhere from a few seconds to a few minutes depending on the number of participants and the network conditions.
+
+Everything that happens during the DKG process is logged to the console, so you can see the progress of the process and any errors that may occur. If everything goes well, you should see a message indicating that the DKG process has completed successfully. I will go into more detail about the background of the DKG process and what happens under the hood in the next section, but keep in mind that it all happens automatically and you won't have to do anything other than wait for the process to complete.
